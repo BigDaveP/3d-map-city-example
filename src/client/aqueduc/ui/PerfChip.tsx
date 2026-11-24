@@ -40,7 +40,7 @@ export function PerfChip({ metrics }: { metrics: Metrics | null }) {
       </button>
       {open && metrics && (
         <div className="aq-perf-detail" id="aq-perf-detail" role="dialog" aria-label="Mesures de performance">
-          <CarteMetrics metrics={metrics} mode={mode} rows={[["Capteurs affichés", String(sensors)]]} />
+          <CarteMetrics metrics={metrics} mode={mode} rows={[["Capteurs simulés", String(sensors)]]} />
           <p className="aq-note">Mesuré en direct dans ce navigateur : les chiffres dépendent de la machine et de son GPU.</p>
         </div>
       )}

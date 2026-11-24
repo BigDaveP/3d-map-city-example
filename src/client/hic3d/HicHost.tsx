@@ -8,7 +8,7 @@
  *  - attributs `content="drawable"` + `layoutsubtree` sur le canvas, retirés au démontage ;
  *  - upload uniquement dans `paint`, en pixels du backing store, 8 au plus par `paint`
  *    (ensemble sale persistant ; surface focalisée d'abord) ; état GL de MapLibre restauré ;
- *  - vérification `readPixels` des premiers uploads (puis 1 sur 100) ; repli si texture vide,
+ *  - vérification `readPixels` (toute la zone capturée) des premiers uploads (puis 1 sur 100) ; repli si texture vide,
  *    exception à l'upload ou aucun `paint` en 2,5 s ;
  *  - `updateElementGeometry` (px CSS) pour chaque surface montée, à chaque image ;
  *  - hit testing avec occlusion (`occlusion.ts`).
@@ -192,12 +192,14 @@ export function HicHost({ ml, map, metrics, surfaces, layerOptions, onFallback, 
           const fb = gl.createFramebuffer();
           gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
           gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, p.tex, 0);
-          const px = new Uint8Array(4);
-          gl.readPixels(Math.floor(w / 2), Math.floor(h / 2), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+          // toute la zone capturée : une surface à fond transparent (marquage au sol) peut avoir un
+          // centre vide ; la texture n'est vide que si aucun texel n'a reçu de pixel
+          const px = new Uint8Array(w * h * 4);
+          gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
           gl.deleteFramebuffer(fb);
           gl.bindFramebuffer(gl.FRAMEBUFFER, prevFb);
-          if (px[3] === 0 && px[0] + px[1] + px[2] === 0) {
-            fail(`texture vide après upload (readPixels = ${Array.from(px)}) : l'API est détectée mais ne transmet aucun pixel`);
+          if (!px.some((v) => v !== 0)) {
+            fail(`texture vide après upload (readPixels : ${w} × ${h} texels nuls) : l'API est détectée mais ne transmet aucun pixel`);
             break;
           }
           cb.current.onActive?.();

@@ -10,7 +10,7 @@ import { CITY } from "@/lib/aqueduc/city";
 import { detectApi } from "../hic/detect";
 import { STYLE_URL, WORKER_URL } from "../mapStyle";
 import { Metrics } from "../metrics";
-import { SensorMarkers } from "./classic/SensorMarkers";
+import { ClassicScene } from "./classic/ClassicScene";
 import { indexNetwork, type NetIndex } from "./net";
 import {
   applyPipeLayers,
@@ -19,10 +19,10 @@ import {
   restyleBasemap,
   setPipeLayer,
   setPipeValues,
-  setSectorServed,
   setSensorStatus,
   type NetworkData,
 } from "./pipes";
+import { SceneSurfaces } from "./scene/Surfaces";
 import { aqueducStore, select, type AqState, type Mode, type Selection } from "./store";
 import { AppBar } from "./ui/AppBar";
 import { Inspector } from "./ui/Inspector";
@@ -36,7 +36,7 @@ type ML = typeof import("maplibre-gl");
 /** Vue d'ouverture : centre-ville, inclinée, cap vers le nord-ouest. */
 export const START_VIEW = { center: CITY.center, zoom: 15.4, pitch: 58, bearing: -25 };
 
-/** Élément sous le pointeur : capteur, puis secteur, puis conduite. */
+/** Élément de la carte sous le pointeur : capteur, puis conduite (les secteurs et étiquettes sont du HTML). */
 function pick(map: MlMap, x: number, y: number): Selection {
   const pad = 5;
   const found = map.queryRenderedFeatures(
@@ -49,8 +49,6 @@ function pick(map: MlMap, x: number, y: number): Selection {
   const by = (id: string) => found.find((f: MapGeoJSONFeature) => f.layer.id === id);
   const sensor = by("aq-sensors");
   if (sensor) return { kind: "sensor", id: String(sensor.properties.id) };
-  const sector = by("aq-sectors");
-  if (sector) return { kind: "sector", id: String(sector.properties.id) };
   const pipe = by("aq-pipes");
   if (pipe) {
     const id = String(pipe.properties.id);
@@ -67,10 +65,6 @@ function syncMap(map: MlMap, net: NetIndex, s: AqState, prev: AqState | null) {
     setPipeValues(map, "pression", s.live.pressure);
     setPipeValues(map, "qualite", s.live.chlorine);
     setSensorStatus(map, net.data.sensors, s.live.readings);
-    const served = s.live.sectors.map((x) => x.served).join();
-    if (served && served !== (prev?.live.sectors.map((x) => x.served).join() ?? "")) {
-      setSectorServed(map, net.data, (id) => s.live.sectors.find((x) => x.id === id)?.served ?? 0);
-    }
   }
   if (!prev || s.selection !== prev.selection) {
     const sel = s.selection;
@@ -195,7 +189,8 @@ export default function AqueducApp({ initialMode }: { initialMode?: Mode }) {
             {error}
           </p>
         )}
-        {ctx && mode === "classic" && <SensorMarkers ml={ctx.ml} map={ctx.map} sensors={ctx.net.data.sensors} />}
+        {ctx && mode === "classic" && <ClassicScene ml={ctx.ml} map={ctx.map} net={ctx.net} />}
+        {ctx && mode === "hic" && <SceneSurfaces ml={ctx.ml} map={ctx.map} metrics={ctx.metrics} net={ctx.net} />}
         <Layers />
         {ctx && <Inspector net={ctx.net} />}
         <Timeline />

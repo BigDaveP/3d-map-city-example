@@ -4,9 +4,8 @@
  * se teste sous Node.
  */
 import type { FeatureCollection, LineString } from "geojson";
-import type { ExpressionSpecification, GeoJSONSource, Map as MlMap } from "maplibre-gl";
+import type { ExpressionSpecification, Map as MlMap } from "maplibre-gl";
 import { FLUSHING_2026, type Sensor } from "@/lib/aqueduc/sim";
-import { num } from "./format";
 import type { LayerId } from "./store";
 
 /** Gris neutre : conduite sans valeur (hors zone suivie, année inconnue). */
@@ -148,7 +147,10 @@ export interface SegmentProps {
 const BEFORE = "building-3d";
 const state = new WeakMap<MlMap, { demo: number[]; last: Record<string, Float32Array>; sel: number | null; inc: number | null }>();
 
-/** Sources et couches : conduites (`aq-pipes-casing`, `aq-pipes`), capteurs (`aq-sensors`), secteurs (`aq-sectors`). */
+/**
+ * Sources et couches : conduites (`aq-pipes-casing`, `aq-pipes`) et capteurs (`aq-sensors`). Les noms
+ * de secteurs et les étiquettes sont du HTML (`scene/` en mode HTML-in-Canvas, `classic/` sinon).
+ */
 export function applyPipeLayers(map: MlMap, data: NetworkData, layer: LayerId = "pression") {
   const before = map.getLayer(BEFORE) ? BEFORE : undefined;
   map.addSource("aq-net", { type: "geojson", data: data.segments, promoteId: "i", attribution: "" });
@@ -196,41 +198,7 @@ export function applyPipeLayers(map: MlMap, data: NetworkData, layer: LayerId = 
       "circle-pitch-alignment": "map",
     },
   });
-  map.addSource("aq-sectors", { type: "geojson", promoteId: "id", data: sectorFeatures(data, (id) => data.sectors.find((x) => x.id === id)!.addresses) });
-  map.addLayer({
-    id: "aq-sectors",
-    type: "symbol",
-    source: "aq-sectors",
-    layout: {
-      // un seul chiffre par secteur : les adresses desservies (estimation)
-      "text-field": ["format", ["get", "name"], { "font-scale": 1 }, "\n", {}, ["get", "label"], { "font-scale": 0.62, "text-font": ["literal", ["Noto Sans Regular"]] }],
-      "text-font": ["Noto Sans Bold"],
-      "text-size": ["interpolate", ["linear"], ["zoom"], 11, 12, 15, 20],
-      "text-letter-spacing": 0.18,
-      "text-pitch-alignment": "map",
-      "text-rotation-alignment": "map",
-      "text-allow-overlap": false,
-      // sous la graine : la station de qualité du secteur est juste au-dessus
-      "text-anchor": "top",
-      "text-offset": [0, 0.8],
-    },
-    paint: { "text-color": "rgba(10, 92, 194, 0.78)", "text-halo-color": "rgba(255,255,255,0.9)", "text-halo-width": 1.6 },
-  });
   state.set(map, { demo: data.demoSegments, last: {}, sel: null, inc: null });
-}
-
-const sectorFeatures = (data: NetworkData, served: (id: string) => number): FeatureCollection => ({
-  type: "FeatureCollection",
-  features: data.sectors.map((s) => ({
-    type: "Feature",
-    geometry: { type: "Point", coordinates: s.at },
-    properties: { id: s.id, name: s.name.toUpperCase(), label: `${num(served(s.id))} adresses desservies` },
-  })),
-});
-
-/** Un seul chiffre par secteur : adresses desservies (estimation), mis à jour par le flux. */
-export function setSectorServed(map: MlMap, data: NetworkData, served: (id: string) => number) {
-  (map.getSource("aq-sectors") as GeoJSONSource | undefined)?.setData(sectorFeatures(data, served));
 }
 
 export function setPipeLayer(map: MlMap, layer: LayerId) {
@@ -270,16 +238,22 @@ export function markSegment(map: MlMap, what: "sel" | "inc", idx: number | null)
 
 /** Symboles conservés : noms de rues et de lieux. */
 const KEEP_SYMBOLS = new Set(["transportation_name", "place"]);
+/**
+ * Noms de lieux masqués : la ville (posée sur le marquage du secteur Centre-ville) et les quartiers,
+ * dont les noms recoupent ceux des secteurs simulés, placés ailleurs (OpenFreeMap « liberty »).
+ */
+const HIDE_PLACES = new Set(["label_city", "label_other"]);
 
 /**
- * Fond de carte sobre (valeurs des maquettes) : seuls les noms de rues et de lieux restent ;
+ * Fond de carte sobre (valeurs des maquettes) : seuls les noms de rues et de lieux restent (sauf
+ * la ville et les quartiers) ;
  * bâtiments #dde2e8 à 0,78 d'opacité.
  */
 export function restyleBasemap(map: MlMap) {
   for (const l of map.getStyle().layers ?? []) {
     if (l.type !== "symbol" || l.id.startsWith("aq-")) continue;
     const sl = (l as { "source-layer"?: string })["source-layer"] ?? "";
-    if (!KEEP_SYMBOLS.has(sl) || l.id.includes("shield")) map.setLayoutProperty(l.id, "visibility", "none");
+    if (!KEEP_SYMBOLS.has(sl) || l.id.includes("shield") || HIDE_PLACES.has(l.id)) map.setLayoutProperty(l.id, "visibility", "none");
   }
   if (map.getLayer(BEFORE)) {
     map.setPaintProperty(BEFORE, "fill-extrusion-color", "#dde2e8");
@@ -288,4 +262,4 @@ export function restyleBasemap(map: MlMap) {
 }
 
 /** Couches interrogées au clic, de la plus précise à la plus étendue. */
-export const PICK_LAYERS = ["aq-sensors", "aq-sectors", "aq-pipes"];
+export const PICK_LAYERS = ["aq-sensors", "aq-pipes"];
