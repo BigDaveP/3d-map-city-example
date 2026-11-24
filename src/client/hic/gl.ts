@@ -49,6 +49,8 @@ void main() {
   // arrondi sous le pixel : aplat (évite le SDF par pixel, coûteux en WebGL logiciel)
   if (u_radius * u_zoom < 1.5) { o = v_color; return; }
   vec2 p = v_local - v_size * 0.5;
+  // intérieur (hors des coins) : pas de calcul de distance
+  if (all(lessThan(abs(p), v_size * 0.5 - u_radius))) { o = v_color; return; }
   vec2 q = abs(p) - v_size * 0.5 + u_radius;
   float d = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - u_radius;
   float a = clamp(0.5 - d * u_zoom, 0.0, 1.0);

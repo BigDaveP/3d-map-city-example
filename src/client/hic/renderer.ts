@@ -115,16 +115,20 @@ export class WallRenderer {
     if (40 * cam.zoom < 1.5) gl.disable(gl.BLEND);
     this.upload(this.regionInst, layout.regions.length);
     if (this.layers.regions) gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, layout.regions.length);
+    let tiles = 0;
     for (let i = 0; i < visible.length; i++) {
       const c = visible[i];
+      display.update(c, o.levelOf(c), store, now);
+      // tuile recouverte par une texture opaque déjà affichée (fondu terminé) : surdessin inutile
+      if (display.shown[c] > 0 && now - display.fadeStart[c] >= FADE_MS && usable(store.get(c, display.shown[c]))) continue;
       const rgb = STATUS_RGB[live.statuses[c]] ?? STATUS_RGB[0];
-      put(this.tileInst, i, C[c * 4], C[c * 4 + 1], C[c * 4 + 2], C[c * 4 + 3], 0, 0, 1, 1, rgb[0], rgb[1], rgb[2], 1);
+      put(this.tileInst, tiles++, C[c * 4], C[c * 4 + 1], C[c * 4 + 2], C[c * 4 + 3], 0, 0, 1, 1, rgb[0], rgb[1], rgb[2], 1);
     }
     gl.uniform1f(p.loc(p.tile, "u_radius"), 12);
     if (12 * cam.zoom < 1.5) gl.disable(gl.BLEND);
     else gl.enable(gl.BLEND);
-    this.upload(this.tileInst, visible.length);
-    if (this.layers.tiles) gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, visible.length);
+    this.upload(this.tileInst, tiles);
+    if (this.layers.tiles && tiles) gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, tiles);
     this.drawCalls += 2;
     gl.enable(gl.BLEND);
 
@@ -133,7 +137,6 @@ export class WallRenderer {
     const top: [number, Slot, number][] = [];
     let fading = false;
     for (const c of visible) {
-      display.update(c, o.levelOf(c), store, now);
       const shown = display.shown[c];
       const prev = display.prev[c];
       const t = Math.min(1, (now - display.fadeStart[c]) / FADE_MS);
@@ -151,7 +154,7 @@ export class WallRenderer {
       }
     }
     const all = base.concat(top);
-    if (all.length) {
+    if (all.length && this.layers.textures) {
       gl.useProgram(p.tex);
       p.setCamera(p.tex, cam.x, cam.y, cam.zoom, cam.vw, cam.vh);
       gl.uniform1i(p.loc(p.tex, "u_tex"), 0);
@@ -204,7 +207,7 @@ export class WallRenderer {
         2 * k,
       );
     }
-    if (this.spark.count) {
+    if (this.spark.count && this.layers.sparklines) {
       gl.useProgram(p.line);
       p.setCamera(p.line, cam.x, cam.y, cam.zoom, cam.vw, cam.vh);
       gl.bindVertexArray(p.lineVao);
