@@ -12,7 +12,7 @@ import { detectApi } from "../hic/detect";
 import { Metrics } from "../metrics";
 import { Sources } from "../sources";
 import { createDataStore, useData } from "../store";
-import { uiStore, type Mode } from "../ui";
+import { togglePin, uiStore, type Mode } from "../ui";
 import { CanvasWall } from "./CanvasWall";
 import { DomWall } from "./DomWall";
 import { FrameLoop } from "./frame";
@@ -82,14 +82,20 @@ export default function WallApp({ n, initialMode, onAside }: { n: number; initia
       camera.zoomAt(e.clientX - r.left, e.clientY - r.top, Math.exp(-dy * 0.0015));
     };
     let drag: { id: number; x: number; y: number } | null = null;
+    let moved = 0;
+    let downCard: HTMLElement | null = null;
     const onDown = (e: PointerEvent) => {
       if ((e.target as Element).closest(INTERACTIVE) || e.button !== 0) return;
+      moved = 0;
+      // la capture du pointeur redirige le « click » vers le viewport : on retient la carte ici
+      downCard = (e.target as Element).closest<HTMLElement>('[data-card][data-level="1"]');
       drag = { id: e.pointerId, x: e.clientX, y: e.clientY };
       vp.setPointerCapture(e.pointerId);
       vp.classList.add("dragging");
     };
     const onMove = (e: PointerEvent) => {
       if (!drag || e.pointerId !== drag.id) return;
+      moved += Math.abs(e.clientX - drag.x) + Math.abs(e.clientY - drag.y);
       camera.pan(e.clientX - drag.x, e.clientY - drag.y);
       drag.x = e.clientX;
       drag.y = e.clientY;
@@ -98,9 +104,16 @@ export default function WallApp({ n, initialMode, onAside }: { n: number; initia
       if (drag?.id === e.pointerId) {
         drag = null;
         vp.classList.remove("dragging");
+        // clic (sans glisser) sur une carte intermédiaire : ouvre son panneau complet (épingle)
+        if (downCard && moved <= 4 && e.type === "pointerup") togglePin(Number(downCard.dataset.card));
+        downCard = null;
       }
     };
     const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && uiStore.getState().pinned.length) {
+        uiStore.setState({ pinned: [] });
+        return;
+      }
       if ((e.target as Element).closest(INTERACTIVE)) return;
       const step = 120;
       const k: Record<string, () => void> = {

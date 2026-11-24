@@ -21,6 +21,8 @@ export interface CardProps {
   /** Mode HTML-in-Canvas : attribut `drawable` et sparkline laissée à WebGL. */
   drawable?: boolean;
   style?: CSSProperties;
+  /** panneau ouvert depuis le niveau intermédiaire : affiche un bouton de fermeture */
+  onClose?: () => void;
 }
 
 function kindSlice(s: DataState, b: number, kind: Kind) {
@@ -38,7 +40,7 @@ function kindSlice(s: DataState, b: number, kind: Kind) {
   }
 }
 
-export const Card = memo(function Card({ ds, card, level, drawable, style }: CardProps) {
+export const Card = memo(function Card({ ds, card, level, drawable, style, onClose }: CardProps) {
   const b = Math.floor(card / KINDS.length);
   const kind = KINDS[card % KINDS.length];
   const branch = useData(ds, (s) => s.branches[b]);
@@ -53,7 +55,8 @@ export const Card = memo(function Card({ ds, card, level, drawable, style }: Car
       className={`card lvl${level} st${status} k-${kind}`}
       data-card={card}
       data-card-id={id}
-      aria-label={label}
+      data-level={level}
+      aria-label={level === 1 ? `${label} — cliquer pour ouvrir le panneau` : label}
       style={{ width: size.w, height: size.h, ...style }}
       {...attrs}
     >
@@ -61,6 +64,11 @@ export const Card = memo(function Card({ ds, card, level, drawable, style }: Car
         <span className="card-name">{branch.name}</span>
         <span className="card-kind">{KIND_LABEL[kind]}</span>
         <span className={`pill st${status}`}>{STATUS_LABEL[status]}</span>
+        {onClose && (
+          <button type="button" className="close" onClick={onClose} aria-label={`Fermer le panneau ${branch.name} ${KIND_LABEL[kind]}`}>
+            ✕
+          </button>
+        )}
       </header>
       {level === 1 ? <MidBody kind={kind} slice={slice} /> : <FullBody kind={kind} slice={slice} ds={ds} id={id} status={status} />}
       {kind === "sales" && (

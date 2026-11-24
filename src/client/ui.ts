@@ -15,6 +15,8 @@ export interface UiState {
   fallback: string;
   robotOpen: boolean;
   level: 0 | 1 | 2;
+  /** cartes épinglées : affichées en panneau complet dès le niveau intermédiaire */
+  pinned: number[];
 }
 
 export const uiStore = createStore<UiState>()(() => ({
@@ -28,4 +30,13 @@ export const uiStore = createStore<UiState>()(() => ({
   fallback: "",
   robotOpen: false,
   level: 0,
+  pinned: [],
 }));
+
+export function togglePin(card: number) {
+  const p = uiStore.getState().pinned;
+  uiStore.setState({ pinned: p.includes(card) ? p.filter((c) => c !== card) : [...p, card] });
+}
+
+/** Niveau effectif d'une carte. */
+export const cardLevel = (level: 0 | 1 | 2, pinned: readonly number[], card: number): 0 | 1 | 2 => (level > 0 && pinned.includes(card) ? 2 : level);

@@ -129,3 +129,7 @@ button, select, input, textarea { font: inherit; color: inherit; }
 .lab-report dd { margin: 0; font-family: ui-monospace, monospace; }
 .lab-report button { background: #1b2430; border: 1px solid var(--line); border-radius: 6px; padding: 3px 8px; margin-right: 4px; }
 .lab-report button[aria-pressed="true"] { background: var(--accent); color: #04121f; }
+/* enfants du canvas : tous à l'origine, leur position réelle vient de canvasTransform */
+.wall-canvas > [drawable] { position: absolute; left: 0; top: 0; }
+.card.lvl1 { cursor: pointer; }
+.card .close { border: 0; background: #263041; border-radius: 6px; font-size: 11px; line-height: 18px; padding: 0 6px; cursor: pointer; }

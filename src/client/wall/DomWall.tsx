@@ -9,6 +9,8 @@ import { CARD_H, CARD_W, MID_SCALE, type Level, type WorldLayout } from "@/lib/w
 import type { Camera } from "../camera";
 import type { Metrics } from "../metrics";
 import { statusOf, useData, type DataStore } from "../store";
+import { useStore } from "zustand";
+import { cardLevel, togglePin, uiStore } from "../ui";
 import { Card } from "./cards/Card";
 import type { FrameLoop } from "./frame";
 import { sameList, visibleCards } from "./visible";
@@ -25,6 +27,7 @@ interface Props {
 export function DomWall({ ds, camera, loop, metrics, layout, level }: Props) {
   const worldRef = useRef<HTMLDivElement>(null);
   const [visible, setVisible] = useState<number[]>([]);
+  const pinned = useStore(uiStore, (s) => s.pinned);
   const levelRef = useRef(level);
   levelRef.current = level;
 
@@ -57,7 +60,8 @@ export function DomWall({ ds, camera, loop, metrics, layout, level }: Props) {
       for (let c = 0; c < live.dirtySince.length; c++) {
         const d = live.dirtySince[c];
         if (!d) continue;
-        if (textLevel && visibleSince[c]) metrics.latency(now - Math.max(d, visibleSince[c]));
+        // même définition qu'en canvas : donnée reçue alors que la carte était déjà affichée
+        if (textLevel && visibleSince[c] && visibleSince[c] <= d) metrics.latency(now - d);
         live.dirtySince[c] = 0;
       }
       metrics.mounted = current.length;
@@ -70,13 +74,13 @@ export function DomWall({ ds, camera, loop, metrics, layout, level }: Props) {
         <div key={r.id} className="region-bg" style={{ left: r.x, top: r.y, width: r.w, height: r.h }} />
       ))}
       {visible.map((c) => (
-        <Slot key={c} ds={ds} card={c} level={level} layout={layout} />
+        <Slot key={c} ds={ds} card={c} level={cardLevel(level, pinned, c)} pinnedFromMid={level === 1 && pinned.includes(c)} layout={layout} />
       ))}
     </div>
   );
 }
 
-const Slot = memo(function Slot({ ds, card, level, layout }: { ds: DataStore; card: number; level: Level; layout: WorldLayout }) {
+const Slot = memo(function Slot({ ds, card, level, layout, pinnedFromMid }: { ds: DataStore; card: number; level: Level; layout: WorldLayout; pinnedFromMid: boolean }) {
   const x = layout.cards[card * 4];
   const y = layout.cards[card * 4 + 1];
   if (level === 0) return <Tile ds={ds} card={card} x={x} y={y} />;
@@ -85,7 +89,7 @@ const Slot = memo(function Slot({ ds, card, level, layout }: { ds: DataStore; ca
       {level === 1 ? (
         <Card ds={ds} card={card} level={1} style={{ transform: `scale(${1 / MID_SCALE})`, transformOrigin: "0 0" }} />
       ) : (
-        <Card ds={ds} card={card} level={2} />
+        <Card ds={ds} card={card} level={2} onClose={pinnedFromMid ? () => togglePin(card) : undefined} />
       )}
     </div>
   );
