@@ -43,10 +43,10 @@ export function useSectorFigure(net: NetIndex, sector: SectorInfo) {
   return { value: Number(value), tone, label };
 }
 
-/** Taille du nom (px) pour tenir dans la largeur du marquage, espacement réduit pour les noms longs. */
+/** Taille du nom (px) pour tenir dans la largeur du marquage ; espacement léger : il se lit comme un mot. */
 function nameStyle(name: string) {
-  const spacing = name.length > 16 ? 0.06 : 0.2;
-  const size = Math.min(40, Math.floor((SURFACE_SIZE.sector.w - 16) / (name.length * (0.7 + spacing))));
+  const spacing = 0.04;
+  const size = Math.min(42, Math.floor((SURFACE_SIZE.sector.w - 16) / (name.length * (0.7 + spacing))));
   return { fontSize: size, letterSpacing: `${spacing}em` };
 }
 

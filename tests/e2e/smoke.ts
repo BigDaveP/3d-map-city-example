@@ -7,7 +7,6 @@
  * Les tuiles viennent d'OpenFreeMap : chargements courts, une seule vue par page.
  */
 import { chromium, type Browser, type Page } from "playwright";
-import { CITY } from "../../src/lib/aqueduc/city";
 
 const BASE = process.env.BASE_URL ?? "http://localhost:3000";
 let failures = 0;
@@ -55,6 +54,22 @@ async function narrow(b: Browser, js: boolean) {
   await ctx.close();
 }
 
+/** Étiquettes de capteurs affichées (DOM ou surfaces) : identifiant, type et statut courant. */
+async function shownTags(p: Page) {
+  return p.evaluate(() => {
+    const { store, net } = (window as any).__aqueduc;
+    const st = store.getState();
+    return [...document.querySelectorAll<HTMLElement>("[data-sensor]")].map((e) => {
+      const s = net.sensorById.get(e.dataset.sensor);
+      return { id: s.id as string, kind: s.kind as string, st: (st.live.readings[s.idx]?.[1] ?? 0) as number, values: e.querySelectorAll(".aq-num").length };
+    });
+  });
+}
+/** Règle R13 : au plus 8 étiquettes, une valeur chacune, toutes pertinentes pour la couche (ou en attention / alerte). */
+function relevant(tags: Awaited<ReturnType<typeof shownTags>>, kinds: string[]) {
+  return tags.length <= 8 && tags.every((t) => t.values === 1 && (kinds.includes(t.kind) || t.st > 0));
+}
+
 /** Point de l'écran sur la conduite `id`, non couvert par une étiquette DOM. */
 async function pointOnPipe(p: Page, id: string) {
   return p.evaluate(async (id) => {
@@ -87,15 +102,20 @@ async function classic(b: Browser) {
   const st = await p.evaluate(() => (window as any).__aqueduc.store.getState().mode);
   check("mode classique", st === "classic", st);
   await p.waitForFunction(() => (window as any).__aqueduc.store.getState().live.t > 0, null, { timeout: 15_000 });
-  const live = await p.evaluate((box) => {
+  const live = await p.evaluate(() => {
     const { store, net } = (window as any).__aqueduc;
     const s = store.getState();
-    const tagged = net.data.sensors.filter((x: any) => x.at[0] >= box[0] && x.at[0] <= box[2] && x.at[1] >= box[1] && x.at[1] <= box[3]).length;
-    return { readings: s.live.readings.length, pressure: s.live.pressure.length, demo: net.data.demoSegments.length, sensors: net.data.sensors.length, tagged };
-  }, CITY.demoBox);
+    return { readings: s.live.readings.length, pressure: s.live.pressure.length, demo: net.data.demoSegments.length, sensors: net.data.sensors.length };
+  });
   check("flux SSE : lectures de tous les capteurs", live.readings === live.sensors, JSON.stringify(live));
   check("flux SSE : pression alignée sur demoSegments", live.pressure === live.demo && live.demo > 0);
-  check("étiquettes DOM des capteurs de demoBox (une valeur chacune)", (await p.locator(".aq-tag").count()) === live.tagged && (await p.locator(".aq-tag .aq-num").count()) === live.tagged, `${live.tagged} capteurs`);
+  const tags = await shownTags(p);
+  check("étiquettes DOM : couche Pression, 8 au plus, une valeur chacune", tags.length > 0 && relevant(tags, ["pression", "debit", "reservoir"]), tags.map((t) => t.id).join(" "));
+  await p.evaluate(() => (window as any).__aqueduc.store.setState({ layer: "age" }));
+  await p.waitForTimeout(500);
+  const ageTags = await shownTags(p);
+  check("couche Âge : seulement les capteurs en attention ou en alerte", ageTags.every((t) => t.st > 0), ageTags.map((t) => `${t.id}:${t.st}`).join(" ") || "aucune");
+  await p.evaluate(() => (window as any).__aqueduc.store.setState({ layer: "pression" }));
   const sector = await p.locator(".aq-flat .aq-mark-sector", { hasText: "CENTRE-VILLE" }).innerText().catch(() => "");
   check("étiquette plate du secteur Centre-ville (un seul chiffre)", /adresses desservies/.test(sector) && (sector.match(/\d[\d\s]*/g) ?? []).length === 1, sector.replace(/\n/g, " "));
   check("pas de fiche sans sélection", (await p.locator("[data-testid=inspector]").count()) === 0);
@@ -158,17 +178,18 @@ async function homeHic(b: Browser) {
     }, null, { timeout: 25_000 })
     .then(() => true)
     .catch(() => false);
-  const r = await p.evaluate((box) => {
+  const r = await p.evaluate(() => {
     const w = window as any;
     const st = w.__aqueduc.store.getState();
     const stats = w.__hicMap.stats();
     const keys: string[] = [...w.__hicMap.layer.panels.keys()];
-    const tagged = w.__aqueduc.net.data.sensors.filter((x: any) => x.at[0] >= box[0] && x.at[0] <= box[2] && x.at[1] >= box[1] && x.at[1] <= box[3]).length;
     const values = [...document.querySelectorAll('.maplibregl-canvas > [data-panel^="sensor:"]')].map((e) => e.querySelectorAll(".aq-num").length);
-    return { mode: st.mode, fallback: st.fallback || stats.fallback || "", api: st.api, uploads: stats.uploads, verified: stats.verified, keys, tagged, values, markers: document.querySelectorAll(".maplibregl-marker").length };
-  }, CITY.demoBox);
+    return { mode: st.mode, fallback: st.fallback || stats.fallback || "", api: st.api, uploads: stats.uploads, verified: stats.verified, keys, values, markers: document.querySelectorAll(".maplibregl-marker").length };
+  });
   const sensors = r.keys.filter((k) => k.startsWith("sensor:")).length;
-  check("surfaces montées : marquage du Centre-ville et étiquettes des capteurs de demoBox", r.keys.includes("sector:centre-ville") && sensors === r.tagged, `${r.keys.length} surfaces, ${sensors}/${r.tagged} capteurs`);
+  const tags = await shownTags(p);
+  check("surfaces montées : marquage du Centre-ville et étiquettes de capteurs", r.keys.includes("sector:centre-ville") && sensors > 0 && sensors === tags.length, `${r.keys.length} surfaces, ${sensors} étiquettes : ${tags.map((t) => t.id).join(" ")}`);
+  check("étiquettes pertinentes (couche Pression, 8 au plus)", relevant(tags, ["pression", "debit", "reservoir"]));
   check("toutes les surfaces capturées, vérifiées par readPixels", captured && r.uploads >= r.keys.length && r.verified >= 3, `uploads ${r.uploads}, verified ${r.verified}`);
   check("pas de repli en mode classique", r.mode === "hic" && !r.fallback, r.fallback || r.mode);
   check("API marquée active après vérification", r.api === "active", r.api);
@@ -230,9 +251,11 @@ async function homeHic(b: Browser) {
           const uv = o.proj.unproject(x, y);
           return uv && uv[0] >= -4 && uv[1] >= -4 && uv[0] <= o.w + 4 && uv[1] <= o.h + 4;
         });
-        // bâtiment au point et tout autour (le verdict d'occlusion vaut pour 6 px)
+        // bâtiment d'au moins 15 m au point et tout autour (le verdict d'occlusion vaut pour 6 px ;
+        // queryRenderedFeatures renvoie aussi des bâtiments bas qui, à ce zoom, ne masquent pas le marquage)
         const around = [[0, 0], [-6, 0], [6, 0], [0, -6], [0, 6]];
-        if (!others && around.every((d) => map.queryRenderedFeatures([x + d[0], y + d[1]], { layers: ["building-3d"] }).length > 0)) return { x: box.left + x, y: box.top + y };
+        if (!others && around.every((d) => map.queryRenderedFeatures([x + d[0], y + d[1]], { layers: ["building-3d"] }).some((f: any) => f.properties.render_height >= 15)))
+          return { x: box.left + x, y: box.top + y };
       }
     return null;
   });

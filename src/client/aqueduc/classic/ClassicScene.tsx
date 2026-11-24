@@ -10,9 +10,8 @@ import type { Map as MlMap, PositionAnchor } from "maplibre-gl";
 import { CITY } from "@/lib/aqueduc/city";
 import { lineCenter, segment, type NetIndex } from "../net";
 import { IncidentMark } from "../scene/IncidentMark";
-import { inBox } from "../scene/marks";
 import { SectorMark, useVisibleSectors } from "../scene/SectorMark";
-import { SensorTag } from "../scene/SensorTag";
+import { SensorTag, useTaggedSensors } from "../scene/SensorTag";
 import { useAq } from "../useAq";
 
 type ML = typeof import("maplibre-gl");
@@ -48,7 +47,7 @@ function Pin({ ml, map, at, anchor, className, children }: { ml: ML; map: MlMap;
 export function ClassicScene({ ml, map, net }: { ml: ML; map: MlMap; net: NetIndex }) {
   const sectors = useVisibleSectors(map, net);
   const incident = useAq((s) => s.incident !== null);
-  const tagged = useMemo(() => net.data.sensors.filter((s) => inBox(s.at, CITY.demoBox)), [net]);
+  const tagged = useTaggedSensors(map, net);
   const brk = useMemo(() => {
     const i = net.segById.get(CITY.breakSegment);
     return i === undefined ? null : { at: lineCenter(segment(net, i)), sector: segment(net, i).properties.s };

@@ -3,6 +3,8 @@
  * Les mêmes informations servent aux surfaces HTML-in-Canvas et aux étiquettes DOM du mode classique.
  */
 import type { PipeClass } from "@/lib/aqueduc/network";
+import type { SensorKind } from "@/lib/aqueduc/sim";
+import type { LayerId } from "../store";
 
 /** Taille des surfaces (px CSS). */
 export const SURFACE_SIZE = {
@@ -76,3 +78,37 @@ export function sectorFigure(served: number, impact: SectorImpact | undefined): 
 
 /** Statut 0 | 1 | 2 d'un capteur -> ton de couleur. */
 export const TONE: readonly Tone[] = ["good", "warn", "bad"];
+
+/** Capteurs pertinents pour chaque couche : seuls ceux-là portent une étiquette (décision R13). */
+export const LAYER_KINDS: Record<LayerId, readonly SensorKind[]> = {
+  pression: ["pression", "debit", "reservoir"],
+  qualite: ["qualite"],
+  age: [],
+  rincage: [],
+  incidents: [],
+};
+/** Étiquettes de capteurs affichées au plus. */
+export const TAG_MAX = 8;
+
+/**
+ * Capteurs qui portent une étiquette, dans l'ordre de priorité : le capteur sélectionné, ceux en
+ * attention ou en alerte (quelle que soit la couche), puis ceux de la couche active ; dans `box`
+ * seulement (sauf la sélection), les plus proches de `center` d'abord, `max` au plus.
+ * `status[idx]` : 0 normal, 1 attention, 2 alerte (undefined : pas encore de lecture).
+ */
+export function pickTags(
+  sensors: readonly { id: string; idx: number; kind: SensorKind; at: readonly [number, number] | number[] }[],
+  o: { layer: LayerId; status: ArrayLike<number | undefined>; selected: string | null; center: readonly [number, number]; box: readonly [number, number, number, number]; max?: number },
+): string[] {
+  const max = o.max ?? TAG_MAX;
+  const kinds = LAYER_KINDS[o.layer];
+  const kx = Math.cos((o.center[1] * Math.PI) / 180);
+  const dist = (at: readonly number[]) => Math.hypot((at[0] - o.center[0]) * kx, at[1] - o.center[1]);
+  const ranked: { id: string; rank: number; d: number }[] = [];
+  for (const s of sensors) {
+    const rank = s.id === o.selected ? 0 : !inBox(s.at, o.box) ? -1 : (o.status[s.idx] ?? 0) > 0 ? 1 : kinds.includes(s.kind) ? 2 : -1;
+    if (rank >= 0) ranked.push({ id: s.id, rank, d: dist(s.at) });
+  }
+  ranked.sort((a, b) => a.rank - b.rank || a.d - b.d);
+  return ranked.slice(0, max).map((r) => r.id);
+}

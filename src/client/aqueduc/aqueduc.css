@@ -184,7 +184,7 @@ html[data-aq="app"] .aq-ssr { display: none; }
 /* mode classique : étiquettes plates, toujours au premier plan */
 .aq-flat { z-index: 1; pointer-events: none; }
 .aq-flat .aq-mark { pointer-events: auto; padding: 3px 9px 4px; border-radius: 8px; background: rgba(255, 255, 255, 0.88); box-shadow: 0 1px 4px rgba(20, 33, 51, 0.14); }
-.aq-flat .aq-mark-name { font-size: 13px; letter-spacing: 0.14em; color: var(--aq-accent); }
+.aq-flat .aq-mark-name { font-size: 13px; letter-spacing: 0.05em; color: var(--aq-accent); }
 .aq-flat .aq-mark-fig { font-size: 11.5px; color: var(--aq-ink-2); }
 /* sous la station de qualité posée sur le centre du secteur, sous la conduite de l'incident */
 .aq-flat-sector { padding-top: 8px; }
@@ -200,7 +200,7 @@ html[data-aq="app"] .aq-ssr { display: none; }
 .aq-mark[drawable] { overflow: hidden; }
 .aq-mark[drawable] > span { text-shadow: 0 0 3px #fff, 0 0 1px #fff, 0 0 1px #fff; }
 .aq-mark-sector[drawable] .aq-mark-name { color: #4f86cf; }
-.aq-mark-sector[drawable] .aq-mark-fig { font-size: 21px; font-weight: 700; color: #4a5566; }
+.aq-mark-sector[drawable] .aq-mark-fig { max-width: 100%; overflow: hidden; text-overflow: ellipsis; font-size: 21px; font-weight: 700; color: #4a5566; }
 .aq-mark-sector[drawable][data-tone="warn"] .aq-mark-fig { color: var(--aq-warn-text); }
 .aq-mark-sector[drawable][data-tone="bad"] .aq-mark-fig { color: #b8301f; }
 .aq-mark-incident[drawable] .aq-mark-name { font-size: 32px; letter-spacing: 0.06em; color: var(--aq-bad); }

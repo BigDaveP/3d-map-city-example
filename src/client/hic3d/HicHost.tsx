@@ -11,6 +11,7 @@
  *  - vérification `readPixels` (toute la zone capturée) des premiers uploads (puis 1 sur 100) ; repli si texture vide,
  *    exception à l'upload ou aucun `paint` en 2,5 s ;
  *  - `updateElementGeometry` (px CSS) pour chaque surface montée, à chaque image ;
+ *  - surfaces `mipmap` (marquages au sol) : mipmaps et filtre anisotrope après chaque capture ;
  *  - hit testing avec occlusion (`occlusion.ts`).
  *
  * Contrat d'une surface : `render()` rend UN élément qui porte `data-panel={key}` et `drawable`,
@@ -52,6 +53,11 @@ export interface SurfaceSpec {
   render(): ReactNode;
   /** l'ancre bouge seule (ex. livreur) : le verdict d'occlusion sous le curseur expire après 400 ms */
   moving?: boolean;
+  /**
+   * Surface vue en fort raccourci (marquage au sol) : mipmaps régénérées après chaque capture,
+   * filtre trilinéaire et anisotrope (8 au plus) pour éviter le crénelage et le scintillement.
+   */
+  mipmap?: boolean;
   /**
    * Instant (performance.now) de la dernière donnée reçue pour cette surface, lu à l'upload :
    * la latence donnée -> pixel est mesurée au dessin qui suit la recapture.
@@ -97,6 +103,8 @@ export function HicHost({ ml, map, metrics, surfaces, layerOptions, onFallback, 
     canvas.setAttribute("content", "drawable");
     canvas.setAttribute("layoutsubtree", "");
     const gl = map.painter.context.gl as AnyGL;
+    const aniso = gl.getExtension("EXT_texture_filter_anisotropic");
+    const anisoMax = aniso ? Math.min(8, gl.getParameter(aniso.MAX_TEXTURE_MAX_ANISOTROPY_EXT) as number) : 0;
     let disposed = false;
     let uploads = 0;
     let verified = 0;
@@ -182,6 +190,12 @@ export function HicHost({ ml, map, metrics, surfaces, layerOptions, onFallback, 
         } catch (err) {
           fail(`upload impossible (${(err as Error).message})`);
           break;
+        }
+        if (specsRef.current.get(p.key)?.mipmap) {
+          // dans le handler paint, texture liée : l'état GL est restauré plus bas avec le reste
+          gl.generateMipmap(gl.TEXTURE_2D);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR);
+          if (aniso && anisoMax > 1) gl.texParameterf(gl.TEXTURE_2D, aniso.TEXTURE_MAX_ANISOTROPY_EXT, anisoMax);
         }
         metrics.capture(performance.now() - tu);
         dirty.delete(p.key);

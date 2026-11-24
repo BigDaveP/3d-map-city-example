@@ -4,7 +4,7 @@
  * réel, monté dans le canvas de MapLibre par `HicHost` :
  *  - `sector:<id>` : nom du secteur et un seul chiffre, peints au sol (secteurs à l'écran) ;
  *  - `incident:<tronçon>` : « BRIS PROBABLE », la conduite et une valeur clé, au sol le long de la rue ;
- *  - `sensor:<id>` : une valeur par capteur de `demoBox`, face caméra au-dessus du capteur.
+ *  - `sensor:<id>` : une valeur par capteur pertinent (`useTaggedSensors`, 8 au plus), face caméra.
  * Les bâtiments les masquent (profondeur partagée) et bloquent les clics là où ils les cachent.
  */
 import { useMemo } from "react";
@@ -18,9 +18,9 @@ import { lineCenter, segment, type NetIndex } from "../net";
 import { aqueducStore } from "../store";
 import { useAq } from "../useAq";
 import { IncidentMark } from "./IncidentMark";
-import { inBox, parseKey, SURFACE_SIZE, surfaceKey } from "./marks";
+import { parseKey, SURFACE_SIZE, surfaceKey } from "./marks";
 import { SectorMark, useVisibleSectors } from "./SectorMark";
-import { SensorTag } from "./SensorTag";
+import { SensorTag, useTaggedSensors } from "./SensorTag";
 
 type ML = typeof import("maplibre-gl");
 
@@ -143,7 +143,7 @@ const onActive = () => {
 export function SceneSurfaces({ ml, map, metrics, net }: { ml: ML; map: MlMap; metrics: Metrics; net: NetIndex }) {
   const sectors = useVisibleSectors(map, net);
   const incident = useAq((s) => s.incident !== null);
-  const tagged = useMemo(() => net.data.sensors.filter((s) => inBox(s.at, CITY.demoBox)), [net]);
+  const tagged = useTaggedSensors(map, net);
   // lu une fois par la couche : constant pour un réseau donné
   const options = useMemo(() => layerOptions(ml, map, net), [ml, map, net]);
   const surfaces = useMemo<SurfaceSpec[]>(
@@ -153,6 +153,7 @@ export function SceneSurfaces({ ml, map, metrics, net }: { ml: ML; map: MlMap; m
         ...SURFACE_SIZE.sector,
         version: 0,
         focusable: true,
+        mipmap: true,
         render: () => <SectorMark net={net} sector={s} drawable />,
       })),
       ...(incident
@@ -162,6 +163,7 @@ export function SceneSurfaces({ ml, map, metrics, net }: { ml: ML; map: MlMap; m
               ...SURFACE_SIZE.incident,
               version: 0,
               focusable: true,
+              mipmap: true,
               render: () => <IncidentMark net={net} id={CITY.breakSegment} drawable />,
             },
           ]

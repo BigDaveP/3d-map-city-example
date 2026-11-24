@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { impactBySector, inBox, sectorFigure } from "../src/client/aqueduc/scene/marks";
+import { impactBySector, inBox, LAYER_KINDS, pickTags, sectorFigure, TAG_MAX } from "../src/client/aqueduc/scene/marks";
 import { CITY } from "../src/lib/aqueduc/city";
 import { isolate } from "../src/lib/aqueduc/graph";
 import { segmentsInBox } from "../src/lib/aqueduc/network";
@@ -58,4 +58,44 @@ test("inBox : seuls les capteurs de demoBox portent une étiquette", () => {
   const tagged = m.sensors.filter((s) => inBox(s.at, CITY.demoBox));
   assert.ok(tagged.length > 10 && tagged.length < m.sensors.length, `${tagged.length} / ${m.sensors.length}`);
   assert.ok(tagged.some((s) => s.id === "P-01"));
+});
+
+// --- étiquettes pertinentes (R13) : capteurs de la couche active, alertes, sélection ; 8 au plus
+const kinds = ["pression", "debit", "qualite", "reservoir"] as const;
+/** 40 capteurs factices sur une ligne vers l'est : le k-ième à k × 50 m du centre */
+const fake = Array.from({ length: 40 }, (_, k) => ({ id: `S-${k}`, idx: k, kind: kinds[k % 4], at: [-72.54 + (k * 50) / 76_900, 46.34] as [number, number] }));
+const center: [number, number] = [-72.54, 46.34];
+const box: [number, number, number, number] = [-73, 46, -72, 47];
+const ok = new Array(40).fill(0);
+const kindOf = (id: string) => fake.find((s) => s.id === id)!.kind;
+
+test("pickTags : seuls les capteurs de la couche active (pression → pression, débit, réservoir ; qualité → qualité ; sinon aucun)", () => {
+  assert.deepEqual(LAYER_KINDS.pression, ["pression", "debit", "reservoir"]);
+  const p = pickTags(fake, { layer: "pression", status: ok, selected: null, center, box });
+  assert.ok(p.length > 0 && p.every((id) => LAYER_KINDS.pression.includes(kindOf(id))), p.join());
+  const q = pickTags(fake, { layer: "qualite", status: ok, selected: null, center, box });
+  assert.ok(q.length > 0 && q.every((id) => kindOf(id) === "qualite"), q.join());
+  for (const layer of ["age", "rincage", "incidents"] as const) assert.deepEqual(pickTags(fake, { layer, status: ok, selected: null, center, box }), []);
+});
+
+test("pickTags : 8 au plus, les plus proches du centre de la vue d'abord", () => {
+  const p = pickTags(fake, { layer: "pression", status: ok, selected: null, center, box });
+  assert.equal(p.length, TAG_MAX);
+  assert.equal(TAG_MAX, 8);
+  const near = fake.filter((s) => s.kind !== "qualite").slice(0, 8).map((s) => s.id);
+  assert.deepEqual([...p].sort(), [...near].sort());
+});
+
+test("pickTags : une alerte ou une attention s'affiche quelle que soit la couche, la sélection aussi", () => {
+  const status = [...ok];
+  status[39] = 2; // le plus loin, en alerte
+  status[38] = 1; // en attention
+  for (const layer of ["pression", "age"] as const) {
+    const p = pickTags(fake, { layer, status, selected: "S-37", center, box });
+    for (const id of ["S-39", "S-38", "S-37"]) assert.ok(p.includes(id), `${layer} : ${id} manquant (${p.join()})`);
+    assert.ok(p.length <= TAG_MAX);
+  }
+  // hors de demoBox : seule la sélection passe
+  const far = pickTags(fake, { layer: "pression", status: ok, selected: "S-3", center, box: [0, 0, 1, 1] });
+  assert.deepEqual(far, ["S-3"]);
 });
