@@ -70,7 +70,9 @@ les deux modes et voit les chiffres de performance, sans explication orale.
 - **Langue** : interface et documentation en français.
 - **Git** : commits atomiques, David co-auteur dans chaque commit. Travail sur une nouvelle
   branche `claude/aqueduc-3d` partant de `claude/carte-3d-html-in-canvas` (PR ouverte :
-  BigDaveP/Dashboard-Example-HTML-in-Canvas#1). Pousser cette branche demande l'accord de David.
+  BigDaveP/Dashboard-Example-HTML-in-Canvas#1), poussée sur GitHub (accord de David). À la fin,
+  une PR **directement vers `main`** (décision de David) ; elle contiendra aussi les commits de
+  la PR n°1 tant que celle-ci n'est pas fusionnée.
 - `npm run build` et le build Docker doivent passer.
 
 ## 4. Approches envisagées
@@ -183,6 +185,18 @@ suivant, « Explorer librement » rend la main à tout moment, relançable.
 **Qualité visuelle** : jetons de design, Inter et une police à chiffres, espacements
 réguliers, états visibles au clavier, contrastes suffisants, attribution visible. Une vue SSR
 sans JavaScript résume l'état du réseau, les incidents et les secteurs.
+
+### 5.3 bis Visiteur sans l'API (décision de David)
+
+- Détection existante : sans l'API, bascule automatique en mode classique.
+- Bandeau clair : « Votre navigateur n'active pas HTML-in-Canvas : vous voyez la version
+  classique », avec deux actions :
+  - **Voir la version HTML-in-Canvas en vidéo** : vidéos enregistrées du scénario (produites
+    par le script de preuves) intégrées à la page ;
+  - **Comment l'activer** : le flag `chrome://flags/#canvas-draw-element`, en une ligne.
+- Prise en charge d'un jeton Origin Trial par variable d'environnement (injecté dans
+  l'en-tête de la page). Le domaine d'hébergement n'est pas encore connu ; sans jeton, rien ne
+  change.
 
 ### 5.4 Vue souterraine
 
