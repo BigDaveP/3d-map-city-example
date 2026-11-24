@@ -71,6 +71,8 @@ export class WallRenderer {
   private texInst: Float32Array;
   private spark = new SparkBuilder();
   drawCalls = 0;
+  /** interrupteurs de couches (diagnostic : coût de chaque couche) */
+  layers = { regions: true, tiles: true, textures: true, sparklines: true };
 
   constructor(private gl: WebGL2RenderingContext, private layout: WorldLayout) {
     this.p = new Programs(gl);
@@ -109,17 +111,22 @@ export class WallRenderer {
     p.setCamera(p.tile, cam.x, cam.y, cam.zoom, cam.vw, cam.vh);
     gl.uniform1f(p.loc(p.tile, "u_zoom"), cam.zoom);
     gl.uniform1f(p.loc(p.tile, "u_radius"), 40);
+    // régions et tuiles sont opaques : sans arrondi visible, pas de mélange (fill-rate)
+    if (40 * cam.zoom < 1.5) gl.disable(gl.BLEND);
     this.upload(this.regionInst, layout.regions.length);
-    gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, layout.regions.length);
+    if (this.layers.regions) gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, layout.regions.length);
     for (let i = 0; i < visible.length; i++) {
       const c = visible[i];
       const rgb = STATUS_RGB[live.statuses[c]] ?? STATUS_RGB[0];
       put(this.tileInst, i, C[c * 4], C[c * 4 + 1], C[c * 4 + 2], C[c * 4 + 3], 0, 0, 1, 1, rgb[0], rgb[1], rgb[2], 1);
     }
     gl.uniform1f(p.loc(p.tile, "u_radius"), 12);
+    if (12 * cam.zoom < 1.5) gl.disable(gl.BLEND);
+    else gl.enable(gl.BLEND);
     this.upload(this.tileInst, visible.length);
-    gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, visible.length);
+    if (this.layers.tiles) gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, visible.length);
     this.drawCalls += 2;
+    gl.enable(gl.BLEND);
 
     // 3. textures : d'abord les niveaux précédents (base opaque), puis le niveau courant en fondu
     const base: [number, Slot, number][] = [];

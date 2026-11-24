@@ -46,6 +46,8 @@ in vec2 v_local; in vec2 v_size; in vec4 v_color;
 uniform float u_zoom; uniform float u_radius;
 out vec4 o;
 void main() {
+  // arrondi sous le pixel : aplat (évite le SDF par pixel, coûteux en WebGL logiciel)
+  if (u_radius * u_zoom < 1.5) { o = v_color; return; }
   vec2 p = v_local - v_size * 0.5;
   vec2 q = abs(p) - v_size * 0.5 + u_radius;
   float d = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - u_radius;
