@@ -16,14 +16,16 @@ function colorOf(expr: unknown, properties: Record<string, unknown> = {}, state:
   return `#${h(c.r)}${h(c.g)}${h(c.b)}`;
 }
 
-test("pipeColor(pression) : interpole les paliers des maquettes", () => {
+test("pipeColor(pression) : interpole les paliers de la décision R12", () => {
   const e = pipeColor("pression");
   assert.equal(colorOf(e, {}, { p: 1.2 }), "#d6402f");
   assert.equal(colorOf(e, {}, { p: 2.6 }), "#e8a33a");
-  assert.equal(colorOf(e, {}, { p: 3.4 }), "#2f9bd6");
-  assert.equal(colorOf(e, {}, { p: 4.4 }), "#1f5fa8");
+  assert.equal(colorOf(e, {}, { p: 4.0 }), "#2f9bd6");
+  assert.equal(colorOf(e, {}, { p: 5.2 }), "#1f5fa8");
+  // réseau sain : 4,4 et 4,9 bar donnent deux bleus distincts (variation avec la distance aux sources)
+  assert.notEqual(colorOf(e, {}, { p: 4.4 }), colorOf(e, {}, { p: 4.9 }));
   // entre deux paliers : mélange ; hors zone suivie (pas d'état) : gris neutre
-  const mid = colorOf(e, {}, { p: 3.0 });
+  const mid = colorOf(e, {}, { p: 3.3 });
   assert.notEqual(mid, "#e8a33a");
   assert.notEqual(mid, "#2f9bd6");
   assert.equal(colorOf(e, {}, {}), NO_DATA);

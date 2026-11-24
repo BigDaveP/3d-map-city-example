@@ -15,7 +15,8 @@ const BAD = "#d23b2b";
 
 /**
  * Paliers de couleur par couche (valeur → couleur), partagés par `pipeColor`, la légende et, plus
- * tard, la couleur RGB des tubes souterrains. Pression : valeurs des maquettes.
+ * tard, la couleur RGB des tubes souterrains. Pression : paliers de la décision R12 (4,0 et 5,2 bar en
+ * haut de l'échelle, pour qu'un réseau sain varie du clair au foncé avec la distance aux sources).
  */
 export const PIPE_STOPS = {
   pression: {
@@ -23,8 +24,8 @@ export const PIPE_STOPS = {
     stops: [
       [1.2, "#d6402f"],
       [2.6, "#e8a33a"],
-      [3.4, "#2f9bd6"],
-      [4.4, "#1f5fa8"],
+      [4.0, "#2f9bd6"],
+      [5.2, "#1f5fa8"],
     ],
   },
   qualite: {
