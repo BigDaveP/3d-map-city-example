@@ -8,13 +8,27 @@ import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Map as MlMap, Marker, Popup } from "maplibre-gl";
 import { COURIERS, RESTAURANTS } from "@/lib/carte/catalog";
-import { CourierPanel, RestaurantPanel } from "./Panels";
-import { couriers, toggleRestaurant, useCarte } from "./store";
+import type { Metrics } from "../metrics";
+import { CourierPanel, panelHooks, RestaurantPanel } from "./Panels";
+import { couriers, statusChangedAt, toggleRestaurant, useCarte } from "./store";
 
 type ML = typeof import("maplibre-gl");
 
-export function ClassicOverlay({ ml, map }: { ml: ML; map: MlMap }) {
+export function ClassicOverlay({ ml, map, metrics }: { ml: ML; map: MlMap; metrics: Metrics }) {
   const city = useCarte((s) => s.city);
+  // latence statut -> pixel en DOM : commit React du panneau, puis l'image suivante
+  useEffect(() => {
+    const mark = new Map<number, number>();
+    panelHooks.onRestaurantCommit = (idx) => {
+      const at = statusChangedAt[idx];
+      if (!at || at <= (mark.get(idx) ?? 0)) return;
+      mark.set(idx, at);
+      requestAnimationFrame(() => metrics.latency(performance.now() - at));
+    };
+    return () => {
+      panelHooks.onRestaurantCommit = () => {};
+    };
+  }, [metrics]);
   const openR = useCarte((s) => s.openRestaurants);
   const openC = useCarte((s) => s.openCouriers);
   const restaurants = useMemo(() => RESTAURANTS.filter((r) => r.city === city), [city]);
@@ -23,12 +37,12 @@ export function ClassicOverlay({ ml, map }: { ml: ML; map: MlMap }) {
       {restaurants.map((r) => (
         <RestaurantMarker key={r.idx} ml={ml} map={map} idx={r.idx} />
       ))}
-      {openR.filter((i) => RESTAURANTS[i].city === city).map((i) => (
+      {openR.map((i) => (
         <PopupPortal key={`r${i}`} ml={ml} map={map} lngLat={() => [RESTAURANTS[i].lng, RESTAURANTS[i].lat]} offset={18}>
           <RestaurantPanel idx={i} />
         </PopupPortal>
       ))}
-      {openC.filter((i) => COURIERS[i].city === city).map((i) => (
+      {openC.map((i) => (
         <PopupPortal key={`c${i}`} ml={ml} map={map} lngLat={() => couriers.position(i, performance.now())} offset={10} follow>
           <CourierPanel idx={i} />
         </PopupPortal>

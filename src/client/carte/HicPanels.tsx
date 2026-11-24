@@ -37,10 +37,10 @@ export function HicPanels({ ml, map, metrics, onFallback }: { ml: ML; map: MlMap
   const s = useStore(carteStore);
   const keys = useMemo(
     () => [
-      ...s.openRestaurants.filter((i) => RESTAURANTS[i].city === s.city).map((i) => keyOf("r", i)),
-      ...s.openCouriers.filter((i) => COURIERS[i].city === s.city).map((i) => keyOf("c", i)),
+      ...s.openRestaurants.map((i) => keyOf("r", i)),
+      ...s.openCouriers.map((i) => keyOf("c", i)),
     ],
-    [s.openRestaurants, s.openCouriers, s.city],
+    [s.openRestaurants, s.openCouriers],
   );
   const [ready, setReady] = useState(false);
   const layerRef = useRef<PanelLayer | null>(null);

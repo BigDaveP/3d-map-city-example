@@ -4,10 +4,11 @@ import { useStore } from "zustand";
 import { CITIES, type CityId } from "@/lib/carte/catalog";
 import { carteStore } from "./store";
 
-export function CarteToolbar({ map }: { map: MlMap | null }) {
+export function CarteToolbar({ map, onExport }: { map: MlMap | null; onExport(): void }) {
   const s = useStore(carteStore);
   const set = carteStore.setState;
-  const openAll = (n: number) => (window as unknown as { __carte?: { openPanels(r: number, c: number): void } }).__carte?.openPanels(Math.min(15, n), Math.max(0, n - 15));
+  // 10 -> 10 restaurants ; 30 -> 30 restaurants ; 60 -> 30 restaurants + 30 livreurs (les deux villes)
+  const openAll = (n: number) => (window as unknown as { __carte?: { openPanels(r: number, c: number): void } }).__carte?.openPanels(Math.min(30, n), Math.max(0, n - 30));
   return (
     <div className="toolbar" role="toolbar" aria-label="Commandes de la carte">
       <div className="grp" role="group" aria-label="Mode des panneaux">
@@ -57,7 +58,7 @@ export function CarteToolbar({ map }: { map: MlMap | null }) {
         </select>
       </label>
       <div className="grp" role="group" aria-label="Ouvrir des panneaux">
-        {[10, 30].map((n) => (
+        {[10, 30, 60].map((n) => (
           <button key={n} type="button" onClick={() => openAll(n)}>
             {n} panneaux
           </button>
@@ -66,7 +67,7 @@ export function CarteToolbar({ map }: { map: MlMap | null }) {
           Tout fermer
         </button>
       </div>
-      <button type="button" id="export-video" disabled={!map || s.recording === "enregistrement"} data-recording={s.recording}>
+      <button type="button" id="export-video" disabled={!map || s.recording === "enregistrement"} data-recording={s.recording} onClick={onExport}>
         {s.recording === "enregistrement" ? "Enregistrement…" : "Exporter 10 s de vidéo"}
       </button>
       <button type="button" aria-pressed={s.robotOpen} onClick={() => set({ robotOpen: !s.robotOpen })}>

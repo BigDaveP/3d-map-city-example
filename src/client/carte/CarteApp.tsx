@@ -17,6 +17,20 @@ import { setRefresh } from "./Panels";
 import { applyRestaurants, carteStore, couriers, toggleCourier, toggleRestaurant, type CarteMode, type RestaurantView } from "./store";
 import { CarteToolbar } from "./Toolbar";
 import { CarteMetrics } from "./CarteMetrics";
+import { download, recordMap } from "./video";
+
+/** Enregistre 10 s du canvas et propose le fichier ; le résultat reste accessible au banc. */
+async function exportVideo(map: MlMap) {
+  const mode = carteStore.getState().mode;
+  carteStore.setState({ recording: "enregistrement" });
+  try {
+    const r = await recordMap(map, 10_000);
+    (window as unknown as Record<string, unknown>).__lastVideo = { ...r, mode };
+    download(r.url, `carte-${mode === "hic" ? "html-in-canvas" : "classique"}-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.webm`);
+  } finally {
+    carteStore.setState({ recording: "prêt" });
+  }
+}
 
 type ML = typeof import("maplibre-gl");
 export const STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
@@ -149,8 +163,9 @@ export default function CarteApp({ initialMode, initialCity }: { initialMode?: C
       couriers,
       openPanels: (nR: number, nC: number) => {
         const st = carteStore.getState();
-        const rs = RESTAURANTS.filter((r) => r.city === st.city).slice(0, nR).map((r) => r.idx);
-        const cs = COURIERS.filter((c) => c.city === st.city).slice(0, nC).map((c) => c.idx);
+        const byCity = <T extends { city: string }>(a: T[]) => [...a.filter((x) => x.city === st.city), ...a.filter((x) => x.city !== st.city)];
+        const rs = byCity(RESTAURANTS).slice(0, nR).map((r) => r.idx);
+        const cs = byCity(COURIERS).slice(0, nC).map((c) => c.idx);
         carteStore.setState({ openRestaurants: rs, openCouriers: cs });
       },
     };
@@ -161,14 +176,14 @@ export default function CarteApp({ initialMode, initialCity }: { initialMode?: C
 
   return (
     <div className="carte-stage">
-      <CarteToolbar map={ctx?.map ?? null} />
+      <CarteToolbar map={ctx?.map ?? null} onExport={() => ctx && void exportVideo(ctx.map)} />
       {s.fallback && (
         <div className="fallback" role="status" data-testid="fallback">
           {s.fallback}
         </div>
       )}
       <div className="carte-map" ref={container} data-mode={s.mode}>
-        {ctx && s.mode === "classic" && <ClassicOverlay ml={ctx.ml} map={ctx.map} />}
+        {ctx && s.mode === "classic" && <ClassicOverlay ml={ctx.ml} map={ctx.map} metrics={ctx.metrics} />}
         {ctx && s.mode === "hic" && (
           <HicPanels
             ml={ctx.ml}

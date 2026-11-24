@@ -13,6 +13,9 @@ import { carteStore, couriers, toggleCourier, toggleRestaurant, useCarte, type R
 export const PANEL_SIZE = { restaurant: { w: 300, h: 236 }, courier: { w: 220, h: 132 } } as const;
 export const THROTTLE_MS = 2000;
 
+/** Points d'accroche par mode (mesure de latence du mode classique). */
+export const panelHooks = { onRestaurantCommit: (_idx: number) => {} };
+
 /** Valeur mise à jour au plus une fois par `ms` (front montant immédiat, puis fin de fenêtre). */
 export function useThrottled<T>(value: T, ms = THROTTLE_MS): T {
   const [shown, setShown] = useState(value);
@@ -49,6 +52,7 @@ export function RestaurantPanel({ idx, drawable, style }: { idx: number; drawabl
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   // l'interrupteur suit le serveur tant que l'utilisateur ne l'a pas touché récemment
   useEffect(() => setPaused(live.status === "pause"), [live.status]);
+  useEffect(() => panelHooks.onRestaurantCommit(idx), [live, idx]);
   useEffect(() => {
     const t = area.current;
     if (t && document.activeElement !== t && t.value !== live.note) t.value = live.note;
