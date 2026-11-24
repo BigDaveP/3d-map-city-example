@@ -55,11 +55,26 @@ export function distancesFrom(n: Network, nodes: number[]): Float64Array {
   return dist;
 }
 
-/** Nœuds porteurs de vannes : degré ≥ 3 avec au moins un tronçon qui n'est pas un branchement. */
+/** Hachage entier déterministe (FNV-1a) d'un identifiant de nœud. */
+function hashId(id: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < id.length; i++) {
+    h ^= id.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h >>> 0;
+}
+
+/**
+ * Nœuds porteurs de vannes : degré ≥ 3 ; vanne systématique si au moins deux tronçons
+ * sont des amenées ou des maîtresses, sinon environ un carrefour sur trois (hachage de l'id).
+ */
 export function placeValves(n: Network): Set<number> {
   const valves = new Set<number>();
   n.adj.forEach((segs, node) => {
-    if (segs.length >= 3 && segs.some((si) => n.segments[si].cls !== "branchement")) valves.add(node);
+    if (segs.length < 3) return;
+    const mains = segs.filter((si) => n.segments[si].cls === "amenee" || n.segments[si].cls === "maitresse").length;
+    if (mains >= 2 || hashId(n.nodes[node]) % 3 === 0) valves.add(node);
   });
   return valves;
 }
