@@ -4,6 +4,7 @@
  */
 import { createStore, useStore } from "zustand";
 import { getBranches } from "@/lib/sim/catalog";
+import { rand01 } from "@/lib/sim/random";
 import { initialSales, nextPace, reviewsAt, salesBaseline, staffAt, weatherAt } from "@/lib/sim/generators";
 import { alertsStatus, reviewsStatus, salesStatus, staffStatus, weatherStatus } from "@/lib/sim/status";
 import {
@@ -143,7 +144,7 @@ export function createDataStore(n: number) {
   // amorce des sparklines et des signatures
   for (let b = 0; b < branches.length; b++) {
     const base = salesBaseline(branches[b]);
-    for (let i = 0; i < 24; i++) live.pushSpark(b, base * (0.6 + ((b * 7 + i * 13) % 10) / 12));
+    for (let i = 0; i < 24; i++) live.pushSpark(b, base * (0.4 + rand01("spark0", b, i) * 1.2));
     KINDS.forEach((k, ki) => {
       const c = b * KINDS.length + ki;
       live.sig[c] = htmlSignature(init, b, k);

@@ -6,8 +6,8 @@
 import { getBranches, REGIONS } from "./sim/catalog";
 import { KINDS } from "./sim/types";
 
-export const CARD_W = 320;
-export const CARD_H = 200;
+export const CARD_W = 340;
+export const CARD_H = 230;
 export const CARD_GAP = 14;
 export const ROW_GAP = 30;
 export const COL_GAP = 90;
