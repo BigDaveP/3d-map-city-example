@@ -1,12 +1,15 @@
 "use client";
 /** Fiche ancrée à droite, affichée seulement quand un élément est sélectionné. */
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { publishNoticeAction } from "@/app/aqueduc-actions";
 import { CITY } from "@/lib/aqueduc/city";
 import { SCENARIO_STEPS } from "@/lib/aqueduc/scenario";
 import { demand, FLUSHING_2026, localHour, nominalFlowLs, THRESHOLDS } from "@/lib/aqueduc/sim";
 import { MATERIAL, num, PIPE_CLASS, sectorStatus, SENSOR_KIND, sensorValue, STATUS_LABEL } from "../format";
 import { segment, type NetIndex } from "../net";
+import { cutLayout, valveLabel } from "../scene/cut";
+import { CutSection } from "../scene/CutSection";
+import { useImpactTotals } from "../scene/SectorMark";
 import { addNotice, select, type Notice } from "../store";
 import { useAq } from "../useAq";
 
@@ -179,6 +182,42 @@ function SectorCard({ net, id }: { net: NetIndex; id: string }) {
   );
 }
 
+/**
+ * Isolation du tronçon : vannes du plan (serveur) et leur état, adresses touchées par secteur
+ * (recalculées depuis le flux). En mode classique, pendant l'étape d'isolation, la coupe sous la rue
+ * est ici, en illustration 2D, avec ses vannes à fermer.
+ */
+function Isolation({ net }: { net: NetIndex }) {
+  const mode = useAq((s) => s.mode);
+  const atIsolation = useAq((s) => s.scenario.active && s.scenario.step === "isolation");
+  const closedNow = useAq((s) => (s.incident?.closedValves.length ?? 0) > 0);
+  const restored = useAq((s) => s.incident?.restoredAt != null);
+  const cut = useMemo(() => cutLayout(net), [net]);
+  const impact = useImpactTotals(net);
+  const valves = net.data.scenario.valves.map((v) => valveLabel(net, v)).join(" et ");
+  return (
+    <>
+      <h3 className="aq-h3">Isolation</h3>
+      {mode === "classic" && atIsolation && cut && <CutSection net={net} cut={cut} />}
+      <p className="aq-insp-status" data-tone={restored ? "good" : closedNow ? "bad" : "warn"}>
+        {restored ? `Remise en eau : vannes ${valves} rouvertes` : closedNow ? `Vannes fermées : ${valves}` : `Vannes à fermer : ${valves}`}
+      </p>
+      {impact.sectors.length > 0 && (
+        <KV
+          rows={impact.sectors.map((x) => [
+            net.sectorById.get(x.id)?.name ?? x.id,
+            <span key={x.id}>
+              <span className="aq-num">{num(x.dry || x.low)}</span> {x.dry ? "adresses sans eau" : "adresses en basse pression"}
+            </span>,
+            x.dry ? "bad" : "warn",
+          ])}
+        />
+      )}
+      <p className="aq-note">Vannes et adresses (une par 12 m de conduite) simulées ; plan d&apos;isolation calculé par le serveur.</p>
+    </>
+  );
+}
+
 function IncidentCard({ net, id }: { net: NetIndex; id: string }) {
   const step = useAq((s) => s.scenario.step);
   const k = SCENARIO_STEPS.findIndex((x) => x.id === step);
@@ -186,6 +225,7 @@ function IncidentCard({ net, id }: { net: NetIndex; id: string }) {
   return (
     <>
       <SegmentCard net={net} id={id} incident />
+      {id === CITY.breakSegment && <Isolation net={net} />}
       <h3 className="aq-h3">Intervention</h3>
       <ol className="aq-steps">
         {SCENARIO_STEPS.map((x, i) => (

@@ -20,7 +20,7 @@ type SectorInfo = NetworkData["sectors"][number];
 // impact par secteur, calculé une fois par message du flux (clé : le tableau de pressions reçu)
 const impactCache = new WeakMap<Float32Array, Map<string, SectorImpact>>();
 const propsCache = new WeakMap<NetIndex, SegmentProps[]>();
-function impactOf(net: NetIndex, s: AqState): Map<string, SectorImpact> | null {
+export function impactOf(net: NetIndex, s: AqState): Map<string, SectorImpact> | null {
   if (!s.incident) return null;
   let m = impactCache.get(s.live.pressure);
   if (!m) {
@@ -41,6 +41,22 @@ export function useSectorFigure(net: NetIndex, sector: SectorInfo) {
   });
   const [value, tone, label] = useThrottled(raw).split("|");
   return { value: Number(value), tone, label };
+}
+
+/**
+ * Adresses touchées par l'incident, tous secteurs : en basse pression (vannes ouvertes) et sans
+ * eau (tronçon isolé), avec le détail par secteur ; recalculées au plus toutes les 2 s.
+ */
+export function useImpactTotals(net: NetIndex): { low: number; dry: number; sectors: { id: string; low: number; dry: number }[] } {
+  const raw = useAq((s) => {
+    const m = impactOf(net, s);
+    return m ? [...m].map(([id, v]) => `${id}:${v.low}:${v.dry}`).join(",") : "";
+  });
+  const shown = useThrottled(raw);
+  return useMemo(() => {
+    const sectors = shown ? shown.split(",").map((e) => e.split(":")).map(([id, low, dry]) => ({ id, low: Number(low), dry: Number(dry) })) : [];
+    return { low: sectors.reduce((a, x) => a + x.low, 0), dry: sectors.reduce((a, x) => a + x.dry, 0), sectors };
+  }, [shown]);
 }
 
 /** Taille du nom (px) pour tenir dans la largeur du marquage ; espacement léger : il se lit comme un mot. */

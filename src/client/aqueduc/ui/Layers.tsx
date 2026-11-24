@@ -89,10 +89,13 @@ export function Layers() {
   const incidents = useAq((s) => (s.incident ? 1 : 0));
   const [open, setOpen] = useState(true);
   const bodyId = useId();
+  // le récit du scénario prend la place à gauche (une seule chose à la fois)
+  const scenario = useAq((s) => s.scenario.active);
   // replié par défaut sur un écran étroit
   useEffect(() => {
     if (window.matchMedia("(max-width: 720px)").matches) setOpen(false);
   }, []);
+  if (scenario) return null;
   return (
     <section className="aq-layers aq-panel" aria-label="Couches">
       <button type="button" className="aq-layers-h" aria-expanded={open} aria-controls={bodyId} onClick={() => setOpen(!open)}>

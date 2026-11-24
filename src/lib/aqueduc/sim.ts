@@ -477,7 +477,8 @@ export function incidentImpact(m: Model, tSim: number, inc: IncidentInput | null
   for (let si = 0; si < p.length; si++) {
     const len = addressLen(m, si);
     if (st.isolated.get(si) === 0) dry += len;
-    else if (p[si] < THRESHOLDS.pressureMin) low += len;
+    // au centième de bar, comme le flux et les capteurs : le client retrouve les mêmes adresses
+    else if (round2(p[si]) < THRESHOLDS.pressureMin) low += len;
   }
   return { lowPressureAddresses: Math.round(low / ADDRESS_M), withoutWaterAddresses: Math.round(dry / ADDRESS_M) };
 }

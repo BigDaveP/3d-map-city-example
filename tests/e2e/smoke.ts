@@ -2,10 +2,12 @@
  * Vérification rapide de bout en bout (Chromium de Playwright, serveur sur BASE_URL).
  *   BASE_URL=http://localhost:3300 npx tsx tests/e2e/smoke.ts
  *   SHOT=chemin.png pour enregistrer une capture de la page d'accueil (mode classique, 1440 × 860) ;
- *   SHOT_HIC=chemin.png pour la même vue en mode HTML-in-Canvas.
+ *   SHOT_HIC=chemin.png pour la même vue en mode HTML-in-Canvas ;
+ *   SHOT_SCENARIO_HIC / SHOT_SCENARIO_CLASSIC=chemin.png : étape 2 du scénario (isolation, coupe).
  * Sortie : une ligne OK/ÉCHEC par point de contrôle ; code de sortie 1 si un échec.
  * Les tuiles viennent d'OpenFreeMap : chargements courts, une seule vue par page.
  */
+import { stat } from "node:fs/promises";
 import { chromium, type Browser, type Page } from "playwright";
 
 const BASE = process.env.BASE_URL ?? "http://localhost:3000";
@@ -311,6 +313,167 @@ async function homeHic(b: Browser) {
   await ctx.close();
 }
 
+/** Lance le scénario par la barre et passe à l'étape d'isolation ; renvoie l'heure simulée quittée. */
+async function toIsolation(p: Page) {
+  const before = await p.evaluate(() => {
+    const st = (window as any).__aqueduc.store.getState();
+    return { t0: st.clock.t0, startedAt: st.clock.startedAt, speed: st.clock.speed };
+  });
+  await p.getByRole("button", { name: "Lancer le scénario de bris" }).click();
+  const story = p.locator("[data-testid=story]");
+  await story.waitFor({ timeout: 5_000 }).catch(() => {});
+  const text = (await story.count()) ? await story.innerText() : "";
+  check("récit à gauche, étapes et mention « simulé »", /Détection/.test(text) && /Rapport/.test(text) && /simul/i.test(text), text.slice(0, 80).replace(/\n/g, " "));
+  check("couches et recherche masquées pendant le scénario", (await p.locator(".aq-layers").count()) === 0 && !(await p.locator(".aq-search").isVisible()));
+  await p.getByRole("button", { name: "Étape suivante →" }).click();
+  // caméra de l'étape (1,5 s), puis tuiles et captures
+  await p.waitForTimeout(1800);
+  await p.evaluate(() => new Promise((r) => {
+    const m = (window as any).__aqueduc.map;
+    return m.loaded() && !m.isMoving() ? r(null) : m.once("idle", r);
+  }));
+  const st = await p.evaluate(() => (window as any).__aqueduc.store.getState());
+  check("étape 2 : isolation, incident sans vannes fermées", st.scenario.step === "isolation" && st.incident && st.incident.closedValves.length === 0, JSON.stringify(st.scenario));
+  return { left: before, resumeAt: st.scenario.resumeAt as number };
+}
+
+/** Retour au réseau vivant : récit et coupe démontés, horloge à l'heure quittée. */
+async function leaveScenario(p: Page, resumeAt: number) {
+  await p.getByRole("button", { name: "Explorer librement" }).click();
+  await p.waitForTimeout(500);
+  const r = await p.evaluate(() => {
+    const w = window as any;
+    const st = w.__aqueduc.store.getState();
+    return { active: st.scenario.active, t0: st.clock.t0, incident: st.incident, cut: w.__hicMap?.layer ? [...w.__hicMap.layer.panels.keys()].some((k: string) => k.startsWith("cut:")) : false };
+  });
+  check("« Explorer librement » : scénario vidé, incident retiré", !r.active && r.incident === null);
+  check("horloge revenue à l'heure quittée", r.t0 === resumeAt, `${r.t0} / ${resumeAt}`);
+  check("récit et coupe démontés, couches revenues", (await p.locator("[data-testid=story]").count()) === 0 && !r.cut && (await p.locator(".aq-layers").count()) === 1);
+}
+
+/** Scénario en mode HTML-in-Canvas : coupe sous la rue, vannes cliquées dans la scène, export vidéo. */
+async function scenarioHic(b: Browser) {
+  console.log("\n== /?mode=hic, scénario de bris (coupe sous la rue, vannes, vidéo)");
+  const ctx = await b.newContext({ viewport: { width: 1440, height: 860 }, deviceScaleFactor: 1, acceptDownloads: true });
+  const p = await ctx.newPage();
+  const errors = collectErrors(p);
+  await p.goto(`${BASE}/?mode=hic`);
+  await p.waitForFunction(() => (window as any).__aqueduc && (window as any).__hicMap?.layer, null, { timeout: 45_000 });
+  await p.waitForFunction(() => (window as any).__aqueduc.store.getState().live.t > 0, null, { timeout: 15_000 });
+  const { resumeAt } = await toIsolation(p);
+  const cutOk = await p
+    .waitForFunction(() => {
+      const q = (window as any).__hicMap.layer.panels.get("cut:13C1949");
+      return q && q.tex && q.proj && q.visible !== null;
+    }, null, { timeout: 15_000 })
+    .then(() => true)
+    .catch(() => false);
+  const r = await p.evaluate(() => {
+    const w = window as any;
+    const keys: string[] = [...w.__hicMap.layer.panels.keys()];
+    const cut = document.querySelector('.maplibregl-canvas > [data-panel="cut:13C1949"]');
+    const panels = [...document.querySelectorAll<HTMLElement>(".aq-panel")].filter((e) => e.offsetParent !== null).map((e) => e.className);
+    return { keys, valves: cut ? [...cut.querySelectorAll("button.aq-valve")].map((e) => e.textContent) : [], panels, fallback: w.__aqueduc.store.getState().fallback };
+  });
+  check("coupe cut:13C1949 montée dans la scène, capturée", cutOk && r.keys.includes("cut:13C1949"), r.keys.join(" "));
+  check("le marquage de l'incident laisse la place à la coupe", !r.keys.includes("incident:13C1949"));
+  check("deux vannes, vrais boutons « V-xx · à fermer »", r.valves.length === 2 && r.valves.every((t) => /^V-\d+ · à fermer$/.test(t ?? "")), r.valves.join(" | "));
+  check("rien d'autre ne flotte : récit et frise seulement", r.panels.length === 2 && r.panels.some((c) => c.includes("aq-story")) && r.panels.some((c) => c.includes("aq-timeline")), r.panels.join(" | "));
+  check("pas de repli en mode classique", !r.fallback, r.fallback);
+  if (process.env.SHOT_SCENARIO_HIC) {
+    await p.waitForTimeout(3000);
+    await p.screenshot({ path: process.env.SHOT_SCENARIO_HIC });
+    console.log(`capture : ${process.env.SHOT_SCENARIO_HIC}`);
+  }
+
+  // clic sur chaque vanne là où elle est dessinée dans la scène (hit testing avec occlusion)
+  const valveAt = (i: number) =>
+    p.evaluate((i) => {
+      const w = window as any;
+      const q = w.__hicMap.layer.panels.get("cut:13C1949");
+      const el = q.el.querySelectorAll("button.aq-valve")[i] as HTMLElement;
+      const box = w.__aqueduc.map.getCanvas().getBoundingClientRect();
+      const [x, y] = q.proj.project(el.offsetLeft, el.offsetTop + el.offsetHeight / 2);
+      return { x: box.left + x, y: box.top + y };
+    }, i);
+  for (const i of [0, 1]) {
+    const pt = await valveAt(i);
+    await p.mouse.move(pt.x, pt.y);
+    await p.waitForTimeout(800);
+    await p.mouse.click(pt.x, pt.y);
+    await p.waitForTimeout(400);
+  }
+  const closed = await p
+    .waitForFunction(() => (window as any).__aqueduc.store.getState().scenario.valvesClosed, null, { timeout: 8_000 })
+    .then(() => true)
+    .catch(() => false);
+  const st = await p.evaluate(() => (window as any).__aqueduc.store.getState());
+  check("clic sur les deux vannes dans la coupe → closeValvesAction, vannes fermées", closed && st.incident?.closedValves.length === 2, JSON.stringify(st.scenario));
+  const insp = p.locator("[data-testid=inspector]");
+  const dry = await p
+    .waitForFunction(() => /Vannes fermées/.test(document.querySelector("[data-testid=inspector]")?.textContent ?? "") && /adresses sans eau/.test(document.querySelector("[data-testid=inspector]")?.textContent ?? ""), null, { timeout: 12_000 })
+    .then(() => true)
+    .catch(() => false);
+  const itext = (await insp.count()) ? await insp.innerText() : "";
+  check("fiche « Vannes fermées », secteurs touchés recalculés (adresses sans eau)", dry, itext.replace(/\n/g, " ").slice(0, 160));
+  const fig = await p.locator(".aq-story-fig").innerText().catch(() => "");
+  check("récit : « Y adresses sans eau » après l'isolation", /\d+ adresses? sans eau/.test(fig), fig);
+  const cutText = await p.locator('.maplibregl-canvas > [data-panel="cut:13C1949"]').innerText().catch(() => "");
+  check("coupe : vannes fermées, tronçon à 0 bar", /fermée/.test(cutText) && !/à fermer/.test(cutText));
+
+  // rapport : export vidéo de la séquence (10 s)
+  for (let i = 0; i < 3; i++) await p.getByRole("button", { name: "Étape suivante →" }).click();
+  const report = await p.locator(".aq-story-fig").innerText().catch(() => "");
+  check("rapport : chronologie et adresses touchées", /basse pression/.test(report) && /sans eau pendant/.test(report), report);
+  const t = Date.now();
+  const [dl] = await Promise.all([p.waitForEvent("download", { timeout: 40_000 }), p.getByRole("button", { name: "Exporter la vidéo" }).click()]);
+  const file = await dl.path();
+  const size = file ? (await stat(file)).size : 0;
+  check("export vidéo : scenario-bris.webm téléchargé", dl.suggestedFilename() === "scenario-bris.webm" && size > 20_000, `${dl.suggestedFilename()}, ${size} octets, ${Date.now() - t} ms`);
+  const done = await p
+    .waitForFunction(() => /Vidéo enregistrée/.test(document.querySelector(".aq-story-export .aq-note")?.textContent ?? ""), null, { timeout: 5_000 })
+    .then(() => true)
+    .catch(() => false);
+  check("message de fin d'enregistrement", done, await p.locator(".aq-story-export .aq-note").innerText());
+  await leaveScenario(p, resumeAt);
+  check("aucune erreur console", errors.length === 0, errors.join(" | "));
+  await ctx.close();
+}
+
+/** Scénario en mode classique : la coupe est une illustration 2D dans la fiche, avec les mêmes vannes. */
+async function scenarioClassic(b: Browser) {
+  console.log("\n== /?mode=classic, scénario de bris (coupe dans la fiche)");
+  const ctx = await b.newContext({ viewport: { width: 1440, height: 860 }, deviceScaleFactor: 1 });
+  const p = await ctx.newPage();
+  const errors = collectErrors(p);
+  await p.goto(`${BASE}/?mode=classic`);
+  await p.waitForFunction(() => (window as any).__aqueduc, null, { timeout: 45_000 });
+  await p.waitForFunction(() => (window as any).__aqueduc.store.getState().live.t > 0, null, { timeout: 15_000 });
+  const { resumeAt } = await toIsolation(p);
+  const insp = p.locator("[data-testid=inspector]");
+  await insp.waitFor({ timeout: 5_000 }).catch(() => {});
+  const text = (await insp.count()) ? await insp.innerText() : "";
+  const valves = p.locator("[data-testid=inspector] .aq-cut-card button");
+  check("fiche de l'incident ouverte d'office, coupe 2D et « Vannes à fermer »", /Vannes à fermer/.test(text) && (await p.locator(".aq-cut-card svg").count()) === 1, text.replace(/\n/g, " ").slice(0, 120));
+  check("deux vannes, vrais boutons « V-xx · à fermer »", (await valves.count()) === 2 && (await valves.allInnerTexts()).every((t) => /^V-\d+ · à fermer$/.test(t)));
+  if (process.env.SHOT_SCENARIO_CLASSIC) {
+    await p.waitForTimeout(2500);
+    await p.screenshot({ path: process.env.SHOT_SCENARIO_CLASSIC });
+    console.log(`capture : ${process.env.SHOT_SCENARIO_CLASSIC}`);
+  }
+  await valves.nth(0).click();
+  await valves.nth(1).click();
+  const dry = await p
+    .waitForFunction(() => /Vannes fermées/.test(document.querySelector("[data-testid=inspector]")?.textContent ?? "") && /adresses sans eau/.test(document.querySelector("[data-testid=inspector]")?.textContent ?? ""), null, { timeout: 12_000 })
+    .then(() => true)
+    .catch(() => false);
+  check("vannes fermées depuis la fiche → « Vannes fermées », adresses sans eau", dry, ((await insp.count()) ? await insp.innerText() : "").replace(/\n/g, " ").slice(0, 160));
+  await leaveScenario(p, resumeAt);
+  check("fiche de l'incident refermée", (await insp.count()) === 0);
+  check("aucune erreur console", errors.length === 0, errors.join(" | "));
+  await ctx.close();
+}
+
 /** /carte en mode HTML-in-Canvas : 5 panneaux capturés, vérifiés par readPixels, sans repli. */
 async function carteHic(b: Browser) {
   console.log("\n== /carte?mode=hic (HTML-in-Canvas)");
@@ -356,6 +519,8 @@ try {
   await narrow(b, true);
   await classic(b);
   await homeHic(b);
+  await scenarioHic(b);
+  await scenarioClassic(b);
   await carteHic(b);
   await otherPages();
 } finally {

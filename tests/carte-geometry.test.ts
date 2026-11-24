@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { modelMatrix, mul, PanelProjection, placeGround, placePanel, placeVertical } from "../src/client/carte/hic/geometry";
+import { modelMatrix, mul, PanelProjection, placeGround, placePanel, placeVertical, verticalFlip } from "../src/client/carte/hic/geometry";
 
 const anchor = { x: 0.3, y: 0.36, z: 0 };
 const unit = 1e-7;
@@ -98,4 +98,25 @@ test("placeVertical : plan vertical le long du segment, sous la chaussée, lisib
     // normale vers la caméra (inclinaison 60°)
     assert.ok(dot(normal(p), toCamera(bearing, 60)) > 0, `cap ${bearing} : coupe vue de dos`);
   }
+});
+
+test("verticalFlip : hystérésis près de l'axe du segment (pas de scintillement de la coupe)", () => {
+  const from: [number, number] = [anchor.x, anchor.y];
+  // segment vers l'est (Mercator : x croissant) : lisible de face pour un cap nord (0°)
+  const to: [number, number] = [anchor.x + 60 * unit, anchor.y];
+  assert.equal(verticalFlip(from, to, 0), false);
+  assert.equal(verticalFlip(from, to, 180), true);
+  // cap à 90° (caméra dans l'axe du segment) : sans état, la décision bascule d'un degré à l'autre
+  assert.notEqual(verticalFlip(from, to, 89), verticalFlip(from, to, 91));
+  // avec l'état précédent, elle tient tant qu'on ne dépasse pas la marge
+  for (const b of [80, 89, 91, 95]) {
+    assert.equal(verticalFlip(from, to, b, false), false, `cap ${b}, non retournée`);
+    assert.equal(verticalFlip(from, to, b, true), b < 85 ? false : true, `cap ${b}, retournée`);
+  }
+  assert.equal(verticalFlip(from, to, 110, false), true);
+  // placeVertical suit la décision imposée
+  const kept = placeVertical(from, to, 0, 230, unit, 95, 560, false);
+  assert.ok(kept.r[0] > 0, "coupe gardée dans le sens from -> to");
+  const auto = placeVertical(from, to, 0, 230, unit, 95, 560);
+  assert.ok(auto.r[0] < 0, "sans décision imposée : retournée dès que la caméra passe l'axe");
 });

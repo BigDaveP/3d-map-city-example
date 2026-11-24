@@ -126,6 +126,17 @@ export interface NetworkData {
   sensors: Sensor[];
   sectors: { id: string; name: string; addresses: number; at: [number, number] }[];
   valves: { node: number; at: [number, number] }[];
+  /** plan d'isolation du tronçon du scénario, calculé par le serveur */
+  scenario: {
+    segment: string;
+    /** nœuds des vannes à fermer */
+    valves: number[];
+    /** tronçons privés d'eau une fois les vannes fermées */
+    isolated: number[];
+    path: import("@/lib/aqueduc/graph").IsolationPath | null;
+    /** adresses (estimées, simulées) en basse pression vannes ouvertes, sans eau vannes fermées */
+    impact: { lowPressure: number; withoutWater: number };
+  };
   attribution: string;
   demoSegments: number[];
 }

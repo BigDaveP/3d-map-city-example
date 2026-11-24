@@ -45,22 +45,44 @@ export const SCENARIO_STEPS: { id: StepId; at: number; title: string; text: stri
   },
 ];
 
-const stepAt = (id: StepId) => SCENARIO_STEPS.find((s) => s.id === id)!.at;
+const timeOf = (id: StepId) => SCENARIO_STEPS.find((s) => s.id === id)!.at;
 const ORDER: StepId[] = SCENARIO_STEPS.map((s) => s.id);
 
+/** Étape en cours à l'heure simulée t : la dernière commencée (détection avant 06:58). */
+export function stepAtTime(t: number): StepId {
+  let id: StepId = ORDER[0];
+  for (const s of SCENARIO_STEPS) if (s.at <= t) id = s.id;
+  return id;
+}
+
+/** Paramètres de l'incident d'une étape (sans le tronçon, toujours `CITY.breakSegment`). */
+export interface ScenarioIncidentParams {
+  startedAt: number;
+  closedValves: number[];
+  restoredAt: number | null;
+}
+
 /**
- * Incident à appliquer à une étape. Les vannes ne sont fermées qu'à l'étape « isolation » si le visiteur
- * l'a fait (`valvesClosed`) ; après, l'équipe les a fermées dans tous les cas. Le modèle fournit l'index
- * du tronçon et les vannes qui l'isolent.
+ * Incident d'une étape à partir des seules vannes qui isolent le tronçon : utilisable par le client,
+ * qui n'a pas le modèle (les vannes lui viennent du serveur). Les vannes ne sont fermées qu'à
+ * l'étape « isolation » si le visiteur l'a fait (`valvesClosed`) ; après, l'équipe les a fermées
+ * dans tous les cas.
  */
-export function scenarioIncident(step: StepId, valvesClosed: boolean, m: Model): IncidentInput {
-  const segment = m.network.byId.get(CITY.breakSegment)!;
+export function scenarioIncidentParams(step: StepId, valvesClosed: boolean, valves: readonly number[]): ScenarioIncidentParams {
   const k = ORDER.indexOf(step);
   const closed = k > ORDER.indexOf("isolation") || (step === "isolation" && valvesClosed);
   return {
-    segment,
     startedAt: BREAK_AT,
-    closedValves: closed ? isolate(m.network, segment, m.valves).valves : [],
-    restoredAt: k >= ORDER.indexOf("retablissement") ? stepAt("retablissement") : null,
+    closedValves: closed ? [...valves] : [],
+    restoredAt: k >= ORDER.indexOf("retablissement") ? timeOf("retablissement") : null,
   };
+}
+
+/**
+ * Incident à appliquer à une étape, pour le modèle (serveur, tests) : le modèle fournit l'index du
+ * tronçon et les vannes qui l'isolent.
+ */
+export function scenarioIncident(step: StepId, valvesClosed: boolean, m: Model): IncidentInput {
+  const segment = m.network.byId.get(CITY.breakSegment)!;
+  return { segment, ...scenarioIncidentParams(step, valvesClosed, isolate(m.network, segment, m.valves).valves) };
 }

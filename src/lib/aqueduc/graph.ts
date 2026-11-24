@@ -119,3 +119,61 @@ export function isolate(n: Network, segment: number, valves: Set<number>): Isola
     isolated: [...isolated].sort((x, y) => x - y),
   };
 }
+
+/** Tracé d'une isolation à deux vannes, pour la coupe sous la rue. */
+export interface IsolationPath {
+  /** vanne de départ et d'arrivée (nœuds) */
+  from: number;
+  to: number;
+  /** tronçons isolés de `from` à `to`, dans l'ordre (sans les branchements) */
+  segments: number[];
+  /** tronçon hors zone de l'autre côté de chaque vanne (le plus gros, amenée ou maîtresse d'abord) */
+  before: number | null;
+  after: number | null;
+}
+
+const MAIN_RANK = { amenee: 2, maitresse: 2, distribution: 1, branchement: 0 } as const;
+
+/**
+ * Chemin de vanne à vanne le long des tronçons isolés (parcours en largeur, branchements exclus) ;
+ * null si l'isolation n'a pas exactement deux vannes ou si elles ne sont pas reliées.
+ */
+export function isolationPath(n: Network, iso: Isolation): IsolationPath | null {
+  if (iso.valves.length !== 2) return null;
+  const [from, to] = iso.valves;
+  const inside = new Set(iso.isolated.filter((si) => n.segments[si].cls !== "branchement"));
+  // parcours en largeur de `from` à `to` par les tronçons isolés
+  const via = new Map<number, number>([[from, -1]]);
+  const queue = [from];
+  for (let head = 0; head < queue.length && !via.has(to); head++) {
+    const node = queue[head];
+    if (node !== from && iso.valves.includes(node)) continue;
+    for (const si of n.adj[node]) {
+      if (!inside.has(si)) continue;
+      const s = n.segments[si];
+      const next = s.a === node ? s.b : s.a;
+      if (via.has(next)) continue;
+      via.set(next, si);
+      queue.push(next);
+    }
+  }
+  if (!via.has(to)) return null;
+  const segments: number[] = [];
+  for (let node = to; node !== from; ) {
+    const si = via.get(node)!;
+    segments.unshift(si);
+    const s = n.segments[si];
+    node = s.a === node ? s.b : s.a;
+  }
+  const outside = (valve: number): number | null => {
+    let best: number | null = null;
+    for (const si of n.adj[valve]) {
+      const s = n.segments[si];
+      if (iso.isolated.includes(si) || s.cls === "branchement") continue;
+      const b = best === null ? null : n.segments[best];
+      if (!b || MAIN_RANK[s.cls] > MAIN_RANK[b.cls] || (MAIN_RANK[s.cls] === MAIN_RANK[b.cls] && s.diameter > b.diameter)) best = si;
+    }
+    return best;
+  };
+  return { from, to, segments, before: outside(from), after: outside(to) };
+}

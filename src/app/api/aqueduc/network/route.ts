@@ -1,10 +1,13 @@
 /**
- * Réseau réel complet (GeoJSON), capteurs simulés, secteurs, vannes et ordre des segments du flux.
+ * Réseau réel complet (GeoJSON), capteurs simulés, secteurs, vannes, ordre des segments du flux et
+ * plan d'isolation du tronçon du scénario (vannes à fermer, calculées ici : le client n'a pas le modèle).
  * Propriétés : i (index), id, d (mm), m (matériau), y (année), c (classe), s (secteur), l (longueur en m,
  * donnée source), b (bris antérieurs simulés depuis 2009).
  */
 import { CITY } from "@/lib/aqueduc/city";
-import { breakHistory } from "@/lib/aqueduc/sim";
+import { isolate, isolationPath } from "@/lib/aqueduc/graph";
+import { SCENARIO_STEPS, scenarioIncident } from "@/lib/aqueduc/scenario";
+import { breakHistory, incidentImpact } from "@/lib/aqueduc/sim";
 import { getDemoSegments, getModel } from "@/server/aqueduc";
 
 export const dynamic = "force-static";
@@ -28,12 +31,27 @@ export async function GET() {
     const k = s.a === node ? 0 : s.coords.length - 2;
     return [r6(s.coords[k]), r6(s.coords[k + 1])];
   };
+  // scénario de bris : vannes qui isolent le tronçon et adresses touchées à l'isolation, vannes ouvertes puis fermées
+  const brk = n.byId.get(CITY.breakSegment)!;
+  const iso = isolate(n, brk, m.valves);
+  const at = SCENARIO_STEPS.find((s) => s.id === "isolation")!.at;
+  const scenario = {
+    segment: CITY.breakSegment,
+    valves: iso.valves,
+    isolated: iso.isolated,
+    path: isolationPath(n, iso),
+    impact: {
+      lowPressure: incidentImpact(m, at, scenarioIncident("isolation", false, m)).lowPressureAddresses,
+      withoutWater: incidentImpact(m, at, scenarioIncident("isolation", true, m)).withoutWaterAddresses,
+    },
+  };
   const body = {
     segments: { type: "FeatureCollection", features },
     demoSegments: getDemoSegments(),
     sensors: m.sensors,
     sectors: m.sectors.map((s, k) => ({ id: s.id, name: s.name, addresses: s.addresses, at: CITY.sectorSeeds[k].at })),
     valves: [...m.valves].sort((a, b) => a - b).map((node) => ({ node, at: nodePos(node) })),
+    scenario,
     attribution: CITY.attribution,
   };
   return new Response(JSON.stringify(body), {

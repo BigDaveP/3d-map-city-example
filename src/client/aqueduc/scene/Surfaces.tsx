@@ -4,19 +4,23 @@
  * réel, monté dans le canvas de MapLibre par `HicHost` :
  *  - `sector:<id>` : nom du secteur et un seul chiffre, peints au sol (secteurs à l'écran) ;
  *  - `incident:<tronçon>` : « BRIS PROBABLE », la conduite et une valeur clé, au sol le long de la rue ;
- *  - `sensor:<id>` : une valeur par capteur pertinent (`useTaggedSensors`, 8 au plus), face caméra.
+ *  - `sensor:<id>` : une valeur par capteur pertinent (`useTaggedSensors`, 8 au plus), face caméra ;
+ *  - `cut:<tronçon>` : pendant l'étape d'isolation du scénario, coupe verticale sous la rue, de vanne
+ *    à vanne (elle remplace alors le marquage de l'incident, dont elle porte l'information).
  * Les bâtiments les masquent (profondeur partagée) et bloquent les clics là où ils les cachent.
  */
 import { useMemo } from "react";
 import type { Map as MlMap } from "maplibre-gl";
 import { CITY } from "@/lib/aqueduc/city";
-import { metersPerPixel, placeGround, placePanel, type PanelPlacement } from "../../carte/hic/geometry";
+import { metersPerPixel, placeGround, placePanel, placeVertical, verticalFlip, type PanelPlacement } from "../../carte/hic/geometry";
 import { TRANSITION_MS } from "../../carte/hic/panelLayer";
 import { HicHost, type HicHostProps, type SurfaceSpec } from "../../hic3d/HicHost";
 import type { Metrics } from "../../metrics";
 import { lineCenter, segment, type NetIndex } from "../net";
 import { aqueducStore } from "../store";
 import { useAq } from "../useAq";
+import { cutLayout, cutView } from "./cut";
+import { CutSection } from "./CutSection";
 import { IncidentMark } from "./IncidentMark";
 import { parseKey, rectQuad, SURFACE_SIZE, surfaceKey, type Quad } from "./marks";
 import { SectorMark, useVisibleSectors } from "./SectorMark";
@@ -76,6 +80,10 @@ interface Anchor {
 /** Placement de chaque surface à chaque image, d'après la caméra courante. */
 function layerOptions(ml: ML, map: MlMap, net: NetIndex): HicHostProps["layerOptions"] {
   const anchors = new Map<string, Anchor | null>();
+  const cut = cutLayout(net);
+  const cutEnds = cut && ([cut.from, cut.to].map((p) => ml.MercatorCoordinate.fromLngLat(p)) as [InstanceType<ML["MercatorCoordinate"]>, InstanceType<ML["MercatorCoordinate"]>]);
+  // sens de lecture de la coupe : hystérésis (pas de scintillement quand la caméra regarde dans son axe)
+  let cutFlipped: boolean | undefined;
   const at = (lngLat: [number, number], heading = 0): Anchor => {
     const m = ml.MercatorCoordinate.fromLngLat(lngLat, 0);
     return { lngLat, x: m.x, y: m.y, z: m.z, unit: m.meterInMercatorCoordinateUnits(), heading };
@@ -108,6 +116,20 @@ function layerOptions(ml: ML, map: MlMap, net: NetIndex): HicHostProps["layerOpt
   return {
     place: (key, { bearing, pitch, zoom }): PanelPlacement | null => {
       const k = parseKey(key);
+      if (k?.kind === "cut") {
+        if (!cutEnds) return null;
+        const from: [number, number] = [cutEnds[0].x, cutEnds[0].y];
+        const to: [number, number] = [cutEnds[1].x, cutEnds[1].y];
+        const f = verticalFlip(from, to, bearing, cutFlipped);
+        if (f !== cutFlipped) {
+          cutFlipped = f;
+          // le contenu suit (vannes et profil en miroir) ; hors de la boucle de rendu de la couche
+          if (cutView.getState().reversed !== f) queueMicrotask(() => cutView.setState({ reversed: f }));
+        }
+        const { w, h } = SURFACE_SIZE.cut;
+        // bord haut au niveau de la chaussée : la coupe descend sous la rue
+        return placeVertical(from, to, 0, h, cutEnds[0].meterInMercatorCoordinateUnits(), bearing, w, f);
+      }
       const a = anchor(key);
       if (!k || !a) return null;
       const { w, h } = SURFACE_SIZE[k.kind];
@@ -147,7 +169,10 @@ const onActive = () => {
 
 export function SceneSurfaces({ ml, map, metrics, net }: { ml: ML; map: MlMap; metrics: Metrics; net: NetIndex }) {
   const sectors = useVisibleSectors(map, net);
-  const incident = useAq((s) => s.incident !== null);
+  const cut = useMemo(() => cutLayout(net), [net]);
+  // la coupe, à l'isolation, porte l'information de l'incident : son marquage au sol s'efface
+  const showCut = useAq((s) => s.scenario.active && s.scenario.step === "isolation") && cut !== null;
+  const incident = useAq((s) => s.incident !== null) && !showCut;
   // lu une fois par la couche : constant pour un réseau donné
   const options = useMemo(() => layerOptions(ml, map, net), [ml, map, net]);
   const cover = useMemo<TagCover>(() => {
@@ -163,15 +188,25 @@ export function SceneSurfaces({ ml, map, metrics, net }: { ml: ML; map: MlMap; m
         return [s.x, s.y] as [number, number];
       });
     };
+    // zone d'écran approchée de la coupe : son bord haut (au sol), prolongé vers le bas dans les
+    // proportions de la surface (vue presque de face à l'isolation)
+    const cutQuad = (): Quad | null => {
+      if (!cut) return null;
+      const [a, b] = [map.project(cut.from), map.project(cut.to)];
+      const down = Math.max(60, (Math.hypot(b.x - a.x, b.y - a.y) * SURFACE_SIZE.cut.h) / SURFACE_SIZE.cut.w);
+      return [[a.x, a.y - 30], [b.x, b.y - 30], [b.x, b.y + down], [a.x, a.y + down]];
+    };
     return {
       // étiquette de 120 × 26 px à 14 px au-dessus du capteur (taille écran ≈ taille CSS, voir DISTANCE)
       tag: (p) => rectQuad(p.x - 62, p.y - 46, p.x + 62, p.y - 10),
       figures: () =>
-        [...sectors.map((s) => band(surfaceKey("sector", s.id), 0.5, 1)), incident ? band(surfaceKey("incident", CITY.breakSegment), 0, 1) : null].filter(
-          (q): q is Quad => !!q,
-        ),
+        [
+          ...sectors.map((s) => band(surfaceKey("sector", s.id), 0.5, 1)),
+          incident ? band(surfaceKey("incident", CITY.breakSegment), 0, 1) : null,
+          showCut ? cutQuad() : null,
+        ].filter((q): q is Quad => !!q),
     };
-  }, [ml, map, options, sectors, incident]);
+  }, [ml, map, options, sectors, incident, showCut, cut]);
   const tagged = useTaggedSensors(map, net, cover);
   const surfaces = useMemo<SurfaceSpec[]>(
     () => [
@@ -202,8 +237,19 @@ export function SceneSurfaces({ ml, map, metrics, net }: { ml: ML; map: MlMap; m
         focusable: true,
         render: () => <SensorTag sensor={s} drawable />,
       })),
+      ...(showCut && cut
+        ? [
+            {
+              key: surfaceKey("cut", CITY.breakSegment),
+              ...SURFACE_SIZE.cut,
+              version: 0,
+              focusable: true,
+              render: () => <CutSection net={net} cut={cut} drawable />,
+            },
+          ]
+        : []),
     ],
-    [sectors, incident, tagged, net],
+    [sectors, incident, tagged, net, showCut, cut],
   );
   return <HicHost ml={ml} map={map} metrics={metrics} surfaces={surfaces} layerOptions={options} onFallback={onFallback} onActive={onActive} />;
 }

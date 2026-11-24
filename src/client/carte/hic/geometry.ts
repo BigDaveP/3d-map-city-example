@@ -106,12 +106,28 @@ export function placeGround(
   return { o: [center.x - (w / 2) * R[0] - (h / 2) * D[0], center.y - (w / 2) * R[1] - (h / 2) * D[1], z], r: R, d: D };
 }
 
+/** Marge (cosinus, ≈ 8,6°) que la caméra doit franchir pour retourner une coupe déjà orientée. */
+export const FLIP_MARGIN = 0.15;
+
+/**
+ * La coupe `from` -> `to` doit-elle être parcourue à l'envers (`to` -> `from`) pour se lire de face ?
+ * Sa normale pointe vers la caméra si cos(angle du segment − cap) > 0. Avec l'état précédent
+ * (`prev`), la décision ne change qu'au-delà de `FLIP_MARGIN` : quand la caméra regarde dans l'axe
+ * du segment, la coupe ne bascule pas d'une image à l'autre.
+ */
+export function verticalFlip(from: [number, number], to: [number, number], bearingDeg: number, prev?: boolean): boolean {
+  const c = Math.cos(Math.atan2(to[1] - from[1], to[0] - from[0]) - (bearingDeg * Math.PI) / 180);
+  if (prev === undefined) return c < 0;
+  return prev ? c < FLIP_MARGIN : c < -FLIP_MARGIN;
+}
+
 /**
  * Plan vertical le long d'un segment (Mercator), sous la chaussée : coupe de w×h px CSS dont la
  * largeur couvre exactement `from` -> `to` (pixels carrés : la hauteur suit l'échelle de la
  * largeur) et dont le bord haut est à `depthTopM` mètres sous le sol. Le plan est parcouru dans
- * le sens qui le rend lisible depuis la caméra (sinon `to` -> `from`). `h` ne change pas le
- * placement : la coupe descend de h × (longueur du segment / w) sous son bord haut.
+ * le sens qui le rend lisible depuis la caméra (sinon `to` -> `from`) ; `flipped` impose ce sens
+ * (décision de `verticalFlip` avec hystérésis). `h` ne change pas le placement : la coupe descend
+ * de h × (longueur du segment / w) sous son bord haut.
  */
 export function placeVertical(
   from: [number, number],
@@ -121,12 +137,10 @@ export function placeVertical(
   unit: number,
   bearingDeg: number,
   w: number,
+  flipped: boolean = verticalFlip(from, to, bearingDeg),
 ): PanelPlacement {
-  let a = from;
-  let b = to;
   // normale r × d = (−r_y, r_x, 0)·s ; vers la caméra si cos(angle du segment − cap) > 0
-  const ang = Math.atan2(b[1] - a[1], b[0] - a[0]);
-  if (Math.cos(ang - (bearingDeg * Math.PI) / 180) < 0) [a, b] = [b, a];
+  const [a, b] = flipped ? [to, from] : [from, to];
   const R: [number, number, number] = [(b[0] - a[0]) / w, (b[1] - a[1]) / w, 0];
   const D: [number, number, number] = [0, 0, -Math.hypot(R[0], R[1])];
   return { o: [a[0], a[1], -depthTopM * unit], r: R, d: D };

@@ -61,6 +61,8 @@ html[data-aq="app"] .aq-ssr { display: none; }
 .aq-btn:hover { border-color: #c5ced9; }
 .aq-btn:disabled { opacity: 0.5; cursor: progress; }
 .aq-btns { display: flex; flex-wrap: wrap; gap: 6px; }
+.aq-btn.aq-pri { background: var(--aq-accent); border-color: var(--aq-accent); color: #fff; }
+.aq-btn.aq-pri:hover { background: #084c9f; }
 
 /* ---------------------------------------------------------------- barre d'application */
 .aq-bar { position: relative; z-index: 20; flex: none; display: flex; align-items: center; gap: var(--aq-gap); min-height: 52px; padding: 0 var(--aq-gap); background: rgba(255, 255, 255, 0.97); border-bottom: 1px solid var(--aq-line); font-size: 13px; }
@@ -164,6 +166,52 @@ html[data-aq="app"] .aq-ssr { display: none; }
 .aq-notices ul { margin: 8px 0 0; padding-left: 16px; font-size: 12px; color: var(--aq-ink-2); }
 .aq-notices p { margin: 6px 0 0; font-size: 12px; }
 
+/* ---------------------------------------------------------------- récit du scénario (maquette C) */
+.aq-launch { flex: none; }
+.aq-tl-scenario { font-size: 11px; font-weight: 600; color: var(--aq-accent); }
+.aq-story { left: var(--aq-gap); top: var(--aq-gap); bottom: calc(118px + 2 * var(--aq-gap)); width: 300px; z-index: 5; display: flex; flex-direction: column; gap: 10px; padding: 16px; overflow: auto; font-size: 12.5px; }
+.aq-story .aq-h3 { margin: 0; }
+.aq-story h2 { margin: 0; font-size: 18px; line-height: 1.25; letter-spacing: -0.005em; }
+.aq-story h2:focus { outline: none; }
+.aq-story-steps { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+.aq-story-steps button { display: grid; grid-template-columns: 24px 1fr; gap: 10px; align-items: center; width: 100%; padding: 3px 4px; border: 0; border-radius: 8px; background: none; color: var(--aq-ink-2); font: 13px var(--aq-ui); text-align: left; cursor: pointer; }
+.aq-story-steps button:hover { background: var(--aq-bg); }
+.aq-story-steps b { font-weight: 600; }
+.aq-story-steps .aq-num { font-size: 11.5px; }
+.aq-story-n { display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; border: 1.5px solid var(--aq-line); font-weight: 700; font-size: 11px; }
+.aq-story-steps [data-state="done"] .aq-story-n { background: var(--aq-good); border-color: var(--aq-good); color: #fff; }
+.aq-story-steps [data-state="now"] button { color: var(--aq-ink); }
+.aq-story-steps [data-state="now"] .aq-story-n { background: var(--aq-accent); border-color: var(--aq-accent); color: #fff; }
+.aq-story-body { margin: 2px 0 6px 38px; display: grid; gap: 8px; color: var(--aq-ink-2); }
+.aq-story-body p { margin: 0; font-size: 12px; }
+.aq-story-fig { padding: 6px 9px; border-radius: 7px; font-weight: 600; color: var(--aq-ink); background: #fdf3e1; border-left: 3px solid var(--aq-warn); }
+.aq-story-fig[data-tone="bad"] { background: #fbe9e7; border-left-color: var(--aq-bad); }
+.aq-story-fig[data-tone="good"] { background: #e7f4ec; border-left-color: var(--aq-good); }
+.aq-story-nav { margin-top: auto; }
+.aq-story-exit { margin-left: auto; }
+.aq-story-export { display: grid; gap: 4px; }
+.aq-story-export .aq-note { margin: 0; }
+.aq-story > .aq-note { margin: 0; }
+
+/* coupe sous la rue : surface de la scène (560 × 230) ou illustration dans la fiche */
+.aq-cut { position: relative; overflow: hidden; color: #fff; font-family: var(--aq-ui); }
+.aq-cut svg { display: block; width: 100%; height: 100%; }
+.aq-cut-num { paint-order: stroke; stroke: rgba(40, 30, 20, 0.55); stroke-width: 3px; }
+.aq-valve { position: absolute; transform: translateX(-50%); padding: 2px 8px; border: 1.5px solid #fff; border-radius: 6px; background: #0a5cc2; color: #fff; font: 700 12px var(--aq-ui); white-space: nowrap; cursor: pointer; }
+.aq-valve[aria-pressed="true"] { background: #142133; }
+.aq-valve:disabled { cursor: default; }
+.aq-valve:focus-visible { outline: 3px solid #ffd34d; outline-offset: 1px; }
+.aq-cut-error { position: absolute; left: 8px; right: 8px; top: 4px; margin: 0; padding: 2px 6px; border-radius: 4px; background: var(--aq-bad); font-size: 11.5px; font-weight: 600; }
+.aq-cut-card { margin: 0 0 8px; color: var(--aq-ink); overflow: visible; }
+.aq-cut-card svg { height: auto; aspect-ratio: 560 / 230; border-radius: 8px; }
+.aq-cut-card .aq-valves { margin-top: 8px; }
+.aq-valve-card[aria-pressed="true"] { background: #142133; border-color: #142133; color: #fff; }
+.aq-cut-card .aq-cut-error { position: static; margin-top: 6px; color: #fff; }
+.aq-insp-status { margin: 0 0 4px; font-weight: 600; }
+.aq-insp-status[data-tone="bad"] { color: var(--aq-bad); }
+.aq-insp-status[data-tone="warn"] { color: var(--aq-warn-text); }
+.aq-insp-status[data-tone="good"] { color: var(--aq-good); }
+
 /* ---------------------------------------------------------------- étiquettes des capteurs */
 .aq-pin { z-index: 2; display: flex; flex-direction: column; align-items: center; pointer-events: none; }
 .aq-tag { pointer-events: auto; display: flex; align-items: center; gap: 5px; padding: 2px 8px; border: 1px solid var(--aq-line); border-radius: 99px; background: #fff; color: var(--aq-ink); font: 600 11.5px var(--aq-ui); white-space: nowrap; box-shadow: 0 2px 6px rgba(20, 33, 51, 0.15); cursor: pointer; }
@@ -244,6 +292,10 @@ html[data-aq="app"] .aq-ssr { display: none; }
   .aq-tl-title { flex: 1 1 100%; }
   .aq-tl-btns { margin: 0 0 0 auto; }
   .aq-inspector { left: var(--aq-gap); width: auto; top: auto; bottom: 168px; max-height: calc(100% - 230px); }
+  /* récit en haut, fiche en bas : les deux tiennent sans se recouvrir */
+  .aq-story { right: var(--aq-gap); width: auto; bottom: auto; max-height: 42%; padding: 12px; }
+  .aq-stage:has(.aq-story) .aq-inspector { max-height: calc(58% - 190px); }
+  .aq-story-steps li:not([data-state="now"]) { display: none; }
   .aq-stage .maplibregl-ctrl-attrib.maplibregl-compact { margin-bottom: 4px; }
   .aq-stage .maplibregl-ctrl-bottom-right { bottom: 166px; }
   .aq-ssr h1 { font-size: 22px; }

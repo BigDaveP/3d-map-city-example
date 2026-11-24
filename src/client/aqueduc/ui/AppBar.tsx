@@ -1,7 +1,9 @@
 "use client";
 /**
  * Barre d'application : démos, nom, mention « Simulation », recherche (tronçon, capteur, secteur ou rue),
- * horloge simulée, bascule Classique / HTML-in-Canvas et puce de performance.
+ * lancement du scénario de bris, horloge simulée, bascule Classique / HTML-in-Canvas et puce de
+ * performance. Pendant le scénario, la recherche et le lancement s'effacent (maquette C) : le récit
+ * à gauche porte la navigation.
  */
 import { useId, useMemo, useState, type FormEvent } from "react";
 import type { Map as MlMap } from "maplibre-gl";
@@ -9,6 +11,7 @@ import DemoNav from "../../shell/DemoNav";
 import type { Metrics } from "../../metrics";
 import { clockDay, clockTime } from "../format";
 import { fold, lineCenter, segment, type NetIndex } from "../net";
+import { startScenario } from "../scenarioController";
 import { aqueducStore, select, type Mode } from "../store";
 import { useAq, useSimNow } from "../useAq";
 import { PerfChip } from "./PerfChip";
@@ -50,6 +53,7 @@ function Clock() {
 export function AppBar({ map, net, metrics }: { map: MlMap | null; net: NetIndex | null; metrics: Metrics | null }) {
   const mode = useAq((s) => s.mode);
   const api = useAq((s) => s.api);
+  const scenario = useAq((s) => s.scenario.active);
   const [q, setQ] = useState("");
   const [msg, setMsg] = useState("");
   const listId = useId();
@@ -101,7 +105,7 @@ export function AppBar({ map, net, metrics }: { map: MlMap | null; net: NetIndex
       <span className="aq-sim" title="Capteurs, mesures, secteurs et incidents simulés ; seul le tracé des conduites est réel.">
         Simulation
       </span>
-      <form className="aq-search" role="search" onSubmit={submit}>
+      <form className="aq-search" role="search" onSubmit={submit} hidden={scenario}>
         <label className="aq-sr" htmlFor={`${listId}-in`}>
           Rechercher un tronçon, un capteur, un secteur ou une rue
         </label>
@@ -126,6 +130,11 @@ export function AppBar({ map, net, metrics }: { map: MlMap | null; net: NetIndex
         </span>
       </form>
       <span className="aq-spacer" />
+      {!scenario && (
+        <button type="button" className="aq-btn aq-pri aq-launch" disabled={!net} onClick={() => startScenario()}>
+          Lancer le scénario de bris
+        </button>
+      )}
       <Clock />
       <div className="aq-seg" role="group" aria-label="Mode de rendu">
         <button type="button" aria-pressed={mode === "classic"} onClick={() => setMode("classic")}>

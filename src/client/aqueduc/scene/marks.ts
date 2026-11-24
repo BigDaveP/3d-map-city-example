@@ -11,9 +11,11 @@ export const SURFACE_SIZE = {
   sector: { w: 420, h: 90 },
   incident: { w: 520, h: 80 },
   sensor: { w: 120, h: 26 },
+  /** coupe verticale sous la rue (scénario, étape d'isolation) */
+  cut: { w: 560, h: 230 },
 } as const;
 
-/** Clés des surfaces : `sector:<id>`, `incident:<tronçon>`, `sensor:<id>`. */
+/** Clés des surfaces : `sector:<id>`, `incident:<tronçon>`, `sensor:<id>`, `cut:<tronçon>`. */
 export type SurfaceKind = keyof typeof SURFACE_SIZE;
 export const surfaceKey = (kind: SurfaceKind, id: string) => `${kind}:${id}`;
 export function parseKey(key: string): { kind: SurfaceKind; id: string } | null {
