@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test 'tests/**/*.test.ts'",
+    "test": "node --conditions=react-server --import tsx --test 'tests/**/*.test.ts'",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx scripts/db-setup.ts migrate",
     "db:seed": "tsx scripts/db-setup.ts seed",
