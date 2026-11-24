@@ -246,8 +246,14 @@ function CardControls({ ds, id, status }: { ds: DataStore; id: string; status: n
   const managers = useData(ds, (s) => s.managers);
   const [saving, setSaving] = useState<"" | "…" | "✓" | "✗">("");
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
-  // la note est non contrôlée : la valeur initiale vient du store, la saisie reste fluide
+  // la note est non contrôlée : la saisie reste fluide ; une valeur arrivée du serveur après le
+  // montage (chargement initial des notes) est recopiée tant que le champ n'a pas le focus
   const initial = useRef(note);
+  const area = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    const t = area.current;
+    if (t && document.activeElement !== t && t.value !== note) t.value = note;
+  }, [note]);
 
   useEffect(() => () => clearTimeout(timer.current), []);
 
@@ -283,6 +289,7 @@ function CardControls({ ds, id, status }: { ds: DataStore; id: string; status: n
     <>
       <div className="note">
         <textarea
+          ref={area}
           defaultValue={initial.current}
           onInput={onInput}
           placeholder="Note d'équipe…"
