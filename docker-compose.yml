@@ -1,0 +1,32 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: mur
+      POSTGRES_PASSWORD: mur
+      POSTGRES_DB: mur
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mur -d mur"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+
+  # Image de production (même Dockerfile que Coolify). `docker compose --profile app up`
+  app:
+    profiles: ["app"]
+    build: .
+    environment:
+      DATABASE_URL: postgres://mur:mur@db:5432/mur
+      DB_AUTO_SETUP: "1"
+    ports:
+      - "3000:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pgdata:
