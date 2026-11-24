@@ -1,0 +1,36 @@
+{
+  "date": "2026-11-24T01:24:00.883Z",
+  "browser": "Chromium 158.0.8127.36 (Playwright, headless)",
+  "chromeArgs": [
+    "--enable-blink-features=CanvasDrawElement",
+    "--enable-precise-memory-info"
+  ],
+  "webgl": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+  "glBaseline": {
+    "sansDessin": {
+      "fps": 59.99933702390043,
+      "p95": 16.799999999999727
+    },
+    "clearChaqueFrame": {
+      "fps": 60.00400026668444,
+      "p95": 16.799999999999727
+    },
+    "taille": "1600×900"
+  },
+  "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz × 4",
+  "memoryGB": 17,
+  "viewport": {
+    "width": 1600,
+    "height": 900
+  },
+  "repeat": 2,
+  "speed": [
+    10
+  ],
+  "budget": [
+    [
+      12,
+      6
+    ]
+  ]
+}

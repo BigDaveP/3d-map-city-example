@@ -1,0 +1,29 @@
+/* Palette catégorielle (3 premiers emplacements, pas sombre) validée : CVD ΔE 9,4, contraste >= 3:1 */
+.viz-root { --series-1: #3987e5; --series-2: #d95926; --series-3: #199e70; --surface-1: #121821; }
+.bench { padding: 0 20px 40px; max-width: 1500px; margin: 0 auto; }
+.bench h1 { font-size: 22px; margin: 14px 0 4px; }
+.bench h2 { font-size: 16px; margin: 26px 0 8px; }
+.bench .lead, .bench .meta, .bench .note { color: var(--muted); }
+.bench .meta { font-size: 12px; }
+.bench a { color: var(--accent); }
+.bench .warn { background: #2b2410; border: 1px solid #5a4a14; border-radius: 6px; padding: 8px 12px; font-size: 13px; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; list-style: none; padding: 0; margin: 10px 0; font-size: 13px; }
+.legend .sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.charts { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px; }
+.chart { margin: 0; background: var(--surface-1); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px 6px; }
+.chart figcaption { font-size: 13px; margin-bottom: 4px; }
+.chart .unit, .chart .cnote { color: var(--muted); font-size: 12px; }
+.chart svg { width: 100%; height: auto; display: block; }
+.chart .grid { stroke: #222b38; stroke-width: 1; }
+.chart .axis { stroke: #3a4658; stroke-width: 1; }
+.chart .tick { fill: var(--muted); font-size: 11px; }
+.chart .hit { fill: transparent; }
+.chart .bar:hover path { filter: brightness(1.25); }
+.chart .bar:hover .hit { fill: rgba(255, 255, 255, 0.04); }
+.tablewrap { overflow-x: auto; }
+.bench table { border-collapse: collapse; font-size: 12.5px; min-width: 100%; }
+.bench th, .bench td { padding: 4px 8px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
+.bench td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.bench tr.total { background: #151c26; font-weight: 600; }
+.bench details summary { cursor: pointer; margin: 8px 0; font-weight: 600; }
+@media (max-width: 600px) { .bench { padding: 0 16px 30px; } .charts { grid-template-columns: 1fr; } }

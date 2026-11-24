@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
   output: "standalone",
   reactStrictMode: true,
   // Les migrations SQL sont lues au démarrage par l'instrumentation.
-  outputFileTracingIncludes: { "/*": ["./drizzle/**/*"] },
+  outputFileTracingIncludes: { "/*": ["./drizzle/**/*"], "/bench": ["./bench/results/**/*"], "/bench/results.csv": ["./bench/results/**/*"] },
 };
 
 export default nextConfig;
