@@ -22,6 +22,13 @@ export class LiveState {
   sig: string[];
   /** 0 = propre ; sinon performance.now() de réception de la plus ancienne donnée non affichée. */
   dirtySince: Float64Array;
+  /**
+   * Version du contenu HTML de chaque carte : incrémentée à chaque changement. Une texture
+   * mémorise la version capturée ; elle est périmée si version > texture.version (quel que
+   * soit son niveau : une texture intermédiaire peut être périmée pendant qu'on regarde la
+   * version complète).
+   */
+  version: Uint32Array;
   /** Nombre de passages à dirty (pour le banc). */
   dirtyMarks = 0;
   private listeners = new Set<() => void>();
@@ -35,6 +42,14 @@ export class LiveState {
     this.sparkCount = new Uint16Array(this.branches);
     this.sig = new Array(cardCount).fill("");
     this.dirtySince = new Float64Array(cardCount);
+    this.version = new Uint32Array(cardCount);
+  }
+
+  /** Marque la carte dirty (donnée reçue à `at`, ou interaction). */
+  markDirty(card: number, at: number) {
+    if (this.dirtySince[card] === 0 || at < this.dirtySince[card]) this.dirtySince[card] = at;
+    this.version[card]++;
+    this.dirtyMarks++;
   }
 
   setStatus(card: number, s: Status) {
@@ -66,8 +81,7 @@ export class LiveState {
   updateSig(card: number, sig: string, receivedAt: number): boolean {
     if (this.sig[card] === sig) return false;
     this.sig[card] = sig;
-    if (this.dirtySince[card] === 0 || receivedAt < this.dirtySince[card]) this.dirtySince[card] = receivedAt;
-    this.dirtyMarks++;
+    this.markDirty(card, receivedAt);
     return true;
   }
 

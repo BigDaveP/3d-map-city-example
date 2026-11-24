@@ -24,7 +24,7 @@ export class SparkBuilder {
    * Ajoute la sparkline `values[0..n)` dans la zone monde (x, y, w, h).
    * Même normalisation que le SVG du mode DOM (0..max), épaisseur en px écran.
    */
-  add(values: Float32Array, n: number, x: number, y: number, w: number, h: number, zoom: number, thicknessPx: number, rgba: [number, number, number, number]) {
+  add(values: Float32Array, n: number, x: number, y: number, w: number, h: number, zoom: number, thicknessPx: number, rgba: [number, number, number, number], pad = (2 / 46) * h) {
     if (n < 2) return;
     this.ensure((n - 1) * 6);
     let max = 1;
@@ -34,7 +34,7 @@ export class SparkBuilder {
     const d = this.data;
     let o = this.count * FLOATS_PER_VERTEX;
     const px = (i: number) => x + (i / (SPARK_N - 1)) * w;
-    const py = (i: number) => y + h - (2 / 46) * h - (values[i] / max) * (h - (4 / 46) * h);
+    const py = (i: number) => y + h - pad - (values[i] / max) * (h - 2 * pad);
     for (let i = 0; i < n - 1; i++) {
       const x0 = px(i), y0 = py(i), x1 = px(i + 1), y1 = py(i + 1);
       let nx = -(y1 - y0), ny = x1 - x0;
@@ -54,9 +54,9 @@ export class SparkBuilder {
     this.count += (n - 1) * 6;
   }
 
-  addSeries(get: (out: Float32Array) => number, x: number, y: number, w: number, h: number, zoom: number, thicknessPx: number, rgba: [number, number, number, number]) {
+  addSeries(get: (out: Float32Array) => number, x: number, y: number, w: number, h: number, zoom: number, thicknessPx: number, rgba: [number, number, number, number], pad?: number) {
     const n = get(this.series);
-    this.add(this.series, n, x, y, w, h, zoom, thicknessPx, rgba);
+    this.add(this.series, n, x, y, w, h, zoom, thicknessPx, rgba, pad);
   }
 
   view() {
