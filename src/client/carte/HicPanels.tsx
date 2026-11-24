@@ -101,15 +101,15 @@ export function HicPanels({ ml, map, metrics, onFallback }: { ml: ML; map: MlMap
       if (disposed) return;
       const t0 = performance.now();
       paintSeen = true;
-      const changed = new Set<string>();
+      // dirty flags persistants : un panneau repoussé par le budget reste à capturer au paint suivant
       const ce = (e as Event & { changedElements?: ArrayLike<Element> }).changedElements;
       if (ce) for (let i = 0; i < ce.length; i++) {
         const k = (ce[i] as HTMLElement).dataset?.panel;
-        if (k) changed.add(k);
+        if (k) dirty.add(k);
       }
       // texture manquante ou contenu changé ; le panneau focalisé d'abord
       const focusedKey = (document.activeElement as HTMLElement | null)?.closest?.<HTMLElement>("[data-panel]")?.dataset.panel;
-      const todo = [...layer.panels.values()].filter((p) => p.el && (!p.tex || changed.has(p.key)));
+      const todo = [...layer.panels.values()].filter((p) => p.el && (!p.tex || dirty.has(p.key)));
       todo.sort((a, b) => (a.key === focusedKey ? -1 : b.key === focusedKey ? 1 : 0));
       if (!todo.length) return;
       // l'état GL est suivi par MapLibre : on le restaure après nos uploads
@@ -147,6 +147,7 @@ export function HicPanels({ ml, map, metrics, onFallback }: { ml: ML; map: MlMap
           break;
         }
         metrics.capture(performance.now() - tu);
+        dirty.delete(p.key);
         uploads++;
         n++;
         if (verified < VERIFY_FIRST || uploads % VERIFY_EVERY === 0) {
@@ -182,6 +183,7 @@ export function HicPanels({ ml, map, metrics, onFallback }: { ml: ML; map: MlMap
       map.triggerRepaint();
     };
     const lastLatencyMark = new Map<string, number>();
+    const dirty = new Set<string>();
     canvas.addEventListener("paint", onPaint);
     canvas.requestPaint?.();
     const watchdog = setTimeout(() => {
