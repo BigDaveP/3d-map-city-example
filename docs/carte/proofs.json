@@ -1,0 +1,89 @@
+{
+  "clicMasque_classic": {
+    "textarea": {
+      "x": 750,
+      "y": 168.890625
+    },
+    "elementFromPoint": "textarea",
+    "focusApresClic": "textarea:R03",
+    "occlusionStats": null,
+    "errors": []
+  },
+  "clicMasque_hic": {
+    "textarea": {
+      "x": 750,
+      "y": 217.2380828857422
+    },
+    "elementFromPoint": "textarea",
+    "focusApresClic": "canvas",
+    "occlusionStats": {
+      "queries": 1,
+      "totalMs": 153.3000000002794,
+      "blocked": 0,
+      "passThrough": 1
+    },
+    "errors": []
+  },
+  "saisie_hic": {
+    "focus": "R03",
+    "valeur": "Saisie dans un panneau incliné",
+    "tab": [
+      "button@r2",
+      "button@r1",
+      "input@r1"
+    ],
+    "errors": []
+  },
+  "focusMasque_hic": {
+    "focus": "R03"
+  },
+  "aria_classic": [
+    "      - row \"Brasserie Corvelac Ouvert 0 9 min\":",
+    "        - rowheader \"Brasserie Corvelac\"",
+    "  - 'button \"Brasserie Corvelac (ouvert) : ouvrir le panneau\"'",
+    "  - region \"Brasserie Corvelac — Ouvert\":",
+    "    - strong: Brasserie Corvelac",
+    "    - button \"Fermer Brasserie Corvelac\": ✕",
+    "    - switch \"Mettre en pause les commandes en ligne\"",
+    "    - text: Mettre en pause les commandes en ligne"
+  ],
+  "aria_hic": [
+    "      - row \"Brasserie Corvelac Ouvert 1 9 min\":",
+    "        - rowheader \"Brasserie Corvelac\"",
+    "    - region \"Brasserie Corvelac — Ouvert\":",
+    "      - strong: Brasserie Corvelac",
+    "      - button \"Fermer Brasserie Corvelac\": ✕",
+    "      - switch \"Mettre en pause les commandes en ligne\"",
+    "      - text: Mettre en pause les commandes en ligne",
+    "      - textbox \"Note pour l'équipe, Brasserie Corvelac\":"
+  ],
+  "transitionInteractive": {
+    "focus": "R03",
+    "avancement": 0.1584
+  },
+  "video_classic": {
+    "w": 900,
+    "h": 612,
+    "octets": 393827
+  },
+  "video_hic": {
+    "w": 900,
+    "h": 612,
+    "octets": 372534
+  },
+  "selection_classic": {
+    "selectionTexte": "Brasserie Corvelac",
+    "copieTexte": "Brasserie Corvelac\n",
+    "copieChamp": "texte à copier"
+  },
+  "selection_hic": {
+    "selectionTexte": "",
+    "copieTexte": "(témoin)",
+    "copieChamp": "texte à copier"
+  },
+  "repli": {
+    "mode": "classic",
+    "api": "absente",
+    "message": "Mode classique activé automatiquement : API HTML-in-Canvas absente (ni texElementSubImage2D ni texElementImage2D (activez chrome://flags/#canvas-draw-element))."
+  }
+}

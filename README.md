@@ -56,6 +56,65 @@ Interactions : molette = zoom au curseur, glisser = déplacer, `+`/`-`/flèches 
 clic sur une carte intermédiaire = ouvrir son panneau complet (Échap pour fermer), Tab parcourt
 les champs des cartes rapprochées (la caméra suit le focus).
 
+## Carte opérationnelle 3D (`/carte`)
+
+Seconde démo, qui teste l'autre hypothèse : **de vrais panneaux HTML (formulaires, focus,
+accessibilité) intégrés dans une scène WebGL 3D**, en perspective, masqués par les bâtiments,
+avec des effets shader. Le livrable est **[CAPABILITIES.md](CAPABILITIES.md)**, une matrice
+« mode classique vs HTML-in-Canvas » avec preuves dans `docs/carte/`.
+
+- 30 restaurants fictifs (Montréal et Québec) et 40 livreurs simulés (SSE, 1 à 2 s).
+- Carte MapLibre GL JS 6, tuiles vectorielles gratuites [OpenFreeMap](https://openfreemap.org)
+  (style « liberty », bâtiments `fill-extrusion` d'après `render_height`), caméra inclinée à 62°,
+  rotation activée. Attribution affichée : OpenFreeMap, © OpenMapTiles, données © OpenStreetMap.
+  Les conditions d'OpenFreeMap autorisent l'intégration gratuite mais interdisent la collecte
+  automatisée : le banc et le script de preuves chargent la carte quelques dizaines de fois,
+  pas plus.
+- **Mode classique** : marqueurs et popups MapLibre en DOM (plats, toujours devant).
+- **Mode HTML-in-Canvas** : mêmes composants React, montés dans le canvas de MapLibre et
+  dessinés dans la scène 3D.
+
+```bash
+npm run dev
+```
+
+Ouvrir <http://localhost:3000/carte> (`?mode=classic|hic`, `?ville=mtl|qc`). Clic sur un disque
+de statut ou un livreur pour ouvrir son panneau ; boutons « 10 / 30 / 60 panneaux », « Face
+caméra / Sur façade », brouillard, ombre, transition d'ouverture, « Exporter 10 s de vidéo ».
+
+**Choix de l'intégration : option A.** Une sonde (un panneau derrière la tour de la Place
+Ville-Marie) a montré que tout fonctionne sur le canvas de MapLibre :
+
+1. `content="drawable"` sur `map.getCanvas()` ne perturbe pas le rendu de MapLibre ;
+2. l'upload (`texElementSubImage2D`) se fait avec le contexte GL de MapLibre, dans le handler
+   `paint`, à condition de **restaurer l'état GL** (texture liée, unité active, framebuffer)
+   que MapLibre garde en cache ;
+3. une custom layer en `renderingMode: "3d"` partage le **buffer de profondeur** des bâtiments ;
+4. `updateElementGeometry` accepte une **matrice projective 4×4** : le hit testing suit la
+   perspective.
+
+L'option B (canvas superposé) n'a donc pas été nécessaire. Code : `src/client/carte/`.
+
+Pièges rencontrés : la matrice à utiliser dans la custom layer est
+`defaultProjectionData.mainMatrix` (avec `modelViewProjectionMatrix`, des coordonnées Mercator
+0..1 s'effondrent en un point) ; le worker de MapLibre 6, chargé via
+`new URL(..., import.meta.url)`, est réécrit par Turbopack et relançait le rechargement à chaud
+en boucle : il est servi tel quel par `/maplibre/[file]` (`setWorkerUrl`).
+
+Banc et preuves, relançables en une commande (de préférence sur une machine avec GPU) :
+
+```bash
+BASE_URL=http://localhost:3100 npm run bench:carte
+```
+
+```bash
+BASE_URL=http://localhost:3100 npm run proofs:carte
+```
+
+`bench:carte` écrit `bench/results/carte.csv` et `carte-meta.json` (qui indique si le WebGL
+était matériel ou logiciel) ; `proofs:carte` régénère les captures, les vidéos WebM et
+`docs/carte/proofs.json`. `HEADED=1` ouvre un vrai navigateur pour le script de preuves.
+
 ## Activer l'API
 
 | Navigateur | Comment |
