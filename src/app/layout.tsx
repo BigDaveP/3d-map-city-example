@@ -1,12 +1,15 @@
 import type { Metadata, Viewport } from "next";
 import "maplibre-gl/dist/maplibre-gl.css";
+import "@fontsource-variable/inter";
+import "@fontsource-variable/jetbrains-mono";
 import "./globals.css";
 import "./carte/carte.css";
+import "@/client/aqueduc/aqueduc.css";
 import { originTrialMeta } from "@/lib/origin-trial";
 
 export const metadata: Metadata = {
-  title: "Mur de supervision — HTML-in-Canvas",
-  description: "Démo d'apprentissage : 1 000 cartes HTML, mode DOM virtualisé vs HTML-in-Canvas (WebGL2). Données simulées.",
+  title: "Démos HTML-in-Canvas",
+  description: "Démos d'apprentissage HTML-in-Canvas : réseau d'eau 3D, mur de supervision, carte de livraison et banc de mesures. Données simulées.",
 };
 
 /** Le jeton Origin Trial est lu à la requête (variable d'environnement d'exécution). */

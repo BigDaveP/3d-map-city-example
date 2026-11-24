@@ -363,6 +363,11 @@ function chlorineAt(m: Model, node: number, minute: number): number {
 
 const round2 = (x: number) => Math.round(x * 100) / 100;
 
+/** Débit nominal (L/s) d'une conduite de `diameterMm` à la demande relative d (vitesse 0,6 m/s à demande 1). */
+export function nominalFlowLs(diameterMm: number, d: number): number {
+  return MAIN_VELOCITY * Math.PI * (diameterMm / 2000) ** 2 * 1000 * d;
+}
+
 /** Lectures de tous les capteurs à l'instant t, indexées par `sensor.idx`. */
 export function readingsAt(m: Model, tSim: number, inc: IncidentInput | null): Reading[] {
   const minute = Math.floor(tSim / 60_000);
@@ -379,7 +384,7 @@ export function readingsAt(m: Model, tSim: number, inc: IncidentInput | null): R
       // débit nominal selon le plus gros diamètre de maîtresse au nœud
       let dia = 0;
       for (const si of n.adj[s.node]) if (n.segments[si].cls === "maitresse") dia = Math.max(dia, n.segments[si].diameter);
-      const expected = MAIN_VELOCITY * Math.PI * (dia / 2000) ** 2 * 1000 * d;
+      const expected = nominalFlowLs(dia, d);
       let q = expected * (1 + 0.02 * noise(s.node, minute, 3));
       if (st && st.ramp > 0) q *= 1 + 0.8 * st.ramp * Math.exp(-st.dBreak[s.node] / (2 * BREAK_DECAY_M));
       if (st?.isolatedNodes.has(s.node)) q *= st.isolatedNodes.get(s.node)!;

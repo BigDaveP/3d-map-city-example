@@ -5,6 +5,7 @@ import { GET as getStream } from "../src/app/api/aqueduc/stream/route";
 import { closeValvesAction, publishNoticeAction } from "../src/app/aqueduc-actions";
 import { CITY } from "../src/lib/aqueduc/city";
 import { isolate } from "../src/lib/aqueduc/graph";
+import { breakHistory } from "../src/lib/aqueduc/sim";
 import { segmentsInBox } from "../src/lib/aqueduc/network";
 import { getModel } from "../src/server/aqueduc";
 
@@ -115,8 +116,11 @@ test("network : 13C1949 présent, attribution exacte, demoSegments aligné", asy
   const f = j.segments.features.find((x: any) => x.properties.id === "13C1949");
   assert.ok(f);
   assert.equal(f.geometry.type, "LineString");
-  assert.deepEqual(Object.keys(f.properties).sort(), ["c", "d", "i", "id", "m", "s", "y"]);
+  // l : longueur (m) de la donnée source ; b : bris antérieurs simulés (même calcul que breakHistory)
+  assert.deepEqual(Object.keys(f.properties).sort(), ["b", "c", "d", "i", "id", "l", "m", "s", "y"]);
   const m = getModel();
+  assert.equal(f.properties.l, 69.9);
+  assert.equal(f.properties.b, breakHistory(m, f.properties.i));
   assert.equal(j.segments.features.length, m.network.segments.length);
   assert.deepEqual(j.demoSegments, segmentsInBox(m.network, CITY.demoBox));
   assert.equal(j.sensors.length, m.sensors.length);

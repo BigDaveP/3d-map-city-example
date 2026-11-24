@@ -5,7 +5,7 @@ import path from "node:path";
 import { CITY } from "@/lib/aqueduc/city";
 import { isolate, type Isolation } from "@/lib/aqueduc/graph";
 import { decodeNetwork, segmentsInBox, type RawNetwork } from "@/lib/aqueduc/network";
-import { buildModel, type Model } from "@/lib/aqueduc/sim";
+import { buildModel, type IncidentInput, type Model } from "@/lib/aqueduc/sim";
 
 const g = globalThis as unknown as { __aqueducModel?: Model; __aqueducDemo?: number[] };
 
@@ -20,6 +20,26 @@ export function getModel(): Model {
 /** Segments de la zone du démo, dans l'ordre des tableaux `p` et `q` du flux. */
 export function getDemoSegments(): number[] {
   return (g.__aqueducDemo ??= segmentsInBox(getModel().network, CITY.demoBox));
+}
+
+/** Nombre d'un paramètre : null si absent ou vide, undefined s'il est invalide. */
+export function numParam(v: string | null): number | null | undefined {
+  if (v === null || v === "") return null;
+  const x = Number(v);
+  return Number.isFinite(x) ? x : undefined;
+}
+
+/**
+ * Incident décrit par les paramètres `inc`, `closed` et `restored` (flux et séries) : toujours sur
+ * CITY.breakSegment. Renvoie null sans incident, undefined si un paramètre est invalide.
+ */
+export function incidentFromQuery(q: URLSearchParams): IncidentInput | null | undefined {
+  const m = getModel();
+  const inc = numParam(q.get("inc"));
+  const restored = numParam(q.get("restored"));
+  const closed = (q.get("closed") ?? "").split(",").filter(Boolean).map(Number);
+  if (inc === undefined || restored === undefined || closed.some((v) => !Number.isInteger(v) || v < 0 || v >= m.network.nodes.length)) return undefined;
+  return inc === null ? null : { segment: m.network.byId.get(CITY.breakSegment)!, startedAt: inc, closedValves: closed, restoredAt: restored };
 }
 
 export interface Notice {

@@ -1,0 +1,120 @@
+"use client";
+/** Couches, repliables, avec la légende de la couche active. */
+import { useEffect, useId, useState } from "react";
+import { FLUSHING_2026 } from "@/lib/aqueduc/sim";
+import { num } from "../format";
+import { FLUSH_COLORS, NO_DATA, PIPE_STOPS } from "../pipes";
+import { aqueducStore, type LayerId } from "../store";
+import { useAq } from "../useAq";
+
+const LAYERS: { id: LayerId; label: string; swatch: string }[] = [
+  { id: "pression", label: "Pression", swatch: "#2f9bd6" },
+  { id: "qualite", label: "Qualité de l'eau", swatch: "#1c8a4a" },
+  { id: "age", label: "Âge des conduites", swatch: "#8a6d3b" },
+  { id: "rincage", label: "Rinçage 2026", swatch: "#7a5cd6" },
+  { id: "incidents", label: "Incidents", swatch: "#d23b2b" },
+];
+
+const gradient = (stops: readonly (readonly [number, string])[]) => {
+  const a = stops[0][0];
+  const b = stops[stops.length - 1][0];
+  return `linear-gradient(90deg, ${stops.map(([v, c]) => `${c} ${Math.round(((v - a) / (b - a)) * 100)}%`).join(", ")})`;
+};
+
+const MONTH = new Intl.DateTimeFormat("fr-CA", { month: "short", timeZone: "UTC" });
+
+function Legend({ layer }: { layer: LayerId }) {
+  if (layer === "pression" || layer === "qualite") {
+    const { stops, unit } = PIPE_STOPS[layer];
+    return (
+      <div className="aq-legend">
+        <div className="aq-ramp" style={{ background: gradient(stops) }} />
+        <div className="aq-ramp-l aq-num">
+          {stops.map(([v]) => (
+            <span key={v}>{num(v, v < 1 ? 2 : 1)}</span>
+          ))}
+        </div>
+        <p>
+          {layer === "pression" ? "Pression simulée en bar" : `Chlore résiduel simulé en ${unit}, norme ≥ 0,2`}.{" "}
+          <span className="aq-key" style={{ background: NO_DATA }} /> hors zone suivie.
+        </p>
+      </div>
+    );
+  }
+  if (layer === "age") {
+    const { stops } = PIPE_STOPS.age;
+    return (
+      <div className="aq-legend">
+        <div className="aq-ramp" style={{ background: gradient(stops) }} />
+        <div className="aq-ramp-l aq-num">
+          {stops.filter((_, i) => i % 2 === 0).map(([v]) => (
+            <span key={v}>{v}</span>
+          ))}
+        </div>
+        <p>Année d&apos;installation (données de la Ville). Le matériau est dans la fiche.</p>
+      </div>
+    );
+  }
+  if (layer === "rincage") {
+    const first = FLUSHING_2026[0];
+    const last = FLUSHING_2026[FLUSHING_2026.length - 1];
+    return (
+      <div className="aq-legend">
+        <div className="aq-ramp" style={{ background: `linear-gradient(90deg, ${FLUSH_COLORS[0]}, ${FLUSH_COLORS[FLUSH_COLORS.length - 1]})` }} />
+        <div className="aq-ramp-l">
+          <span>{MONTH.format(new Date(first.start))}</span>
+          <span>{MONTH.format(new Date(last.end))}</span>
+        </div>
+        <p>Campagne simulée : un secteur toutes les deux semaines.</p>
+      </div>
+    );
+  }
+  return (
+    <div className="aq-legend">
+      <ul className="aq-keys">
+        {PIPE_STOPS.incidents.stops.map(([v, c]) => (
+          <li key={v}>
+            <span className="aq-key" style={{ background: c }} />
+            {v === 0 ? "aucun bris" : v === 1 ? "1 ou 2 bris" : "3 bris et plus"}
+          </li>
+        ))}
+      </ul>
+      <p>Bris antérieurs simulés depuis 2009 ; l&apos;incident en cours est en rouge.</p>
+    </div>
+  );
+}
+
+export function Layers() {
+  const layer = useAq((s) => s.layer);
+  const incidents = useAq((s) => (s.incident ? 1 : 0));
+  const [open, setOpen] = useState(true);
+  const bodyId = useId();
+  // replié par défaut sur un écran étroit
+  useEffect(() => {
+    if (window.matchMedia("(max-width: 720px)").matches) setOpen(false);
+  }, []);
+  return (
+    <section className="aq-layers aq-panel" aria-label="Couches">
+      <button type="button" className="aq-layers-h" aria-expanded={open} aria-controls={bodyId} onClick={() => setOpen(!open)}>
+        <span>Couches</span>
+        <span className="aq-caret" aria-hidden="true" />
+      </button>
+      {open && (
+        <div id={bodyId}>
+          <fieldset className="aq-layer-list">
+            <legend className="aq-sr">Couleur des conduites</legend>
+            {LAYERS.map((l) => (
+              <label key={l.id} className="aq-layer" data-on={layer === l.id || undefined}>
+                <input type="radio" name="aq-layer" value={l.id} checked={layer === l.id} onChange={() => aqueducStore.setState({ layer: l.id })} />
+                <span className="aq-key" style={{ background: l.swatch }} />
+                {l.label}
+                {l.id === "incidents" && incidents > 0 && <em className="aq-num">{incidents}</em>}
+              </label>
+            ))}
+          </fieldset>
+          <Legend layer={layer} />
+        </div>
+      )}
+    </section>
+  );
+}

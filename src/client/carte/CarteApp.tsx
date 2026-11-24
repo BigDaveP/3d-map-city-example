@@ -8,6 +8,7 @@ import type { Map as MlMap } from "maplibre-gl";
 import { useStore } from "zustand";
 import { CITIES, COURIERS, RESTAURANTS, type CityId } from "@/lib/carte/catalog";
 import { detectApi } from "../hic/detect";
+import { STYLE_URL, WORKER_URL } from "../mapStyle";
 import { Metrics } from "../metrics";
 import { RobotView } from "../wall/RobotView";
 import { ClassicOverlay } from "./ClassicOverlay";
@@ -33,7 +34,7 @@ async function exportVideo(map: MlMap) {
 }
 
 type ML = typeof import("maplibre-gl");
-export const STYLE_URL = "https://tiles.openfreemap.org/styles/liberty";
+export { STYLE_URL };
 
 export default function CarteApp({ initialMode, initialCity }: { initialMode?: CarteMode; initialCity?: CityId }) {
   const container = useRef<HTMLDivElement>(null);
@@ -56,7 +57,7 @@ export default function CarteApp({ initialMode, initialCity }: { initialMode?: C
     });
     import("maplibre-gl").then((ml) => {
       if (disposed || !container.current) return;
-      ml.setWorkerUrl("/maplibre/maplibre-gl-worker.mjs");
+      ml.setWorkerUrl(WORKER_URL);
       const metrics = new Metrics();
       map = new ml.Map({
         container: container.current,

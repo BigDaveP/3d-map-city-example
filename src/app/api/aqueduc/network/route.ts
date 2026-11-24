@@ -1,5 +1,10 @@
-/** Réseau réel complet (GeoJSON), capteurs simulés, secteurs, vannes et ordre des segments du flux. */
+/**
+ * Réseau réel complet (GeoJSON), capteurs simulés, secteurs, vannes et ordre des segments du flux.
+ * Propriétés : i (index), id, d (mm), m (matériau), y (année), c (classe), s (secteur), l (longueur en m,
+ * donnée source), b (bris antérieurs simulés depuis 2009).
+ */
 import { CITY } from "@/lib/aqueduc/city";
+import { breakHistory } from "@/lib/aqueduc/sim";
 import { getDemoSegments, getModel } from "@/server/aqueduc";
 
 export const dynamic = "force-static";
@@ -15,7 +20,7 @@ export async function GET() {
     return {
       type: "Feature" as const,
       geometry: { type: "LineString" as const, coordinates },
-      properties: { i: s.idx, id: s.id, d: s.diameter, m: s.material, y: s.year, c: s.cls, s: m.sectors[m.sectorOf[s.idx]].id },
+      properties: { i: s.idx, id: s.id, d: s.diameter, m: s.material, y: s.year, c: s.cls, s: m.sectors[m.sectorOf[s.idx]].id, l: s.length, b: breakHistory(m, s.idx) },
     };
   });
   const nodePos = (node: number): [number, number] => {

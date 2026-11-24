@@ -5,33 +5,21 @@
  * Le tronçon de l'incident est toujours CITY.breakSegment ; `inc` n'en porte que l'heure de début.
  * L'état de l'incident est reconstruit à chaque connexion depuis les paramètres : rien n'est mémorisé.
  */
-import { CITY } from "@/lib/aqueduc/city";
-import { readingsAt, sectorStats, segmentValues, type IncidentInput } from "@/lib/aqueduc/sim";
-import { getDemoSegments, getModel } from "@/server/aqueduc";
+import { readingsAt, sectorStats, segmentValues } from "@/lib/aqueduc/sim";
+import { getDemoSegments, getModel, incidentFromQuery, numParam } from "@/server/aqueduc";
 
 export const dynamic = "force-dynamic";
 
 const STATUS = { ok: 0, attention: 1, alerte: 2 } as const;
 const r2 = (x: number) => Math.round(x * 100) / 100;
 
-function num(v: string | null): number | null | undefined {
-  if (v === null || v === "") return null;
-  const x = Number(v);
-  return Number.isFinite(x) ? x : undefined;
-}
-
 export async function GET(req: Request) {
   const q = new URL(req.url).searchParams;
-  const t0 = num(q.get("t0")) ?? Date.now();
-  const speed = num(q.get("speed")) ?? 1;
-  const inc = num(q.get("inc"));
-  const restored = num(q.get("restored"));
+  const t0 = numParam(q.get("t0")) ?? Date.now();
+  const speed = numParam(q.get("speed")) ?? 1;
   const m = getModel();
-  const closed = (q.get("closed") ?? "").split(",").filter(Boolean).map(Number);
-  if (t0 === undefined || (speed !== 1 && speed !== 60) || inc === undefined || restored === undefined || closed.some((v) => !Number.isInteger(v) || v < 0 || v >= m.network.nodes.length))
-    return new Response("Paramètres invalides", { status: 400 });
-  const incident: IncidentInput | null =
-    inc === null ? null : { segment: m.network.byId.get(CITY.breakSegment)!, startedAt: inc, closedValves: closed, restoredAt: restored };
+  const incident = incidentFromQuery(q);
+  if (t0 === undefined || (speed !== 1 && speed !== 60) || incident === undefined) return new Response("Paramètres invalides", { status: 400 });
   const demo = getDemoSegments();
   const enc = new TextEncoder();
   const start = Date.now();
