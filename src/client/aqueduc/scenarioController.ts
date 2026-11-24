@@ -93,18 +93,24 @@ function apply(step: StepId, t: number, now: number, patch: Partial<AqState["sce
   });
 }
 
-/** Lance (ou relance) le scénario à la détection ; l'heure quittée reste celle du premier lancement. */
+/**
+ * Lance (ou relance) le scénario à la détection ; l'heure, la vitesse et la couche quittées restent
+ * celles du premier lancement. Le scénario repart en temps réel (×1) : à ×60, l'horloge dépasserait
+ * l'heure des étapes suivantes pendant la lecture d'une seule étape.
+ */
 export function startScenario(now = Date.now()) {
   const s = aqueducStore.getState();
   const fresh = !s.scenario.active;
+  const resume = fresh ? { resumeAt: simNow(now), resumeSpeed: s.clock.speed, resumeLayer: s.layer } : {};
   aqueducStore.setState({
+    clock: { ...s.clock, speed: 1 },
     layer: "pression",
     scenario: {
       ...s.scenario,
       valvesClosed: false,
       valvesTurned: [],
       error: "",
-      ...(fresh ? { resumeAt: simNow(now), resumeSpeed: s.clock.speed, resumeLayer: s.layer } : {}),
+      ...resume,
     },
   });
   if (fresh) env.camera?.("start", 0);

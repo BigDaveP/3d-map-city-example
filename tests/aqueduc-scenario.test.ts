@@ -189,6 +189,8 @@ test("startScenario : horloge du scénario, incident de l'étape, couche Pressio
   assert.equal(s.layer, "pression");
   assert.equal(s.clock.t0, step("detection").at);
   assert.equal(s.clock.startedAt, NOW);
+  // la ligne de temps du scénario avance en temps réel, quelle que soit la vitesse quittée (×60)
+  assert.equal(s.clock.speed, 1);
   assert.deepEqual(s.incident, scenarioIncidentParams("detection", false, iso.valves));
   assert.deepEqual(views, ["start", "detection"]);
   // relancer pendant le scénario garde l'heure quittée
@@ -237,6 +239,7 @@ test("exploreFreely après l'isolation : réseau vivant à l'heure quittée, sc�
   const left = simNow(NOW);
   startScenario(NOW);
   goToStep("isolation", NOW + 1000);
+  assert.equal(aqueducStore.getState().clock.speed, 1);
   aqueducStore.setState({ selection: { kind: "incident", id: CITY.breakSegment } });
   views.length = 0;
   exploreFreely(NOW + 90_000);
