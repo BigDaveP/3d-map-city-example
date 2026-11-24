@@ -23,6 +23,8 @@ export interface CarteState {
   pulse: boolean;
   /** effet de transition à l'ouverture d'un panneau */
   transition: "dissolve" | "sweep" | "none";
+  /** durée de la transition d'ouverture (ms) */
+  transitionMs: number;
   restaurants: RestaurantView[];
   assignments: Record<string, string>;
   persistence: string;
@@ -43,6 +45,7 @@ const initial: CarteState = {
   shadow: true,
   pulse: true,
   transition: "dissolve",
+  transitionMs: 700,
   restaurants: RESTAURANTS.map(() => ({ status: "ouvert", pending: 0, prepMin: 0, dispatched: 0, note: "" })),
   assignments: {},
   persistence: "…",

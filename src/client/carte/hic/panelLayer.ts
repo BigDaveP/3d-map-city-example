@@ -55,7 +55,7 @@ export interface PixelRequest {
 export interface PanelLayerOptions {
   anchor(key: string): PanelAnchor | null;
   orientation(): "billboard" | "facade";
-  effects(): { fog: boolean; shadow: boolean; transition: "dissolve" | "sweep" | "none" };
+  effects(): { fog: boolean; shadow: boolean; transition: "dissolve" | "sweep" | "none"; transitionMs: number };
   focused(): string | null;
   setGeometry(el: HTMLElement, m: DOMMatrix): void;
   onRender(ms: number, latencies: number[]): void;
@@ -236,7 +236,7 @@ export class PanelLayer implements CustomLayerInterface {
     gl.uniform1f(this.loc("u_xray"), 0);
     let drawn = 0;
     for (const p of ready) {
-      const t = Math.min(1, (now - p.openedAt) / TRANSITION_MS);
+      const t = Math.min(1, (now - p.openedAt) / fx.transitionMs);
       gl.uniform1i(this.loc("u_trans"), fx.transition === "dissolve" ? 1 : fx.transition === "sweep" ? 2 : 0);
       gl.uniform1f(this.loc("u_t"), t);
       // résultat de la requête précédente (disponible une image plus tard au plus tôt)
@@ -275,7 +275,7 @@ export class PanelLayer implements CustomLayerInterface {
     this.pixelQueries(gl, now);
 
     gl.bindVertexArray(null);
-    const anim = ready.some((p) => now - p.openedAt < TRANSITION_MS) || this.pixelRequests.length > 0;
+    const anim = ready.some((p) => now - p.openedAt < fx.transitionMs) || this.pixelRequests.length > 0;
     this.opt.onRender(performance.now() - t0, latencies);
     if (anim) map.triggerRepaint();
   }

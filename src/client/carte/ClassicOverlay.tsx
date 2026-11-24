@@ -21,9 +21,14 @@ export function ClassicOverlay({ ml, map, metrics }: { ml: ML; map: MlMap; metri
     const mark = new Map<number, number>();
     panelHooks.onRestaurantCommit = (idx) => {
       const at = statusChangedAt[idx];
-      if (!at || at <= (mark.get(idx) ?? 0)) return;
+      const first = !mark.has(idx);
+      if (!at || at <= (mark.get(idx) ?? 0)) {
+        if (first) mark.set(idx, at);
+        return;
+      }
       mark.set(idx, at);
-      requestAnimationFrame(() => metrics.latency(performance.now() - at));
+      // premier rendu d'un panneau qui vient d'ouvrir : pas une mise à jour
+      if (!first) requestAnimationFrame(() => metrics.latency(performance.now() - at));
     };
     return () => {
       panelHooks.onRestaurantCommit = () => {};

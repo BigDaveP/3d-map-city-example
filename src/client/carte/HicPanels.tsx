@@ -81,7 +81,7 @@ export function HicPanels({ ml, map, metrics, onFallback }: { ml: ML; map: MlMap
       orientation: () => carteStore.getState().orientation,
       effects: () => {
         const st = carteStore.getState();
-        return { fog: st.fog, shadow: st.shadow, transition: st.transition };
+        return { fog: st.fog, shadow: st.shadow, transition: st.transition, transitionMs: st.transitionMs };
       },
       focused: () => {
         const a = document.activeElement;
@@ -123,6 +123,7 @@ export function HicPanels({ ml, map, metrics, onFallback }: { ml: ML; map: MlMap
         if (n >= MAX_UPLOADS_PER_PAINT && p.key !== focusedKey) break;
         const el = p.el!;
         // taille en pixels du backing store (une texture trop petite reste noire sans exception)
+        const existed = !!p.tex;
         const w = Math.max(1, Math.ceil((el.offsetWidth || p.w) * scale));
         const h = Math.max(1, Math.ceil((el.offsetHeight || p.h) * scale));
         if (!p.tex || p.tw < w || p.th < h) {
@@ -166,10 +167,11 @@ export function HicPanels({ ml, map, metrics, onFallback }: { ml: ML; map: MlMap
           if (carteStore.getState().api !== "active") carteStore.setState({ api: "active" });
         }
         // latence statut -> pixel : émise au prochain dessin de ce panneau
+        // (pas pour la première capture d'un panneau : ce n'est pas une mise à jour)
         if (p.key[0] === "r") {
           const at = statusChangedAt[Number(p.key.slice(1))];
           if (at && at > (lastLatencyMark.get(p.key) ?? 0)) {
-            p.pendingLatency = at;
+            if (existed) p.pendingLatency = at;
             lastLatencyMark.set(p.key, at);
           }
         }
