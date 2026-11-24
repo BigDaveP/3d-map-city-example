@@ -61,7 +61,11 @@ export function placePanel(
     r = [Math.cos(b), Math.sin(b), 0];
     up = [r[1] * n[2] - r[2] * n[1], r[2] * n[0] - r[0] * n[2], r[0] * n[1] - r[1] * n[0]];
   } else {
-    const t = (facadeDeg * Math.PI) / 180;
+    let t = (facadeDeg * Math.PI) / 180;
+    // vu de dos, le texte serait en miroir : la normale du plan (-sin t, cos t, 0) doit pointer
+    // vers la caméra, soit sin(pitch)·cos(t - cap) > 0 ; sinon on retourne le panneau de 180°
+    const b = (bearingDeg * Math.PI) / 180;
+    if (Math.cos(t - b) < 0) t += Math.PI;
     r = [Math.cos(t), Math.sin(t), 0];
     up = [0, 0, 1];
   }
