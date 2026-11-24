@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
+import "maplibre-gl/dist/maplibre-gl.css";
 import "./globals.css";
+import "./carte/carte.css";
 
 export const metadata: Metadata = {
   title: "Mur de supervision — HTML-in-Canvas",

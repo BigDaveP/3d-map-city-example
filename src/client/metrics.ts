@@ -73,6 +73,17 @@ export class Metrics {
   private domSampledAt = 0;
   private phase?: Phase;
   private frameCaptures = 0;
+  private pending = 0;
+
+  /** Travail JS accumulé hors d'une boucle maîtrisée (couches MapLibre, handler paint). */
+  addWork(ms: number) {
+    this.pending += ms;
+  }
+  pendingWork() {
+    const p = this.pending;
+    this.pending = 0;
+    return p;
+  }
 
   /** Début de frame (rAF). */
   frameStart(now: number) {
