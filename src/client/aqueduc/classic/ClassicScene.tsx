@@ -11,7 +11,8 @@ import { CITY } from "@/lib/aqueduc/city";
 import { lineCenter, segment, type NetIndex } from "../net";
 import { IncidentMark } from "../scene/IncidentMark";
 import { SectorMark, useVisibleSectors } from "../scene/SectorMark";
-import { SensorTag, useTaggedSensors } from "../scene/SensorTag";
+import { rectQuad, type Quad } from "../scene/marks";
+import { SensorTag, useTaggedSensors, type TagCover } from "../scene/SensorTag";
 import { useAq } from "../useAq";
 
 type ML = typeof import("maplibre-gl");
@@ -47,7 +48,6 @@ function Pin({ ml, map, at, anchor, className, children }: { ml: ML; map: MlMap;
 export function ClassicScene({ ml, map, net }: { ml: ML; map: MlMap; net: NetIndex }) {
   const sectors = useVisibleSectors(map, net);
   const incident = useAq((s) => s.incident !== null);
-  const tagged = useTaggedSensors(map, net);
   const brk = useMemo(() => {
     const i = net.segById.get(CITY.breakSegment);
     return i === undefined ? null : { at: lineCenter(segment(net, i)), sector: segment(net, i).properties.s };
@@ -59,6 +59,26 @@ export function ClassicScene({ ml, map, net }: { ml: ML; map: MlMap; net: NetInd
     for (const s of net.data.sectors) m.set(s.id, incident && brk && brk.sector === s.id ? awayFrom(s.at, brk.at, SECTOR_AWAY_M) : s.at);
     return m;
   }, [net, incident, brk]);
+  const cover = useMemo<TagCover>(
+    () => ({
+      // étiquette au-dessus de sa tige de 20 px
+      tag: (p) => rectQuad(p.x - 50, p.y - 44, p.x + 50, p.y - 18),
+      // ligne du chiffre de l'étiquette d'un secteur (sous le nom), étiquette de l'incident entière
+      figures: () => {
+        const out: Quad[] = sectors.map((s) => {
+          const p = map.project(labelAt.get(s.id)!);
+          return rectQuad(p.x - 115, p.y + 28, p.x + 115, p.y + 50);
+        });
+        if (incident && incidentAt) {
+          const p = map.project(incidentAt);
+          out.push(rectQuad(p.x - 160, p.y + 8, p.x + 160, p.y + 58));
+        }
+        return out;
+      },
+    }),
+    [map, sectors, incident, incidentAt, labelAt],
+  );
+  const tagged = useTaggedSensors(map, net, cover);
   return (
     <>
       {sectors.map((s) => (

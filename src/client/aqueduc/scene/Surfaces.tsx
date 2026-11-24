@@ -18,9 +18,9 @@ import { lineCenter, segment, type NetIndex } from "../net";
 import { aqueducStore } from "../store";
 import { useAq } from "../useAq";
 import { IncidentMark } from "./IncidentMark";
-import { parseKey, SURFACE_SIZE, surfaceKey } from "./marks";
+import { parseKey, rectQuad, SURFACE_SIZE, surfaceKey, type Quad } from "./marks";
 import { SectorMark, useVisibleSectors } from "./SectorMark";
-import { SensorTag, useTaggedSensors } from "./SensorTag";
+import { SensorTag, useTaggedSensors, type TagCover } from "./SensorTag";
 
 type ML = typeof import("maplibre-gl");
 
@@ -34,6 +34,8 @@ const SCALE = { sector: 1, incident: 1, sensor: 1 } as const;
  * plan) ; les marquages au sol grandissent un peu au loin, sans perdre la perspective.
  */
 const DISTANCE = { sector: [0.85, 1.6], incident: [0.85, 1.6], sensor: [0.6, 2.4] } as const;
+/** Opacité des parties de marquage au sol cachées par un bâtiment. */
+const GROUND_GHOST = 0.45;
 /** Hauteur de l'étiquette au-dessus du capteur (px CSS de l'étiquette). */
 const SENSOR_LIFT_PX = 14;
 /**
@@ -132,6 +134,9 @@ function layerOptions(ml: ML, map: MlMap, net: NetIndex): HicHostProps["layerOpt
       return p;
     },
     effects: () => ({ fog: true, shadow: false, transition: "dissolve", transitionMs: TRANSITION_MS }),
+    // marquages au sol : ils transparaissent sous les bâtiments, translucides (opacité 0,78), comme
+    // les conduites et le fond de carte ; les étiquettes de capteurs restent masquées
+    ghost: (key) => (parseKey(key)?.kind === "sensor" ? 0 : GROUND_GHOST),
   };
 }
 
@@ -143,9 +148,31 @@ const onActive = () => {
 export function SceneSurfaces({ ml, map, metrics, net }: { ml: ML; map: MlMap; metrics: Metrics; net: NetIndex }) {
   const sectors = useVisibleSectors(map, net);
   const incident = useAq((s) => s.incident !== null);
-  const tagged = useTaggedSensors(map, net);
   // lu une fois par la couche : constant pour un réseau donné
   const options = useMemo(() => layerOptions(ml, map, net), [ml, map, net]);
+  const cover = useMemo<TagCover>(() => {
+    // zone d'écran d'une bande [v0, v1] (fraction de la hauteur) d'un marquage au sol
+    const band = (key: string, v0: number, v1: number): Quad | null => {
+      const k = parseKey(key);
+      const p = k && options.place!(key, { bearing: map.getBearing(), pitch: map.getPitch(), zoom: map.getZoom() });
+      if (!k || !p) return null;
+      const { w, h } = SURFACE_SIZE[k.kind];
+      return [[0, v0 * h], [w, v0 * h], [w, v1 * h], [0, v1 * h]].map(([u, v]) => {
+        const c = new ml.MercatorCoordinate(p.o[0] + u * p.r[0] + v * p.d[0], p.o[1] + u * p.r[1] + v * p.d[1], 0).toLngLat();
+        const s = map.project(c);
+        return [s.x, s.y] as [number, number];
+      });
+    };
+    return {
+      // étiquette de 120 × 26 px à 14 px au-dessus du capteur (taille écran ≈ taille CSS, voir DISTANCE)
+      tag: (p) => rectQuad(p.x - 62, p.y - 46, p.x + 62, p.y - 10),
+      figures: () =>
+        [...sectors.map((s) => band(surfaceKey("sector", s.id), 0.5, 1)), incident ? band(surfaceKey("incident", CITY.breakSegment), 0, 1) : null].filter(
+          (q): q is Quad => !!q,
+        ),
+    };
+  }, [ml, map, options, sectors, incident]);
+  const tagged = useTaggedSensors(map, net, cover);
   const surfaces = useMemo<SurfaceSpec[]>(
     () => [
       ...sectors.map((s) => ({

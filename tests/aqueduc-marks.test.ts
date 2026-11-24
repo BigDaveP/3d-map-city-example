@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { impactBySector, inBox, LAYER_KINDS, pickTags, sectorFigure, TAG_MAX } from "../src/client/aqueduc/scene/marks";
+import { convexOverlap, impactBySector, inBox, LAYER_KINDS, pickTags, sectorFigure, TAG_MAX } from "../src/client/aqueduc/scene/marks";
 import { CITY } from "../src/lib/aqueduc/city";
 import { isolate } from "../src/lib/aqueduc/graph";
 import { segmentsInBox } from "../src/lib/aqueduc/network";
@@ -98,4 +98,30 @@ test("pickTags : une alerte ou une attention s'affiche quelle que soit la couche
   // hors de demoBox : seule la sélection passe
   const far = pickTags(fake, { layer: "pression", status: ok, selected: "S-3", center, box: [0, 0, 1, 1] });
   assert.deepEqual(far, ["S-3"]);
+});
+
+test("pickTags : l'alerte passe avant l'attention (une alerte lointaine n'est jamais évincée par 8 attentions proches)", () => {
+  const status = [...ok];
+  for (let k = 0; k < 9; k++) status[k] = 1;
+  status[39] = 2;
+  const p = pickTags(fake, { layer: "age", status, selected: null, center, box });
+  assert.equal(p.length, TAG_MAX);
+  assert.equal(p[0], "S-39");
+});
+
+test("pickTags : une étiquette qui recouvrirait le chiffre d'un marquage est écartée (sauf la sélection)", () => {
+  const covered = (id: string) => id === "S-0" || id === "S-1";
+  const p = pickTags(fake, { layer: "pression", status: ok, selected: "S-1", center, box, covered });
+  assert.ok(!p.includes("S-0") && p.includes("S-1"), p.join());
+  assert.equal(p.length, TAG_MAX);
+});
+
+test("convexOverlap : rectangles et quadrilatères à l'écran", () => {
+  const sq = (x: number, y: number, w: number, h: number): [number, number][] => [[x, y], [x + w, y], [x + w, y + h], [x, y + h]];
+  assert.ok(convexOverlap(sq(0, 0, 10, 10), sq(5, 5, 10, 10)));
+  assert.ok(!convexOverlap(sq(0, 0, 10, 10), sq(11, 0, 10, 10)));
+  // bande diagonale qui passe à côté du coin du carré : la boîte englobante se recouvre, pas la bande
+  const band: [number, number][] = [[20, 0], [30, 0], [0, 30], [-10, 30]];
+  assert.ok(!convexOverlap(sq(16, 16, 10, 10), band));
+  assert.ok(convexOverlap(sq(8, 8, 6, 6), band));
 });

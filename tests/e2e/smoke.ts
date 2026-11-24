@@ -234,44 +234,78 @@ async function homeHic(b: Browser) {
     await p.keyboard.press("Escape");
   }
 
-  // clic sur une partie du marquage du Centre-ville masquée par un bâtiment : il traverse vers la carte
-  const hidden = await p.evaluate(() => {
+  // Points du marquage du Centre-ville sur un glyphe opaque : texels lus dans la texture capturée
+  // (le shader écarte les texels transparents, qui seraient « masqués » quoi qu'il arrive).
+  // « masqué » : un bâtiment au point et à ±6 px ; « dégagé » : aucun bâtiment à ±10 px.
+  const glyphs = await p.evaluate(() => {
     const { map } = (window as any).__aqueduc;
     const L = (window as any).__hicMap.layer;
     const q = L.panels.get("sector:centre-ville");
     const canvas = map.getCanvas() as HTMLCanvasElement;
     const box = canvas.getBoundingClientRect();
-    if (!q?.proj) return null;
-    for (const v of [0.5, 0.3, 0.7, 0.15, 0.85].map((f) => f * q.h))
-      for (let u = 8; u < q.w; u += 8) {
+    if (!q?.proj || !q.tex) return null;
+    const gl = map.painter.context.gl as WebGL2RenderingContext;
+    const scale = canvas.width / canvas.clientWidth;
+    const tw = Math.ceil(q.w * scale);
+    const th = Math.ceil(q.h * scale);
+    const prev = gl.getParameter(gl.FRAMEBUFFER_BINDING);
+    const fb = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, q.tex, 0);
+    const px = new Uint8Array(tw * th * 4);
+    gl.readPixels(0, 0, tw, th, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, prev);
+    gl.deleteFramebuffer(fb);
+    let hidden: { x: number; y: number } | null = null;
+    let open: { x: number; y: number } | null = null;
+    let opaque = 0;
+    for (let v = 3; v < q.h - 3; v += 2)
+      for (let u = 3; u < q.w - 3; u += 2) {
+        // glyphe plein : texels opaques sur un carré de 5 × 5
+        let full = true;
+        for (let dv = -2; dv <= 2 && full; dv++)
+          for (let du = -2; du <= 2 && full; du++) full = px[(Math.round((v + dv) * scale) * tw + Math.round((u + du) * scale)) * 4 + 3] >= 200;
+        if (!full) continue;
+        opaque++;
         const [x, y] = q.proj.project(u, v);
         if (x < 260 || x > box.width - 20 || y < 40 || y > box.height - 150) continue;
         const others = [...L.panels.values()].some((o: any) => {
           if (o === q || !o.proj) return false;
           const uv = o.proj.unproject(x, y);
-          return uv && uv[0] >= -4 && uv[1] >= -4 && uv[0] <= o.w + 4 && uv[1] <= o.h + 4;
+          return uv && uv[0] >= -6 && uv[1] >= -6 && uv[0] <= o.w + 6 && uv[1] <= o.h + 6;
         });
-        // bâtiment d'au moins 15 m au point et tout autour (le verdict d'occlusion vaut pour 6 px ;
-        // queryRenderedFeatures renvoie aussi des bâtiments bas qui, à ce zoom, ne masquent pas le marquage)
-        const around = [[0, 0], [-6, 0], [6, 0], [0, -6], [0, 6]];
-        if (!others && around.every((d) => map.queryRenderedFeatures([x + d[0], y + d[1]], { layers: ["building-3d"] }).some((f: any) => f.properties.render_height >= 15)))
-          return { x: box.left + x, y: box.top + y };
+        if (others) continue;
+        const hits = [[0, 0], [-6, 0], [6, 0], [0, -6], [0, 6], [-10, -10], [10, 10], [-10, 10], [10, -10]].map((d) => map.queryRenderedFeatures([x + d[0], y + d[1]], { layers: ["building-3d"] }).length > 0);
+        if (!hidden && hits.slice(0, 5).every(Boolean)) hidden = { x: box.left + x, y: box.top + y };
+        if (!open && !hits.some(Boolean)) open = { x: box.left + x, y: box.top + y };
       }
-    return null;
+    return { hidden, open, opaque };
   });
-  check("un bâtiment masque une partie du marquage du Centre-ville", !!hidden);
-  if (hidden) {
-    const before = await p.evaluate(() => (window as any).__occlusion.passThrough);
-    await p.mouse.move(hidden.x, hidden.y);
+  check("texels opaques lus dans la texture du marquage", (glyphs?.opaque ?? 0) > 100, String(glyphs?.opaque));
+  const clickAt = async (pt: { x: number; y: number }) => {
+    const before = await p.evaluate(() => ({ ...(window as any).__occlusion }));
+    await p.mouse.move(pt.x, pt.y);
     // requête d'occlusion : une à deux images (lente sans GPU)
     await p.waitForTimeout(800);
-    await p.mouse.click(hidden.x, hidden.y);
-    await p.waitForTimeout(200);
-    const after = await p.evaluate(() => {
+    await p.mouse.click(pt.x, pt.y);
+    await p.waitForTimeout(300);
+    return p.evaluate((b) => {
       const w = window as any;
-      return { occ: w.__occlusion, sel: w.__aqueduc.store.getState().selection };
-    });
-    check("clic sur la partie masquée : passThrough ≥ 1, transmis à la carte", after.occ.passThrough >= before + 1 && after.sel?.kind !== "sector", `${JSON.stringify(after.occ)} · sélection ${JSON.stringify(after.sel)}`);
+      return { pass: w.__occlusion.passThrough - b.passThrough, occ: w.__occlusion, sel: w.__aqueduc.store.getState().selection };
+    }, before);
+  };
+  // témoin : un glyphe dégagé reçoit le clic et sélectionne le secteur
+  check("un glyphe dégagé du marquage du Centre-ville", !!glyphs?.open);
+  if (glyphs?.open) {
+    const r = await clickAt(glyphs.open);
+    check("clic sur le glyphe dégagé → secteur Centre-ville sélectionné", r.pass === 0 && r.sel?.kind === "sector" && r.sel.id === "centre-ville", `${JSON.stringify(r.occ)} · sélection ${JSON.stringify(r.sel)}`);
+    await p.keyboard.press("Escape");
+  }
+  // un glyphe masqué par un bâtiment (quelle que soit sa hauteur) : le clic traverse vers la carte
+  check("un bâtiment masque un glyphe du marquage du Centre-ville", !!glyphs?.hidden);
+  if (glyphs?.hidden) {
+    const r = await clickAt(glyphs.hidden);
+    check("clic sur le glyphe masqué : passThrough ≥ 1, transmis à la carte", r.pass >= 1 && r.sel?.kind !== "sector", `${JSON.stringify(r.occ)} · sélection ${JSON.stringify(r.sel)}`);
   }
   check("aucune erreur console", errors.length === 0, errors.join(" | "));
   await ctx.close();

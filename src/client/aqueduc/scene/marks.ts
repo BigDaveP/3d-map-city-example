@@ -92,13 +92,22 @@ export const TAG_MAX = 8;
 
 /**
  * Capteurs qui portent une étiquette, dans l'ordre de priorité : le capteur sélectionné, ceux en
- * attention ou en alerte (quelle que soit la couche), puis ceux de la couche active ; dans `box`
- * seulement (sauf la sélection), les plus proches de `center` d'abord, `max` au plus.
+ * alerte, en attention (quelle que soit la couche), puis ceux de la couche active ; dans `box`
+ * seulement (sauf la sélection), les plus proches de `center` d'abord, `max` au plus. Une
+ * étiquette `covered` (elle cacherait le chiffre d'un marquage) est écartée, sauf la sélection.
  * `status[idx]` : 0 normal, 1 attention, 2 alerte (undefined : pas encore de lecture).
  */
 export function pickTags(
   sensors: readonly { id: string; idx: number; kind: SensorKind; at: readonly [number, number] | number[] }[],
-  o: { layer: LayerId; status: ArrayLike<number | undefined>; selected: string | null; center: readonly [number, number]; box: readonly [number, number, number, number]; max?: number },
+  o: {
+    layer: LayerId;
+    status: ArrayLike<number | undefined>;
+    selected: string | null;
+    center: readonly [number, number];
+    box: readonly [number, number, number, number];
+    max?: number;
+    covered?: (id: string) => boolean;
+  },
 ): string[] {
   const max = o.max ?? TAG_MAX;
   const kinds = LAYER_KINDS[o.layer];
@@ -106,9 +115,40 @@ export function pickTags(
   const dist = (at: readonly number[]) => Math.hypot((at[0] - o.center[0]) * kx, at[1] - o.center[1]);
   const ranked: { id: string; rank: number; d: number }[] = [];
   for (const s of sensors) {
-    const rank = s.id === o.selected ? 0 : !inBox(s.at, o.box) ? -1 : (o.status[s.idx] ?? 0) > 0 ? 1 : kinds.includes(s.kind) ? 2 : -1;
+    const st = o.status[s.idx] ?? 0;
+    let rank = s.id === o.selected ? 0 : !inBox(s.at, o.box) ? -1 : st === 2 ? 1 : st === 1 ? 2 : kinds.includes(s.kind) ? 3 : -1;
+    if (rank > 0 && o.covered?.(s.id)) rank = -1;
     if (rank >= 0) ranked.push({ id: s.id, rank, d: dist(s.at) });
   }
   ranked.sort((a, b) => a.rank - b.rank || a.d - b.d);
   return ranked.slice(0, max).map((r) => r.id);
 }
+
+export type Quad = readonly (readonly [number, number])[];
+
+/** Deux polygones convexes (px écran) se recouvrent-ils ? Axes séparateurs. */
+export function convexOverlap(a: Quad, b: Quad): boolean {
+  for (const poly of [a, b])
+    for (let i = 0; i < poly.length; i++) {
+      const [x0, y0] = poly[i];
+      const [x1, y1] = poly[(i + 1) % poly.length];
+      const nx = y0 - y1;
+      const ny = x1 - x0;
+      let amin = Infinity, amax = -Infinity, bmin = Infinity, bmax = -Infinity;
+      for (const [x, y] of a) {
+        const d = x * nx + y * ny;
+        amin = Math.min(amin, d);
+        amax = Math.max(amax, d);
+      }
+      for (const [x, y] of b) {
+        const d = x * nx + y * ny;
+        bmin = Math.min(bmin, d);
+        bmax = Math.max(bmax, d);
+      }
+      if (amax < bmin || bmax < amin) return false;
+    }
+  return true;
+}
+
+/** Rectangle (px écran) en quadrilatère. */
+export const rectQuad = (x0: number, y0: number, x1: number, y1: number): Quad => [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];

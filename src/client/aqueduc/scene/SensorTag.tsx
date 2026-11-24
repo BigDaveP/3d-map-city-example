@@ -12,14 +12,23 @@ import { SENSOR_KIND, sensorValue, STATUS_LABEL } from "../format";
 import type { NetIndex } from "../net";
 import { select } from "../store";
 import { useAq } from "../useAq";
-import { pickTags, SURFACE_SIZE, surfaceKey, TONE } from "./marks";
+import { convexOverlap, pickTags, SURFACE_SIZE, surfaceKey, TONE, type Quad } from "./marks";
+
+/** Où tombent à l'écran les étiquettes et les chiffres des marquages, selon le mode. */
+export interface TagCover {
+  /** zone d'écran de l'étiquette d'un capteur projeté en `p` (px du canvas) */
+  tag(p: { x: number; y: number }): Quad;
+  /** zones d'écran des chiffres des marquages affichés (secteurs, incident) */
+  figures(): Quad[];
+}
 
 /**
- * Capteurs étiquetés (décision R13, mêmes règles dans les deux modes) : couche active, attention ou
- * alerte, sélection ; 8 au plus, les plus proches du centre de la vue. Recalculé à la fin d'un
- * mouvement de caméra et quand la couche, la sélection ou les statuts changent (pas à chaque image).
+ * Capteurs étiquetés (décision R13, mêmes règles dans les deux modes) : sélection, alerte, attention,
+ * couche active ; 8 au plus, les plus proches du centre de la vue ; une étiquette qui cacherait le
+ * chiffre d'un marquage est écartée. Recalculé à la fin d'un mouvement de caméra et quand la couche,
+ * la sélection, les statuts ou les marquages changent (pas à chaque image).
  */
-export function useTaggedSensors(map: MlMap, net: NetIndex): Sensor[] {
+export function useTaggedSensors(map: MlMap, net: NetIndex, cover: TagCover): Sensor[] {
   const [center, setCenter] = useState<[number, number]>(() => map.getCenter().toArray() as [number, number]);
   useEffect(() => {
     const update = () => setCenter(map.getCenter().toArray() as [number, number]);
@@ -30,10 +39,14 @@ export function useTaggedSensors(map: MlMap, net: NetIndex): Sensor[] {
   const selected = useAq((s) => (s.selection?.kind === "sensor" ? s.selection.id : null));
   // statuts en une chaîne (« 0010… »), au plus toutes les 2 s : un capteur qui oscille autour d'un seuil ne fait pas clignoter les étiquettes
   const statuses = useThrottled(useAq((s) => s.live.readings.map((r) => r[1]).join("")));
-  const ids = useMemo(
-    () => pickTags(net.data.sensors, { layer, status: Array.from(statuses, Number), selected, center, box: CITY.demoBox }).join(","),
-    [net, layer, statuses, selected, center],
-  );
+  const ids = useMemo(() => {
+    const figures = cover.figures();
+    const covered = (id: string) => {
+      const q = cover.tag(map.project(net.sensorById.get(id)!.at));
+      return figures.some((f) => convexOverlap(q, f));
+    };
+    return pickTags(net.data.sensors, { layer, status: Array.from(statuses, Number), selected, center, box: CITY.demoBox, covered }).join(",");
+  }, [map, net, layer, statuses, selected, center, cover]);
   return useMemo(() => (ids ? ids.split(",").map((id) => net.sensorById.get(id)!) : []), [ids, net]);
 }
 
