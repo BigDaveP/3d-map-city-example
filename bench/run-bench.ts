@@ -49,7 +49,7 @@ async function runOne(n: number, config: string, rep: number, speed: number, bud
   const errors: string[] = [];
   p.on("pageerror", (e) => errors.push(e.message));
   const mode = config === "dom" ? "dom" : "canvas";
-  await p.goto(`${BASE}/?mode=${mode}&n=${n}`);
+  await p.goto(`${BASE}/mur?mode=${mode}&n=${n}`);
   await p.waitForFunction(() => (window as any).__wall, null, { timeout: 60_000 });
   await p.evaluate(([atlas, maxCaptures, maxMs]) => (window as any).__wall.ui.setState({ atlas, maxCaptures, maxMs }), [config !== "canvas-percard", budget[0], budget[1]] as const);
   await p.evaluate((s) => (window as any).__wall.actions.setSpeed(s), speed);

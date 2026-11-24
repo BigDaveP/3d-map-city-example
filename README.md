@@ -39,7 +39,7 @@ npm run db:setup
 npm run dev
 ```
 
-Puis ouvrir <http://localhost:3000> (paramètres : `?n=250|500|1000`, `?mode=dom|canvas`).
+Puis ouvrir <http://localhost:3000/mur> (paramètres : `?n=250|500|1000`, `?mode=dom|canvas`).
 `npm run db:setup` applique les migrations Drizzle et le seed (idempotent ; `db:migrate` et
 `db:seed` séparément). Sans Postgres joignable, l'application fonctionne quand même : les notes
 sont gardées en mémoire et la barre d'outils l'indique.
@@ -48,7 +48,7 @@ Pages :
 
 | URL | Contenu |
 |---|---|
-| `/` | le mur (vue d'ensemble SSR + mur client) |
+| `/mur` | le mur (vue d'ensemble SSR + mur client) ; `/` est la page d'accueil des démos |
 | `/lab` | une seule carte HTML-in-Canvas, avec les mesures de l'API (unité, captures, vérification) |
 | `/bench` | résultats du banc (graphiques + tableaux), CSV dans `/bench/results.csv` |
 
