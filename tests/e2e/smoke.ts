@@ -134,6 +134,36 @@ async function classic(b: Browser) {
   await ctx.close();
 }
 
+/** /carte en mode HTML-in-Canvas : 5 panneaux capturés, vérifiés par readPixels, sans repli. */
+async function carteHic(b: Browser) {
+  console.log("\n== /carte?mode=hic (HTML-in-Canvas)");
+  const ctx = await b.newContext({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1 });
+  const p = await ctx.newPage();
+  const errors = collectErrors(p);
+  await p.goto(`${BASE}/carte?mode=hic`);
+  await p.waitForFunction(() => (window as any).__carte && (window as any).__hicMap, null, { timeout: 45_000 });
+  await p.evaluate(() => (window as any).__carte.openPanels(5, 0));
+  const ok = await p
+    .waitForFunction(() => {
+      const s = (window as any).__hicMap?.stats();
+      return s && s.uploads >= 5 && s.verified >= 3;
+    }, null, { timeout: 20_000 })
+    .then(() => true)
+    .catch(() => false);
+  const r = await p.evaluate(() => {
+    const w = window as any;
+    const st = w.__carte.store.getState();
+    const stats = w.__hicMap?.stats() ?? {};
+    return { mode: st.mode, fallback: st.fallback || stats.fallback || "", api: st.api, uploads: stats.uploads, verified: stats.verified, panels: w.__hicMap?.layer.panels.size };
+  });
+  check("uploads ≥ 5 et verified ≥ 3", ok && r.uploads >= 5 && r.verified >= 3, `uploads ${r.uploads}, verified ${r.verified}`);
+  check("5 panneaux dans la couche", r.panels === 5, String(r.panels));
+  check("pas de repli en mode classique", r.mode === "hic" && !r.fallback, r.fallback || r.mode);
+  check("API marquée active après vérification", r.api === "active", r.api);
+  check("aucune erreur console", errors.length === 0, errors.join(" | "));
+  await ctx.close();
+}
+
 async function otherPages() {
   console.log("\n== Autres démos");
   for (const path of ["/mur", "/carte", "/bench"]) {
@@ -148,6 +178,7 @@ try {
   await narrow(b, false);
   await narrow(b, true);
   await classic(b);
+  await carteHic(b);
   await otherPages();
 } finally {
   await b.close();

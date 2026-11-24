@@ -62,7 +62,7 @@ rien faire, on peut taper dans une note invisible.
 | Lancer de rayon sur la géométrie des bâtiments (CPU) | Possible (empreintes et `render_height` des tuiles), synchrone, mais il faut reconstruire les polygones découpés par tuiles et rester cohérent avec ce que MapLibre affiche. Non retenu. |
 | **Requêtes d'occlusion WebGL2** | **Retenu.** Le GPU répond exactement à la question « ce pixel du panneau passe-t-il le test de profondeur ? », avec la profondeur réellement dessinée. |
 
-**Implémentation** (`src/client/carte/HicPanels.tsx`, `hic/panelLayer.ts`) :
+**Implémentation** (`src/client/hic3d/HicHost.tsx`, `src/client/hic3d/occlusion.ts`, `src/client/carte/hic/panelLayer.ts`) :
 
 1. À chaque `pointermove`, on cherche le panneau sous le curseur par l'**homographie inverse**
    de sa matrice (le plus proche de la caméra en cas de chevauchement).
