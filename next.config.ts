@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
   output: "standalone",
   reactStrictMode: true,
   // Les migrations SQL sont lues au démarrage par l'instrumentation.
-  outputFileTracingIncludes: { "/*": ["./drizzle/**/*"], "/bench": ["./bench/results/**/*"], "/bench/results.csv": ["./bench/results/**/*"], "/maplibre/[file]": ["./node_modules/maplibre-gl/dist/maplibre-gl-worker.mjs", "./node_modules/maplibre-gl/dist/maplibre-gl-shared.mjs"] },
+  outputFileTracingIncludes: { "/*": ["./drizzle/**/*", "./data/aqueduc/**/*"], "/bench": ["./bench/results/**/*"], "/bench/results.csv": ["./bench/results/**/*"], "/maplibre/[file]": ["./node_modules/maplibre-gl/dist/maplibre-gl-worker.mjs", "./node_modules/maplibre-gl/dist/maplibre-gl-shared.mjs"] },
 };
 
 export default nextConfig;

@@ -15,7 +15,8 @@
     "db:setup": "tsx scripts/db-setup.ts all",
     "bench": "tsx bench/run-bench.ts",
     "bench:carte": "tsx bench/run-carte.ts",
-    "proofs:carte": "tsx scripts/carte-proofs.ts"
+    "proofs:carte": "tsx scripts/carte-proofs.ts",
+    "aqueduc:data": "tsx scripts/aqueduc-data.ts"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.4",
