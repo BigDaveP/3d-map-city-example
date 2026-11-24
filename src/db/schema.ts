@@ -47,3 +47,20 @@ export const alerts = pgTable(
   },
   (t) => [index("alerts_branch_idx").on(t.branchId)],
 );
+
+// ------------------------------------------------------------------ carte opérationnelle
+/** État persistant d'un restaurant de la carte (les restaurants eux-mêmes sont dans le code). */
+export const restaurantState = pgTable("restaurant_state", {
+  restaurantId: text("restaurant_id").primaryKey(),
+  paused: boolean("paused").notNull().default(false),
+  note: text("note").notNull().default(""),
+  dispatched: integer("dispatched").notNull().default(0),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Réassignation d'un livreur à un restaurant. */
+export const courierAssignments = pgTable("courier_assignments", {
+  courierId: text("courier_id").primaryKey(),
+  restaurantId: text("restaurant_id").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
