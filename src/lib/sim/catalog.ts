@@ -38,11 +38,13 @@ export function getBranches(cardCount: number): Branch[] {
     const regionIdx = Math.floor(i / perRegion);
     const stem = STEMS[i % STEMS.length];
     const suffix = SUFFIXES[Math.floor(i / STEMS.length) % SUFFIXES.length];
+    // au-delà de 200 succursales (extrapolation), on numérote : « Ardelune 2 »
+    const round = Math.floor(i / (STEMS.length * SUFFIXES.length));
     const basket = 18 + Math.round(rand01("basket", i) * 60);
     out.push({
       id: `S${String(i + 1).padStart(3, "0")}`,
       idx: i,
-      name: stem + suffix,
+      name: stem + suffix + (round ? ` ${round + 1}` : ""),
       regionId: REGIONS[regionIdx].id,
       regionIdx,
       basket,

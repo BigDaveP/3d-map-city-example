@@ -31,9 +31,9 @@ export function Toolbar({ actions, n, persistence, asideOpen, toggleAside }: { a
       <label>
         Cartes
         <select value={n} onChange={(e) => actions.setCount(Number(e.currentTarget.value))}>
-          {[250, 500, 1000].map((v) => (
+          {[250, 500, 1000, 2500, 5000].map((v) => (
             <option key={v} value={v}>
-              {v}
+              {v > 1000 ? `${v} (extrapolation)` : v}
             </option>
           ))}
         </select>

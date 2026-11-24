@@ -20,7 +20,7 @@ const mem = globalThis as unknown as {
 mem.__murMem ??= { notes: new Map(), assign: new Map(), alerts: [], seq: 1 };
 const M = mem.__murMem;
 
-const CARD_RE = /^(S\d{3}):(sales|staff|reviews|weather|alerts)$/;
+const CARD_RE = /^(S\d{3,4}):(sales|staff|reviews|weather|alerts)$/;
 export function parseCardId(cardId: unknown): { branchId: string; kind: Kind } | null {
   if (typeof cardId !== "string") return null;
   const m = CARD_RE.exec(cardId);

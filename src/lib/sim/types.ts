@@ -94,9 +94,10 @@ export interface StormChange {
 export const cardIndex = (branchIdx: number, kindIdx: number) => branchIdx * KINDS.length + kindIdx;
 export const cardId = (branchId: string, kind: Kind) => `${branchId}:${kind}`;
 export const VALID_CARD_COUNTS = [250, 500, 1000] as const;
+export const MAX_CARDS = 5000;
 export function normalizeCardCount(n: unknown): number {
   const v = Number(n);
   if (!Number.isFinite(v)) return 1000;
-  // multiple de 25 (5 régions x 5 indicateurs), entre 25 et 1000
-  return Math.max(25, Math.min(1000, Math.round(v / 25) * 25));
+  // multiple de 25 (5 régions x 5 indicateurs), entre 25 et 5000 (au-delà de 1000 : extrapolation du banc)
+  return Math.max(25, Math.min(MAX_CARDS, Math.round(v / 25) * 25));
 }
