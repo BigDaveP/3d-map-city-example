@@ -1,0 +1,3 @@
+:root { color-scheme: dark; --bg: #0d1117; --fg: #e6edf3; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); font: 14px/1.4 system-ui, sans-serif; }
