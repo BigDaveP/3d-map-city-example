@@ -169,9 +169,10 @@ const reset = () =>
   aqueducStore.setState({
     mode: "hic",
     layer: "age",
+    underground: false,
     selection: null,
     clock: { t0: Date.UTC(2026, 10, 24, 19, 30), speed: 60, startedAt: NOW - 60_000 },
-    scenario: { active: false, step: "detection", valvesClosed: false, resumeAt: null, resumeSpeed: 1, resumeLayer: "pression", valvesTurned: [], error: "" },
+    scenario: { active: false, step: "detection", valvesClosed: false, resumeAt: null, resumeSpeed: 1, resumeLayer: "pression", resumeUnderground: false, valvesTurned: [], error: "" },
     incident: null,
   });
 
@@ -198,6 +199,25 @@ test("startScenario : horloge du scénario, incident de l'étape, couche Pressio
   startScenario(NOW + 10_000);
   assert.equal(aqueducStore.getState().scenario.resumeAt, left);
   assert.equal(aqueducStore.getState().scenario.step, "detection");
+});
+
+test("vue souterraine : coupée pendant le scénario (couches masquées, sans mention), rendue à la sortie", () => {
+  reset();
+  aqueducStore.setState({ underground: true });
+  startScenario(NOW);
+  assert.equal(aqueducStore.getState().underground, false);
+  assert.equal(aqueducStore.getState().scenario.resumeUnderground, true);
+  // relancer pendant le scénario garde la valeur quittée
+  startScenario(NOW + 1000);
+  assert.equal(aqueducStore.getState().scenario.resumeUnderground, true);
+  exploreFreely(NOW + 2000);
+  assert.equal(aqueducStore.getState().underground, true);
+  assert.equal(aqueducStore.getState().scenario.resumeUnderground, false);
+  // vue normale quittée : reste normale
+  reset();
+  startScenario(NOW);
+  exploreFreely(NOW + 1000);
+  assert.equal(aqueducStore.getState().underground, false);
 });
 
 test("goToStep : incident reconstruit à chaque étape, caméra de l'étape, coupe seule en HIC", () => {

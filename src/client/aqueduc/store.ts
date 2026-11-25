@@ -32,7 +32,9 @@ export interface AqState {
   clock: { t0: number; speed: Speed; startedAt: number };
   /**
    * Scénario guidé (piloté par `scenarioController.ts`) : il remplace l'horloge vivante et fixe
-   * `incident` à chaque étape. `resumeAt`, `resumeSpeed`, `resumeLayer` : réseau vivant quitté.
+   * `incident` à chaque étape. `resumeAt`, `resumeSpeed`, `resumeLayer`, `resumeUnderground` :
+   * réseau vivant quitté (la vue souterraine est coupée pendant le scénario : les couches, qui portent
+   * sa mention, sont masquées).
    * `valvesTurned` : vannes manœuvrées dans la coupe, en attente de la confirmation du serveur.
    */
   scenario: {
@@ -42,6 +44,7 @@ export interface AqState {
     resumeAt: number | null;
     resumeSpeed: Speed;
     resumeLayer: LayerId;
+    resumeUnderground: boolean;
     valvesTurned: number[];
     error: string;
   };
@@ -69,7 +72,7 @@ const initial = (): AqState => ({
   undergroundAll: false,
   selection: null,
   clock: { t0: Date.now(), speed: 1, startedAt: Date.now() },
-  scenario: { active: false, step: "detection", valvesClosed: false, resumeAt: null, resumeSpeed: 1, resumeLayer: "pression", valvesTurned: [], error: "" },
+  scenario: { active: false, step: "detection", valvesClosed: false, resumeAt: null, resumeSpeed: 1, resumeLayer: "pression", resumeUnderground: false, valvesTurned: [], error: "" },
   incident: null,
   live: { t: 0, readings: [], pressure: new Float32Array(0), chlorine: new Float32Array(0), sectors: [] },
   notices: [],

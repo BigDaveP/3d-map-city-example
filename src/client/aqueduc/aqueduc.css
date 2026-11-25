@@ -115,8 +115,9 @@ html[data-aq="app"] .aq-ssr { display: none; }
 .aq-under { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; margin: 6px 14px 2px; padding-top: 8px; border-top: 1px solid var(--aq-line); }
 .aq-under-btn[aria-pressed="true"] { background: var(--aq-ink); border-color: var(--aq-ink); color: #fff; }
 .aq-under-all { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; cursor: pointer; }
-/* mention de la vue souterraine : seul élément ajouté au-dessus de la carte */
-.aq-under-note { position: absolute; top: var(--aq-gap); left: 50%; transform: translateX(-50%); margin: 0; padding: 5px 12px; background: rgba(20, 33, 51, 0.86); color: #fff; border-radius: 99px; font-size: 12px; white-space: nowrap; pointer-events: none; }
+/* mention de la vue souterraine, dans le panneau des couches (budget d'interface) */
+.aq-under-note { flex: 1 1 100%; margin: 0; font-size: 11.5px; color: var(--aq-ink-2); }
+.aq-under-x { font-style: normal; text-transform: none; letter-spacing: 0; color: var(--aq-ink); }
 .aq-legend { padding: 6px 14px 12px; }
 .aq-ramp { height: 6px; border-radius: 3px; }
 .aq-ramp-l { display: flex; justify-content: space-between; margin-top: 3px; font-size: 10.5px; color: var(--aq-ink-2); }
@@ -292,7 +293,6 @@ html[data-aq="app"] .aq-ssr { display: none; }
   .aq-app { --aq-gap: 10px; }
   .aq-brand { font-size: 12.5px; }
   .aq-layers { width: auto; min-width: 150px; }
-  .aq-under-note { left: auto; right: var(--aq-gap); transform: none; white-space: normal; max-width: 46%; }
   .aq-timeline { height: auto; grid-template-columns: 1fr; grid-template-rows: auto 74px; }
   .aq-tl-l { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding: 8px 12px; border-right: 0; border-bottom: 1px solid var(--aq-line); }
   .aq-tl-title { flex: 1 1 100%; }

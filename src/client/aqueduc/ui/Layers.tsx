@@ -4,6 +4,7 @@ import { useEffect, useId, useState } from "react";
 import { FLUSHING_2026 } from "@/lib/aqueduc/sim";
 import { num } from "../format";
 import { FLUSH_COLORS, NO_DATA, PIPE_STOPS } from "../pipes";
+import { TUBE_DEPTH_M, TUBE_EXAGGERATION } from "../scene/tubes";
 import { aqueducStore, type LayerId } from "../store";
 import { useAq } from "../useAq";
 
@@ -101,7 +102,11 @@ export function Layers() {
   return (
     <section className="aq-layers aq-panel" aria-label="Couches">
       <button type="button" className="aq-layers-h" aria-expanded={open} aria-controls={bodyId} onClick={() => setOpen(!open)}>
-        <span>Couches</span>
+        <span>
+          Couches
+          {/* panneau replié : la vue souterraine garde son facteur d'exagération à l'écran */}
+          {underground && !open && <em className="aq-under-x"> · souterrain ×{TUBE_EXAGGERATION}</em>}
+        </span>
         <span className="aq-caret" aria-hidden="true" />
       </button>
       {open && (
@@ -126,6 +131,11 @@ export function Layers() {
                 <input type="checkbox" checked={all} onChange={(e) => aqueducStore.setState({ undergroundAll: e.target.checked })} />
                 Tout le réseau
               </label>
+            )}
+            {underground && (
+              <p className="aq-under-note" role="status">
+                Diamètres exagérés ×{TUBE_EXAGGERATION} · axe à {TUBE_DEPTH_M}&nbsp;m, plus bas pour les grosses conduites
+              </p>
             )}
           </div>
           <Legend layer={layer} />

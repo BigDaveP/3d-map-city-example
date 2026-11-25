@@ -7,7 +7,7 @@
  * qu'on ferait défiler, puisque l'incident n'a pas d'heure de fermeture des vannes.
  * Les vannes à fermer viennent du serveur (plan d'isolation du réseau, `attachScenario`) ; leur
  * fermeture passe par `closeValvesAction`, qui les valide. « Explorer librement » rend le réseau
- * vivant à l'heure, la vitesse et la couche quittées.
+ * vivant à l'heure, la vitesse, la couche et la vue (souterraine ou non) quittées.
  */
 import { closeValvesAction } from "@/app/aqueduc-actions";
 import { CITY } from "@/lib/aqueduc/city";
@@ -94,17 +94,19 @@ function apply(step: StepId, t: number, now: number, patch: Partial<AqState["sce
 }
 
 /**
- * Lance (ou relance) le scénario à la détection ; l'heure, la vitesse et la couche quittées restent
- * celles du premier lancement. Le scénario repart en temps réel (×1) : à ×60, l'horloge dépasserait
+ * Lance (ou relance) le scénario à la détection ; l'heure, la vitesse, la couche et la vue quittées
+ * restent celles du premier lancement. La vue souterraine est coupée : les couches, qui portent sa
+ * mention « Diamètres exagérés ×12 », sont masquées pendant le scénario. Le scénario repart en temps réel (×1) : à ×60, l'horloge dépasserait
  * l'heure des étapes suivantes pendant la lecture d'une seule étape.
  */
 export function startScenario(now = Date.now()) {
   const s = aqueducStore.getState();
   const fresh = !s.scenario.active;
-  const resume = fresh ? { resumeAt: simNow(now), resumeSpeed: s.clock.speed, resumeLayer: s.layer } : {};
+  const resume = fresh ? { resumeAt: simNow(now), resumeSpeed: s.clock.speed, resumeLayer: s.layer, resumeUnderground: s.underground } : {};
   aqueducStore.setState({
     clock: { ...s.clock, speed: 1 },
     layer: "pression",
+    underground: false,
     scenario: {
       ...s.scenario,
       valvesClosed: false,
@@ -132,14 +134,15 @@ const offset = (k: number) => {
 export const nextStep = (now = Date.now()) => goToStep(offset(1), now);
 export const prevStep = (now = Date.now()) => goToStep(offset(-1), now);
 
-/** Rend la main : réseau vivant à l'heure, la vitesse et la couche quittées ; récit et coupe démontés. */
+/** Rend la main : réseau vivant à l'heure, la vitesse, la couche et la vue quittées ; récit et coupe démontés. */
 export function exploreFreely(now = Date.now()) {
   const s = aqueducStore.getState();
   if (!s.scenario.active) return;
   aqueducStore.setState({
     clock: { t0: s.scenario.resumeAt ?? now, speed: s.scenario.resumeSpeed, startedAt: now },
     layer: s.scenario.resumeLayer,
-    scenario: { active: false, step: "detection", valvesClosed: false, resumeAt: null, resumeSpeed: 1, resumeLayer: "pression", valvesTurned: [], error: "" },
+    underground: s.scenario.resumeUnderground,
+    scenario: { active: false, step: "detection", valvesClosed: false, resumeAt: null, resumeSpeed: 1, resumeLayer: "pression", resumeUnderground: false, valvesTurned: [], error: "" },
     incident: null,
     selection: s.selection?.kind === "incident" ? null : s.selection,
   });

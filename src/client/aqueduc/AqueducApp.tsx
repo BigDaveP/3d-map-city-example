@@ -24,7 +24,7 @@ import {
 } from "./pipes";
 import { attachScenario, exploreFreely, faceBearing, goToStep, startScenario, STEP_VIEW, stepSelection, type CameraTarget } from "./scenarioController";
 import { cutLayout } from "./scene/cut";
-import { attachUnderground, TUBE_DEPTH_M, TUBE_EXAGGERATION, type TubeLayer } from "./scene/tubes";
+import { attachUnderground, type TubeLayer } from "./scene/tubes";
 import { SceneSurfaces } from "./scene/Surfaces";
 import { aqueducStore, select, type AqState, type Mode, type Selection } from "./store";
 import { AppBar } from "./ui/AppBar";
@@ -128,7 +128,6 @@ export default function AqueducApp({ initialMode }: { initialMode?: Mode }) {
   const [error, setError] = useState("");
   const [tubes, setTubes] = useState<TubeLayer | null>(null);
   const mode = useAq((s) => s.mode);
-  const underground = useAq((s) => s.underground);
 
   // la vue SSR (résumé lisible sans JavaScript) laisse la place à l'application
   useEffect(() => {
@@ -266,12 +265,6 @@ export default function AqueducApp({ initialMode }: { initialMode?: Mode }) {
         )}
         {ctx && mode === "classic" && <ClassicScene ml={ctx.ml} map={ctx.map} net={ctx.net} />}
         {ctx && mode === "hic" && <SceneSurfaces ml={ctx.ml} map={ctx.map} metrics={ctx.metrics} net={ctx.net} />}
-        {/* avant les couches : sur un écran étroit, le panneau déplié passe par-dessus la mention */}
-        {ctx && underground && (
-          <p className="aq-under-note" role="status">
-            Diamètres exagérés ×{TUBE_EXAGGERATION} · conduites à {TUBE_DEPTH_M} m sous la rue
-          </p>
-        )}
         <Layers />
         {ctx && <Story map={ctx.map} net={ctx.net} />}
         {ctx && <Inspector net={ctx.net} />}

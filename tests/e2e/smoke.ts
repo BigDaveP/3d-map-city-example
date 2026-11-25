@@ -354,7 +354,7 @@ async function undergroundHic(b: Browser) {
   const ok = await drawn(0);
   const on = await state();
   check("bouton « Vue souterraine » : couche aq-tubes présente, instances > 0", ok && on.on && on.layer && on.instances > 0, `${on.instances} instances`);
-  check("mention « Diamètres exagérés ×12 » visible", on.note.includes("Diamètres exagérés ×12") && (await p.locator(".aq-under-note").isVisible()), on.note);
+  check("mention « Diamètres exagérés ×12 » visible, dans le panneau des couches", on.note.includes("Diamètres exagérés ×12") && (await p.locator(".aq-layers .aq-under-note").isVisible()), on.note);
   check("bâtiments à 0,35, conduites au sol masquées", on.buildings === 0.35 && on.pipes === 0 && on.casing === "none", JSON.stringify(on));
   const order = await p.evaluate(() => {
     const ids: string[] = (window as any).__aqueduc.map.style._order;
@@ -362,7 +362,8 @@ async function undergroundHic(b: Browser) {
   });
   check("ordre des couches : lignes < tubes < bâtiments < surfaces HTML", order.pipes < order.tubes && order.tubes < order.buildings && order.buildings < order.panels, JSON.stringify(order));
   const floating = await p.evaluate(() => [...document.querySelectorAll<HTMLElement>(".aq-panel")].filter((e) => e.offsetParent !== null).map((e) => e.className));
-  check("rien d'autre ne flotte : couches et frise (plus la mention)", floating.length === 2 && floating.some((c) => c.includes("aq-layers")) && floating.some((c) => c.includes("aq-timeline")), floating.join(" | "));
+  const extra = await p.evaluate(() => [...document.querySelectorAll<HTMLElement>(".aq-stage > *")].filter((e) => e.offsetParent !== null && !e.matches(".aq-map, .aq-panel")).map((e) => e.className));
+  check("rien d'autre ne flotte : couches et frise seulement", floating.length === 2 && floating.some((c) => c.includes("aq-layers")) && floating.some((c) => c.includes("aq-timeline")) && extra.length === 0, [...floating, ...extra].join(" | "));
   if (process.env.SHOT_UNDERGROUND) {
     await p.waitForTimeout(4000);
     await p.screenshot({ path: process.env.SHOT_UNDERGROUND });
