@@ -92,15 +92,15 @@ html:has(.aq-fatal) .aq-ssr { padding-bottom: 96px; }
 .aq-chip { border: 1px solid var(--aq-line); background: #fff; border-radius: 8px; padding: 5px 9px; font-size: 11.5px; color: var(--aq-ink-2); cursor: pointer; white-space: nowrap; }
 .aq-chip b { color: var(--aq-good); font-weight: 600; }
 .aq-perf-detail { position: absolute; right: 0; top: calc(100% + 8px); z-index: 30; width: min(340px, calc(100vw - 20px)); padding: 12px 14px; background: #fff; border: 1px solid var(--aq-line); border-radius: 10px; box-shadow: var(--aq-shadow); }
-.aq-perf-detail .metrics { position: static; min-width: 0; padding: 0; background: none; border: 0; color: var(--aq-ink); font: 12px/1.65 var(--aq-numf); pointer-events: auto; }
-.aq-perf-detail .metrics b { color: var(--aq-accent); }
+.aq-perf-detail .metrics { color: var(--aq-ink); font: 12px/1.65 var(--aq-numf); }
+.aq-perf-detail .metrics b { color: var(--aq-accent); font-weight: 600; }
+.aq-perf-detail .metrics .row { display: flex; justify-content: space-between; gap: 12px; }
 
-/* menu des démos, en thème clair dans la barre */
+/* navigation (banc de mesures, « À propos »), en thème clair dans la barre */
 .aq-bar .demo-nav { grid-column: auto; padding: 0; background: none; border: 0; align-items: center; font-size: 13px; z-index: 25; }
-.aq-bar .demo-nav summary,
+.aq-bar .demo-nav .demo-nav-link,
 .aq-bar .demo-nav > button { background: #fff; border: 1px solid var(--aq-line); border-radius: 8px; padding: 5px 10px; color: var(--aq-ink); font-weight: 500; white-space: nowrap; }
-.aq-bar .demo-nav details ul { box-shadow: var(--aq-shadow); }
-.aq-bar .demo-nav details a:hover { background: var(--aq-bg); }
+.aq-bar .demo-nav .demo-nav-link:hover { background: var(--aq-bg); }
 .aq-bar .demo-nav dialog { color: var(--aq-ink); box-shadow: var(--aq-shadow); }
 .aq-bar .demo-nav dialog::backdrop { background: rgba(20, 33, 51, 0.35); }
 .aq-bar .demo-nav dialog form button { color: #fff; }

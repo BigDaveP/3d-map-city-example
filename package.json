@@ -1,5 +1,5 @@
 {
-  "name": "mur-supervision-html-in-canvas",
+  "name": "aqueduc-3d-html-in-canvas",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -11,9 +11,7 @@
     "test": "node --conditions=react-server --import tsx --test 'tests/**/*.test.ts'",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx scripts/db-setup.ts migrate",
-    "db:seed": "tsx scripts/db-setup.ts seed",
     "db:setup": "tsx scripts/db-setup.ts all",
-    "bench": "tsx bench/run-bench.ts",
     "bench:aqueduc": "tsx bench/run-aqueduc.ts",
     "proofs:aqueduc": "tsx scripts/aqueduc-proofs.ts",
     "aqueduc:data": "tsx scripts/aqueduc-data.ts"

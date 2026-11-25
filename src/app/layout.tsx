@@ -7,8 +7,8 @@ import "@/client/aqueduc/aqueduc.css";
 import { originTrialMeta } from "@/lib/origin-trial";
 
 export const metadata: Metadata = {
-  title: "Démos HTML-in-Canvas",
-  description: "Démos d'apprentissage HTML-in-Canvas : réseau d'eau 3D, mur de supervision et banc de mesures. Données simulées.",
+  title: "Réseau d'eau 3D · HTML-in-Canvas",
+  description: "Démo HTML-in-Canvas : le réseau d'aqueduc de Trois-Rivières en 3D, avec capteurs, secteurs et scénario de bris simulés, et son banc de mesures.",
 };
 
 /** Le jeton Origin Trial est lu à la requête (variable d'environnement d'exécution). */

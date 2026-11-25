@@ -76,7 +76,7 @@ async function ssrWithoutJs(b: Browser) {
   check("« Simulation »", text.includes("Simulation"));
   check("titre de la page", (await p.title()).includes("Réseau d'eau potable"), await p.title());
   check("secteurs listés avec statut", (await p.locator(".aq-table tbody tr").count()) === 10);
-  check("lien vers les autres démos", (await p.locator('nav a[href="/mur"]').count()) === 1);
+  check("lien vers le banc de mesures", (await p.locator('nav a[href="/bench"]').count()) === 1);
   await ctx.close();
 }
 
@@ -793,12 +793,14 @@ async function fallbackNote(b: Browser) {
   await ctx.close();
 }
 
-async function otherPages() {
-  console.log("\n== Autres démos");
-  for (const path of ["/mur", "/bench"]) {
-    const r = await fetch(`${BASE}${path}`);
-    check(`${path} → 200`, r.status === 200, String(r.status));
-  }
+async function benchPage() {
+  console.log("\n== /bench");
+  const r = await fetch(`${BASE}/bench`);
+  check("/bench → 200", r.status === 200, String(r.status));
+  const html = await r.text();
+  check("/bench : section « Réseau d'eau » (ancre #aqueduc) et lien de retour vers la démo", html.includes('id="aqueduc"') && /<nav[^>]*>.*?<a[^>]*href="\/"/s.test(html));
+  const csv = await fetch(`${BASE}/bench/aqueduc.csv`);
+  check("/bench/aqueduc.csv → 200", csv.status === 200, String(csv.status));
 }
 
 const b = await chromium.launch();
@@ -816,7 +818,7 @@ try {
   await appBar(b);
   await withoutApi();
   await fallbackNote(b);
-  await otherPages();
+  await benchPage();
 } finally {
   await b.close();
 }

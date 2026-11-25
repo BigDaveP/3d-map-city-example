@@ -1,6 +1,6 @@
 # Image de production (build standalone de Next.js), prête pour Coolify.
-#   docker build -t mur-supervision .
-#   docker run -p 3000:3000 -e DATABASE_URL=postgres://... -e DB_AUTO_SETUP=1 mur-supervision
+#   docker build -t aqueduc-3d .
+#   docker run -p 3000:3000 -e DATABASE_URL=postgres://... -e DB_AUTO_SETUP=1 aqueduc-3d
 # DB_AUTO_SETUP=1 applique les migrations et le seed au démarrage (instrumentation.ts).
 # Sans base joignable, la démo fonctionne avec une persistance en mémoire (signalée dans l'UI).
 
@@ -32,5 +32,5 @@ COPY --from=build --chown=app:app /app/drizzle ./drizzle
 COPY --from=build --chown=app:app /app/bench/results ./bench/results
 USER app
 EXPOSE 3000
-HEALTHCHECK --interval=15s --timeout=3s --start-period=20s CMD wget -qO- http://127.0.0.1:3000/api/staff?n=25 >/dev/null || exit 1
+HEALTHCHECK --interval=15s --timeout=3s --start-period=20s CMD wget -qO- http://127.0.0.1:3000/api/aqueduc/series >/dev/null || exit 1
 CMD ["node", "server.js"]
