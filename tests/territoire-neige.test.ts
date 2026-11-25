@@ -154,3 +154,49 @@ test("une interdiction posée la nuit (R5) ne vaut pas pour le soir ; une réaff
   assert.ok(snowPlan(at("11:00"), [night], sim).every((p) => p.decidedBy === "direction" && p.ban === "programmee"));
   assert.ok(zone(at("08:00"), [night, move], "B").resources.includes("CH-01"));
 });
+
+// R10 : de 00:00 à 06:00, c'est l'opération de la veille (jour D → nuit du jour D+1)
+const next = (h: string) => atHour(atHour(d, "12:00") + 24 * 3_600_000, h);
+
+test("R10 : un ban A+B à 08:00 le jour D → A et B en vigueur, C sans interdiction à 00:30 le jour D+1, par le visiteur", () => {
+  const ban: EnvAction = { at: at("08:00"), kind: "ban", zones: ["A", "B"] };
+  const plan = snowPlan(next("00:30"), [ban], sim);
+  assert.deepEqual(plan.map((p) => p.ban), ["en-vigueur", "en-vigueur", "aucune"]);
+  assert.deepEqual(plan.map((p) => p.lights), ["allume", "allume", "eteint"]);
+  for (const p of plan.slice(0, 2)) {
+    assert.equal(p.decidedBy, "visiteur");
+    assert.equal(p.decidedAt, at("08:00"));
+    assert.ok(p.progress > 0);
+  }
+  assert.equal(plan[2].decidedBy, null);
+  assert.equal(plan[2].progress, 0);
+});
+
+test("R10 : sans ban du visiteur le jour D, la décision par défaut (10:00, direction) à 00:30 le jour D+1", () => {
+  const plan = snowPlan(next("00:30"), [{ at: at("11:00"), kind: "assign", resource: "CH-01", zone: "B" }], sim);
+  assert.ok(plan.every((p) => p.ban === "en-vigueur" && p.decidedBy === "direction" && p.decidedAt === at("10:00")));
+  // les réaffectations de la veille valent pour la nuit
+  assert.ok(plan[1].resources.includes("CH-01"));
+});
+
+test("R10 : une réaffectation de nuit (01:00, jour D+1) s'applique, après celles de la veille", () => {
+  const actions: EnvAction[] = [
+    { at: at("08:00"), kind: "ban", zones: ["A", "B"] },
+    { at: at("11:00"), kind: "assign", resource: "CH-01", zone: "B" },
+    { at: next("01:00"), kind: "assign", resource: "CH-01", zone: "C" },
+  ];
+  assert.ok(snowPlan(next("00:30"), actions, sim)[1].resources.includes("CH-01"));
+  const plan = snowPlan(next("01:30"), actions, sim);
+  assert.ok(plan[2].resources.includes("CH-01"));
+  assert.ok(!plan[1].resources.includes("CH-01"));
+});
+
+test("R10 : à 06:00 le jour D+1, les actions du jour D ne comptent plus", () => {
+  const actions: EnvAction[] = [
+    { at: at("08:00"), kind: "ban", zones: ["A"] },
+    { at: at("11:00"), kind: "assign", resource: "CH-01", zone: "B" },
+  ];
+  assert.ok(snowPlan(next("06:00"), actions, sim).every((p) => p.ban === "aucune"));
+  assert.ok(snowPlan(next("11:00"), actions, sim).every((p) => p.decidedBy === "direction"));
+  assert.ok(snowPlan(next("11:00"), actions, sim)[0].resources.includes("CH-01"));
+});

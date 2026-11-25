@@ -1364,6 +1364,17 @@ async function deneigement(b: Browser, mode: "hic" | "classic") {
   check("23:30 : réaffectation de CH-01 à la zone C appliquée (de nuit)", moved && /Ressources assignées · 7/i.test(await p.locator("[data-testid=inspector]").innerText()));
   await p.keyboard.press("Escape");
   check("Échap referme la fiche", (await p.locator("[data-testid=inspector]").count()) === 0);
+  // R10 : la nuit appartient à l'opération de la veille ; la décision A+B de 08:00 tient à 00:30
+  await setClock(p, atHour(atHour(SCENARIO_DAY, "12:00") + 24 * 3_600_000, "00:30"));
+  await p.waitForTimeout(1500);
+  const c030 = await lightStates(p, "C");
+  const decided = await p.locator(".dn-decided").innerText();
+  check(
+    "R10, 00:30 le lendemain : A et B toujours en vigueur, C non (feux éteints), « Décidée par vous à 8 h 00 »",
+    (await snowPlans(p)) === "A:en-vigueur B:en-vigueur C:aucune" && (c030.eteint ?? 0) > 0 && Object.keys(c030).length === 1 && decided.includes("Décidée par vous à 8 h 00"),
+    `${await snowPlans(p)} · C ${JSON.stringify(c030)} · ${decided}`,
+  );
+  check("R10, 00:30 : la zone C n'a pas de case cochée", !(await box("C").isChecked()) && (await box("A").isChecked()));
   check("aucune erreur console", errors.length === 0, errors.join(" | "));
   await ctx.close();
 

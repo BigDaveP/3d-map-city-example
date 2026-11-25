@@ -91,10 +91,11 @@ function assignment(actions: readonly EnvAction[]): Record<ZoneId, string[]> {
 
 /**
  * Plan par zone à l'instant t (actions de la journée de t seulement).
- * Entre 00:00 et 06:00, c'est le plan par défaut de la veille : les `ban` du visiteur ne comptent pas
- * (ils repartent à minuit), mais les `assign` faits depuis minuit s'appliquent aux ressources. Seules
- * les décisions de jour (07:30 à 15:00, `isDayBan`) comptent : une interdiction posée la nuit ne
- * vaut pas pour le soir qui suit.
+ * Entre 00:00 et 06:00, c'est l'opération de la veille (R10) : la dernière interdiction décidée par
+ * le visiteur la veille, sinon la décision par défaut de la direction (10:00) ; les ressources de la
+ * veille, plus les `assign` faits depuis minuit (R5). À partir de 06:00, seules les actions du jour
+ * comptent. Seules les décisions de jour (07:30 à 15:00, `isDayBan`) valent : une interdiction
+ * posée la nuit ne vaut pas pour le soir qui suit.
  */
 export function snowPlan(t: number, actions: readonly EnvAction[], _source: SnowSource): ZonePlan[] {
   const day = dayStartOf(t);
@@ -106,18 +107,29 @@ export function snowPlan(t: number, actions: readonly EnvAction[], _source: Snow
   };
 
   if (t < atHour(day, DAY_TIMES.banEnd)) {
+    // nuit : l'opération de la veille (R10). Décision du visiteur de la veille, sinon celle de la
+    // direction à 10:00 ; ressources de la veille, puis les réaffectations faites depuis minuit (R5)
     const prev = dayStartOf(day - HOUR);
-    const decidedAt = atHour(prev, DAY_TIMES.defaultDecisionAt);
+    const yesterday = actionsUpTo(actions, day - 1);
+    const night = assignment([...yesterday, ...today]);
+    const ban = yesterday.filter(isDayBan).at(-1);
+    const decision = ban
+      ? { by: "visiteur" as const, at: ban.at, zones: new Set<ZoneId>(ban.zones) }
+      : { by: "direction" as const, at: atHour(prev, DAY_TIMES.defaultDecisionAt), zones: new Set<ZoneId>(ZONES) };
     const banStart = atHour(prev, DAY_TIMES.banStart);
-    return ZONES.map((zone) => ({
-      zone,
-      ban: "en-vigueur",
-      decidedBy: "direction",
-      decidedAt,
-      resources: resources[zone],
-      progress: progressFrom(banStart, resources[zone].length),
-      lights: "allume",
-    }));
+    return ZONES.map((zone): ZonePlan =>
+      decision.zones.has(zone)
+        ? {
+            zone,
+            ban: "en-vigueur",
+            decidedBy: decision.by,
+            decidedAt: decision.at,
+            resources: night[zone],
+            progress: progressFrom(banStart, night[zone].length),
+            lights: "allume",
+          }
+        : { zone, ban: "aucune", decidedBy: null, decidedAt: null, resources: night[zone], progress: 0, lights: "eteint" },
+    );
   }
 
   const none = (zone: ZoneId): ZonePlan => ({ zone, ban: "aucune", decidedBy: null, decidedAt: null, resources: resources[zone], progress: 0, lights: "eteint" });

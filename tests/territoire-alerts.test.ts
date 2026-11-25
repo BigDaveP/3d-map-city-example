@@ -3,6 +3,7 @@ import test from "node:test";
 import { SCENARIO_DAY } from "../src/lib/aqueduc/scenario";
 import { allAlerts, aqueducAlerts, deneigementAlerts, deneigementAlertsWith, sortAlerts, summarize, type Alert } from "../src/lib/territoire/alerts";
 import { atHour, type EnvAction } from "../src/lib/territoire/day";
+import { deneigementStatus } from "../src/lib/territoire/home";
 import type { SnowSource } from "../src/lib/territoire/neige";
 
 const d = SCENARIO_DAY;
@@ -103,4 +104,14 @@ test("summarize compte par gravité", () => {
 test("déneigement : une interdiction posée la nuit ne retire pas l'alerte de décision du matin (R5)", () => {
   const night: EnvAction = { at: at("02:00"), kind: "ban", zones: ["A"] };
   assert.equal(deneigementAlerts(at("08:00"), [night], sim)[0]?.id, "neige-decision");
+});
+
+test("R10 : la nuit suivant un ban A+B, l'alerte « en vigueur » compte 2 zones ; l'accueil aussi", () => {
+  const ban: EnvAction = { at: at("08:00"), kind: "ban", zones: ["A", "B"] };
+  const t = atHour(at("12:00") + 24 * 3_600_000, "00:30");
+  const a = deneigementAlerts(t, [ban], sim);
+  assert.equal(a.length, 1);
+  assert.equal(a[0].title, "Interdiction en vigueur dans 2 zones");
+  assert.match(deneigementStatus(t, [ban], sim).text, /^Interdiction en vigueur · 2 zones/);
+  assert.match(deneigementStatus(t, [], sim).text, /^Interdiction en vigueur · 3 zones/);
 });
