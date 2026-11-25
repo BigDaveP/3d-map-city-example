@@ -9,3 +9,16 @@ export const ENVS: Record<EnvId, { title: string; icon: string; lot: 1 | 2; blur
   zonage: { title: "Zonage", icon: "zone", lot: 2, blurb: "Zones et usages permis du territoire, en consultation." },
   evaluation: { title: "Évaluation foncière", icon: "lot", lot: 2, blurb: "Lots, valeurs et rôle d'évaluation, en consultation." },
 };
+
+/** Environnements du lot 1 (les autres sont « À venir »), dans l'ordre de `ENVS`. */
+export const LOT1_ENVS = (Object.keys(ENVS) as EnvId[]).filter((id) => ENVS[id].lot === 1);
+
+export const isEnvId = (s: string | null | undefined): s is EnvId => typeof s === "string" && Object.hasOwn(ENVS, s);
+
+/** Genres d'éléments qu'un environnement sait mettre en avant (sélection et caméra). */
+export interface FocusKinds {
+  aqueduc: "segment" | "sensor" | "sector" | "incident";
+  deneigement: "zone" | "resource";
+}
+/** Élément mis en avant dans un environnement : alerte de la cloche, résultat de recherche. */
+export type EnvFocus = { [E in keyof FocusKinds]: { env: E; kind: FocusKinds[E]; id: string } }[keyof FocusKinds];

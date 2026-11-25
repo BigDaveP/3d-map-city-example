@@ -3,6 +3,8 @@ import type { Feature, LineString } from "geojson";
 import type { Sensor } from "@/lib/aqueduc/sim";
 import type { ExtraTag, NetworkData, SegmentProps } from "./pipes";
 
+export { fold } from "@/lib/territoire/search";
+
 export type SegmentFeature = Feature<LineString, SegmentProps>;
 
 export interface NetIndex {
@@ -41,14 +43,6 @@ export function lineCenter(f: SegmentFeature): [number, number] {
   const b = c[Math.ceil((c.length - 1) / 2)];
   return [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
 }
-
-/** Sans accents ni casse, pour la recherche. */
-export const fold = (s: string) =>
-  s
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .trim();
 
 /** Position d'une sélection, pour y amener la caméra. */
 export function selectionCenter(net: NetIndex, kind: string, id: string): [number, number] | null {

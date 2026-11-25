@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { actionsUpTo, atHour, dayStartOf, nextEvents, type EnvAction } from "../src/lib/territoire/day";
+import { actionsUpTo, atHour, dayEndOf, dayEvents, dayStartOf, DAY_TIMES, nextEvents, type EnvAction } from "../src/lib/territoire/day";
 import { ENVS } from "../src/lib/territoire/envs";
 import { SCENARIO_DAY } from "../src/lib/aqueduc/scenario";
 
@@ -54,4 +54,24 @@ test("nextEvents : prochains événements dans l'ordre", () => {
 test("ENVS : cinq environnements, deux au lot 1", () => {
   assert.deepEqual(Object.keys(ENVS), ["aqueduc", "deneigement", "collecte", "zonage", "evaluation"]);
   assert.deepEqual(Object.entries(ENVS).filter(([, e]) => e.lot === 1).map(([k]) => k), ["aqueduc", "deneigement"]);
+});
+
+test("dayEndOf : minuit suivant, journée de 24 h, 23 h ou 25 h", () => {
+  assert.equal(dayEndOf(atHour(SCENARIO_DAY, "14:00")) - SCENARIO_DAY, 24 * H);
+  assert.equal(dayEndOf(Date.UTC(2026, 2, 8, 12)) - dayStartOf(Date.UTC(2026, 2, 8, 12)), 23 * H);
+  assert.equal(dayEndOf(Date.UTC(2026, 10, 1, 12)) - dayStartOf(Date.UTC(2026, 10, 1, 12)), 25 * H);
+});
+
+test("dayEvents : les événements scénarisés de la journée, dans l'ordre, à l'heure locale", () => {
+  const ev = dayEvents(SCENARIO_DAY);
+  assert.deepEqual(
+    ev.map((e) => e.time),
+    [DAY_TIMES.banEnd, DAY_TIMES.collecteStart, DAY_TIMES.forecastAt, DAY_TIMES.defaultDecisionAt, DAY_TIMES.breakAt, DAY_TIMES.decisionDeadline, DAY_TIMES.snowStart, DAY_TIMES.banStart],
+  );
+  for (const e of ev) assert.equal(e.at, atHour(SCENARIO_DAY, e.time));
+  assert.equal(ev.find((e) => e.time === "14:00")?.env, "aqueduc");
+  assert.ok(ev.every((e) => e.label.length > 0));
+  // le jour du changement d'heure, 23:00 est à 24 h − 1 h du minuit local (journée de 25 h)
+  const fall = dayStartOf(Date.UTC(2026, 10, 1, 12));
+  assert.equal(dayEvents(fall).at(-1)!.at - fall, 24 * H);
 });

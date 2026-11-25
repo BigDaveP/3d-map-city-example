@@ -70,6 +70,11 @@ export function dayStartOf(t: number): number {
   return localToUtc(localDate(t), 0, 0);
 }
 
+/** Minuit local qui termine la journée de t : `dayStartOf(t)` + 24 h, 23 h ou 25 h. */
+export function dayEndOf(t: number): number {
+  return dayStartOf(dayStartOf(t) + 36 * HOUR);
+}
+
 /** `day` (minuit local) plus une heure locale « HH:MM », sans erreur au changement d'heure. */
 export function atHour(day: number, hhmm: string): number {
   const [h, mi] = hhmm.split(":").map(Number);
@@ -93,14 +98,16 @@ const EVENTS: { time: keyof typeof DAY_TIMES; label: string; env: EnvId }[] = [
   { time: "banStart", label: "Interdiction en vigueur (23 h)", env: "deneigement" },
 ];
 
+/** Événements scénarisés de la journée `day` (minuit local), dans l'ordre : heure « HH:MM », instant, libellé. */
+export function dayEvents(day: number): { at: number; time: string; label: string; env: EnvId }[] {
+  return EVENTS.map((e) => ({ at: atHour(day, DAY_TIMES[e.time]), time: DAY_TIMES[e.time], label: e.label, env: e.env }));
+}
+
 /** Les n prochains événements scénarisés après t (aujourd'hui, puis demain). */
 export function nextEvents(t: number, n: number): { at: number; label: string; env: EnvId }[] {
-  const today = dayStartOf(t);
-  const tomorrow = dayStartOf(today + 36 * HOUR);
-  return [today, tomorrow]
-    .flatMap((day) => EVENTS.map((e) => ({ at: atHour(day, DAY_TIMES[e.time]), label: e.label, env: e.env })))
+  return [dayStartOf(t), dayEndOf(t)]
+    .flatMap((day) => dayEvents(day).map(({ at, label, env }) => ({ at, label, env })))
     .filter((e) => e.at > t)
     .sort((a, b) => a.at - b.at)
     .slice(0, n);
 }
-

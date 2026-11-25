@@ -1,7 +1,7 @@
 /** Alertes de la ville (Simulation) : déneigement et aqueduc, déduites de l'heure et des actions. Module pur. */
 import { scenarioSteps } from "../aqueduc/scenario";
 import { actionsUpTo, atHour, dayStartOf, DAY_TIMES, type EnvAction } from "./day";
-import type { EnvId } from "./envs";
+import type { EnvFocus, EnvId } from "./envs";
 import { snowPlan, type SnowSource } from "./neige";
 
 export type Severity = "critique" | "attention" | "info";
@@ -12,7 +12,7 @@ export interface Alert {
   title: string;
   detail: string;
   at: number;
-  focus?: { kind: string; id: string };
+  focus?: EnvFocus;
 }
 
 const HOUR = 3_600_000;
@@ -80,7 +80,7 @@ export function aqueducAlerts(t: number, actions: readonly EnvAction[]): Alert[]
   if (t < detection || t >= restored) return [];
   const isolates = actionsUpTo(actions, t).filter((a) => a.kind === "isolate");
   const isolatedAt = Math.min(isolates.length > 0 ? isolates[isolates.length - 1].at : Infinity, step("intervention"));
-  const focus = { kind: "incident", id: BREAK_ID };
+  const focus: EnvFocus = { env: "aqueduc", kind: "incident", id: BREAK_ID };
   if (t < isolatedAt) {
     return [{ id: "aqueduc-bris", env: "aqueduc", severity: "critique", title: `Bris de conduite ${BREAK_ID} · Centre-ville`, detail: "Chute de pression détectée par le capteur P-01 (Simulation) ; le tronçon n'est pas isolé.", at: detection, focus }];
   }

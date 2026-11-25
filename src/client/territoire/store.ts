@@ -7,13 +7,16 @@
  */
 import { createStore } from "zustand/vanilla";
 import { actionsUpTo, type EnvAction } from "@/lib/territoire/day";
-import type { EnvId } from "@/lib/territoire/envs";
+import type { EnvFocus, EnvId } from "@/lib/territoire/envs";
 import type { Forecast } from "@/lib/territoire/meteo";
 
 export type Mode = "classic" | "hic";
 export type Speed = 1 | 60;
-/** Élément mis en avant dans un environnement (alerte choisie dans la cloche, par exemple). */
-export type Focus = { env: EnvId; kind: string; id: string } | null;
+/**
+ * Élément mis en avant dans un environnement (alerte choisie dans la cloche, résultat de recherche) :
+ * le module de l'environnement le sélectionne, y amène la caméra, puis l'efface.
+ */
+export type Focus = EnvFocus | null;
 /** Action sans son heure, genre par genre (`Omit` distribué sur l'union). */
 export type ActionInput = EnvAction extends infer A ? (A extends EnvAction ? Omit<A, "at"> : never) : never;
 

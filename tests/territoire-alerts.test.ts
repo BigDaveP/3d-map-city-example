@@ -66,7 +66,7 @@ test("aqueduc : critique à 14:05, attention à 15:10, rien à 21:00 ni avant 14
   assert.equal(c.length, 1);
   assert.equal(c[0].severity, "critique");
   assert.equal(c[0].title, "Bris de conduite 13C1949 · Centre-ville");
-  assert.deepEqual(c[0].focus, { kind: "incident", id: "13C1949" });
+  assert.deepEqual(c[0].focus, { env: "aqueduc", kind: "incident", id: "13C1949" });
   const a = aqueducAlerts(at("15:10"), []);
   assert.equal(a.length, 1);
   assert.equal(a[0].severity, "attention");
