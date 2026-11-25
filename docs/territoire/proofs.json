@@ -1,0 +1,203 @@
+{
+  "environment": {
+    "date": "2026-11-25T21:22:39.812Z",
+    "browser": "Chromium 158.0.8127.36",
+    "flags": [
+      "--enable-blink-features=CanvasDrawElement"
+    ],
+    "webgl": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+    "gpu": false,
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.30GHz × 4",
+    "viewport": {
+      "width": 1440,
+      "height": 860
+    },
+    "deviceScaleFactor": 1,
+    "base": "http://localhost:3300"
+  },
+  "accueil": {
+    "file": "docs/territoire/accueil.png",
+    "stamp": "mardi 24 nov., 14 h 05",
+    "alerts": [
+      "critique · critique : Bris de conduite 13C1949 · Centre-villeChute de pression détectée par le capteu"
+    ],
+    "envs": [
+      "aqueduc",
+      "deneigement",
+      "collecte (à venir)",
+      "zonage (à venir)",
+      "evaluation (à venir)"
+    ],
+    "errors": []
+  },
+  "aqueduc_hic": {
+    "file": "docs/territoire/aqueduc-hic.png",
+    "state": {
+      "mode": "hic",
+      "api": "active",
+      "fallback": "",
+      "env": "aqueduc"
+    },
+    "surfaces": [
+      "sector:centre-ville",
+      "sector:sainte-cecile",
+      "sector:saint-philippe",
+      "incident:13C1949",
+      "sensor:D-10",
+      "sensor:P-27",
+      "sensor:P-24",
+      "sensor:D-04",
+      "sensor:P-12",
+      "sensor:D-03",
+      "sensor:R-01",
+      "sensor:P-14"
+    ],
+    "incident": true,
+    "errors": []
+  },
+  "deneigement_2330_hic": {
+    "file": "docs/territoire/deneigement-2330-hic.png",
+    "state": {
+      "mode": "hic",
+      "api": "active",
+      "fallback": "",
+      "env": "deneigement"
+    },
+    "plans0800": "A:programmee B:programmee C:aucune",
+    "plans2330": "A:en-vigueur B:en-vigueur C:aucune",
+    "decided": "Décidée par vous à 8 h 00",
+    "marks": [
+      "Zone AStationnement interdit · 23 h – 6 h8 % déneigé",
+      "Zone BStationnement interdit · 23 h – 6 h8 % déneigé",
+      "Zone C171 feux éteints"
+    ],
+    "lightsOpacity": [
+      "case",
+      [
+        "==",
+        [
+          "coalesce",
+          [
+            "feature-state",
+            "lights"
+          ],
+          "eteint"
+        ],
+        "allume"
+      ],
+      1,
+      1
+    ]
+  },
+  "fiche_zone_a": {
+    "file": "docs/territoire/deneigement-fiche-zone-a.png",
+    "click": {
+      "x": 929.1610314060657,
+      "y": 501.40687118240237
+    },
+    "inspector": [
+      "Zone A",
+      "Zone de stationnement de nuit",
+      "Stationnement interdit · 23 h – 6 h",
+      "Décision",
+      "Décidée par vous à 8 h 00",
+      "Feux allumés",
+      "102",
+      "Feux programmés",
+      "0",
+      "Feux éteints",
+      "0",
+      "Avancement"
+    ],
+    "errors": []
+  },
+  "bascule": {
+    "files": [
+      "docs/territoire/bascule-1-aqueduc.png",
+      "docs/territoire/bascule-2-deneigement.png"
+    ],
+    "before": {
+      "env": "aqueduc",
+      "id": 1,
+      "url": "/carte/aqueduc",
+      "surfaces": 12
+    },
+    "after": {
+      "env": "deneigement",
+      "id": 1,
+      "url": "/carte/deneigement",
+      "sameMap": true,
+      "sameCanvas": true,
+      "canvases": 1,
+      "noReload": true,
+      "surfaces": [
+        "zone:A",
+        "zone:B",
+        "zone:C"
+      ]
+    },
+    "sameMap": true,
+    "errors": []
+  },
+  "sameMapAcrossEnvs": true,
+  "visite": {
+    "file": "public/territoire/visite-hic.webm",
+    "octets": 2118415,
+    "ffprobe": {
+      "codec": "vp9",
+      "width": 1440,
+      "height": 886,
+      "frames": 349,
+      "lastFrameS": 13.92
+    },
+    "durationS": 13.96,
+    "parts": {
+      "accueilS": 2.5,
+      "carteS": 11.44,
+      "carteImagesEnregistrees": 108,
+      "carteImagesParS": 7.8,
+      "carte": "1440×804",
+      "bandeau": 82
+    },
+    "marksS": {
+      "selecteur": 5,
+      "arrivee": 7.97,
+      "decision": 9.45,
+      "nuit": 11.74
+    },
+    "credits": [
+      "Conduites : Ville de Trois-Rivières, Données Québec, CC-BY 4.0 · Zones de stationnement de nuit : Ville de Trois-Rivières, Données Québec, CC-BY 4.0",
+      "Météo : Environnement et Changement climatique Canada (Licence du gouvernement ouvert – Canada) · Fond de carte : OpenFreeMap / OpenMapTiles / OpenStreetMap",
+      "Capteurs, mesures et incidents : simulation · Feux, ressources et avancement : simulation"
+    ],
+    "plans": {
+      "aLArrivee": "A:programmee B:programmee C:programmee",
+      "apresDecision": "A:programmee B:programmee C:aucune",
+      "a2330": "A:en-vigueur B:en-vigueur C:aucune"
+    },
+    "recordMap": {
+      "octets": 1682369,
+      "ms": 14194
+    },
+    "images": {
+      "accueil": "docs/territoire/visite-accueil.png (1.2 s)",
+      "aqueduc": "docs/territoire/visite-aqueduc.png (4.0 s)",
+      "decision": "docs/territoire/visite-decision.png (11.5 s)",
+      "nuit": "docs/territoire/visite-nuit.png (13.6 s)"
+    },
+    "errors": []
+  },
+  "sans_api": {
+    "file": "docs/territoire/sans-api.png",
+    "state": {
+      "mode": "classic",
+      "api": "absente",
+      "fallback": "Mode classique : API HTML-in-Canvas absente (ni texElementSubImage2D ni texElementImage2D (activez chrome://flags/#canvas-draw-element)).",
+      "env": "deneigement"
+    },
+    "hicLayer": null,
+    "bandeau": "Votre navigateur n'active pas HTML-in-Canvas : vous voyez la version classique.\n\nVoir la version HTML-in-Canvas en vidéo\nComment l'activer",
+    "boutonVideo": 1,
+    "errors": []
+  }
+}

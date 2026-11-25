@@ -9,7 +9,7 @@
  * Pilotage (vérifications de bout en bout) : `window.__territoire.snow = { plans() }`.
  */
 import type { Map as MlMap, MapMouseEvent } from "maplibre-gl";
-import { ZONES_ATTRIBUTION } from "@/lib/territoire/about";
+import { SNOW_SIM_CREDIT, ZONES_ATTRIBUTION } from "@/lib/territoire/about";
 import { DEPOTS } from "@/lib/territoire/fleet";
 import type { DeneigementData, ZonePlan } from "@/lib/territoire/neige";
 import { setFocus, territoireStore, type Focus } from "../../store";
@@ -22,7 +22,6 @@ import { currentSnow, isZoneId, selectSnow, SNOW_CAMERA, snowStore, type SnowSel
 
 /** Zoom minimal quand la caméra est amenée sur une zone ou une ressource (alerte, recherche). */
 const FOCUS_ZOOM = 12.4;
-const SIM_CREDIT = "Feux, ressources et avancement : simulation";
 
 /** Largeurs réservées sur grand écran : panneau à gauche, fiche à droite, frise en bas (px). */
 const FREE = { left: 330, right: 350, top: 40, bottom: 170 };
@@ -153,7 +152,7 @@ export async function loadDeneigement(): Promise<EnvModule> {
   return {
     id: "deneigement",
     camera: SNOW_CAMERA,
-    attribution: [ZONES_ATTRIBUTION, SIM_CREDIT],
+    attribution: [ZONES_ATTRIBUTION, SNOW_SIM_CREDIT],
     mount: ({ map }) => mountSnow(map, data, zones),
     Scene,
     Panel,

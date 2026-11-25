@@ -41,7 +41,7 @@ function collectErrors(p: Page) {
   p.on("pageerror", (e) => errors.push(`exception : ${e.message}`));
   // le cas « sans fichier vidéo » du visiteur sans l'API simule un 404 (page.route) : erreur console attendue
   // la panne de la météo (Déneigement, ruling P2) simule un 500 sur /api/territoire/meteo : erreur console attendue
-  p.on("console", (m) => m.type() === "error" && !m.location().url.endsWith("/aqueduc/scenario-hic.webm") && !m.location().url.endsWith("/api/territoire/meteo") && errors.push(`console : ${m.text()}`));
+  p.on("console", (m) => m.type() === "error" && !m.location().url.endsWith("/territoire/visite-hic.webm") && !m.location().url.endsWith("/api/territoire/meteo") && errors.push(`console : ${m.text()}`));
   return errors;
 }
 
@@ -867,7 +867,7 @@ async function appBar(b: Browser) {
 
 /**
  * Visiteur sans l'API (Chromium lancé sans CanvasDrawElement) : mode classique, bandeau, vidéo
- * seulement si le fichier répond 200 (publié : public/aqueduc/scenario-hic.webm ; absence simulée par un 404),
+ * seulement si le fichier répond 200 (publié : public/territoire/visite-hic.webm ; absence simulée par un 404),
  * explication « Comment l'activer », fermeture retenue pour la session.
  */
 async function withoutApi() {
@@ -877,7 +877,7 @@ async function withoutApi() {
     const open = async (video: boolean, path = AQ, width = 1440) => {
       const ctx = await nb.newContext({ viewport: { width, height: 860 }, deviceScaleFactor: 1 });
       // le fichier est publié (tâche 12) : son absence est simulée par un 404, sa présence par un vrai 200
-      if (!video) await ctx.route("**/aqueduc/scenario-hic.webm", (r) => r.fulfill({ status: 404, body: "" }));
+      if (!video) await ctx.route("**/territoire/visite-hic.webm", (r) => r.fulfill({ status: 404, body: "" }));
       const p = await ctx.newPage();
       const errors = collectErrors(p);
       await p.goto(`${BASE}${path}`);
@@ -941,13 +941,13 @@ async function withoutApi() {
       const v = p.locator("video[controls]");
       await v.waitFor({ timeout: 5_000 }).catch(() => {});
       const src = (await v.count()) ? await v.getAttribute("src") : "";
-      check("le bouton ouvre un <video controls> sur scenario-hic.webm", /\/aqueduc\/scenario-hic\.webm$/.test(src ?? ""), String(src));
+      check("le bouton ouvre un <video controls> sur visite-hic.webm", /\/territoire\/visite-hic\.webm$/.test(src ?? ""), String(src));
       const dlg = await p.evaluate(() => {
         const d = document.querySelector<HTMLDialogElement>("dialog.aq-noapi-video");
         return { open: !!d?.open, modal: !!d?.matches(":modal"), focusIn: !!d?.contains(document.activeElement), caption: d?.querySelector(".aq-noapi-credits")?.textContent ?? "" };
       });
       check("vidéo dans un <dialog> modal natif, focus à l'intérieur", dlg.open && dlg.modal && dlg.focusIn, JSON.stringify(dlg));
-      check("légende de la vidéo : conduites, fond de carte, simulation", /Ville de Trois-Rivières, Données Québec, CC-BY 4\.0/.test(dlg.caption) && /OpenFreeMap, OpenMapTiles, OpenStreetMap/.test(dlg.caption) && /simulation/.test(dlg.caption), dlg.caption);
+      check("légende de la vidéo : conduites, zones, météo, fond de carte, simulation", /Conduites : Ville de Trois-Rivières, Données Québec, CC-BY 4\.0/.test(dlg.caption) && /Zones de stationnement de nuit/.test(dlg.caption) && /Météo : Environnement et Changement climatique Canada/.test(dlg.caption) && /OpenFreeMap \/ OpenMapTiles \/ OpenStreetMap/.test(dlg.caption) && /simulation/.test(dlg.caption), dlg.caption);
       // Tab ne sort pas du dialogue (le navigateur rend la page inerte)
       for (let i = 0; i < 4; i++) await p.keyboard.press("Tab");
       check("Tab reste dans le dialogue", await p.evaluate(() => !!document.querySelector("dialog.aq-noapi-video")?.contains(document.activeElement)));

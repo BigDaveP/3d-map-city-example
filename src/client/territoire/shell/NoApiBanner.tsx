@@ -1,16 +1,16 @@
 "use client";
 /**
  * Bandeau du visiteur sans l'API HTML-in-Canvas (Chrome ou Edge ordinaire) : dit pourquoi la page est
- * en mode classique, propose la vidéo de la version HTML-in-Canvas (seulement si le fichier existe) et
+ * en mode classique, propose la vidéo de la visite en HTML-in-Canvas (seulement si le fichier existe) et
  * indique comment activer l'option. Compact, au-dessus de la carte (jamais dessus) et refermable ; la
  * fermeture est retenue pour la session.
  */
 import { useEffect, useRef, useState } from "react";
-import { CITY, SIM_CREDIT } from "@/lib/aqueduc/city";
+import { VISIT_CREDITS } from "@/lib/territoire/about";
 import { useTerritoire } from "../useTerritoire";
 import { UiIcon } from "./EnvIcon";
 
-export const VIDEO_URL = "/aqueduc/scenario-hic.webm";
+export const VIDEO_URL = "/territoire/visite-hic.webm";
 const DISMISS_KEY = "aq-noapi-dismissed";
 
 function readDismissed(): boolean {
@@ -138,7 +138,7 @@ export function NoApiBanner() {
           <div className="aq-noapi-frame">
             <video src={VIDEO_URL} controls autoPlay muted playsInline aria-describedby="aq-noapi-credits" />
             <p id="aq-noapi-credits" className="aq-noapi-credits">
-              {CITY.attribution}. {SIM_CREDIT}.
+              {VISIT_CREDITS.join(" · ")}.
             </p>
             <button
               ref={closeBtn}

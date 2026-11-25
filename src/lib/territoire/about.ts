@@ -3,7 +3,7 @@
  * attributions affichées, réel et simulé par environnement, constantes de la journée de démo.
  * Module pur : la page, l'accueil et les tests le lisent.
  */
-import { CITY } from "../aqueduc/city";
+import { CITY, SIM_CREDIT } from "../aqueduc/city";
 import { DAY_TIMES } from "./day";
 import type { EnvId } from "./envs";
 import { METEO_ATTRIBUTION, SNOW_THRESHOLD_CM } from "./meteo";
@@ -17,6 +17,20 @@ export const BASEMAP_ATTRIBUTION = "Fond de carte : OpenFreeMap / OpenMapTiles /
 
 /** Les quatre lignes d'attribution affichées là où les données apparaissent. */
 export const ATTRIBUTIONS = [CITY.attribution.split(" · ")[0], ZONES_ATTRIBUTION, METEO_ATTRIBUTION, BASEMAP_ATTRIBUTION] as const;
+
+/** Mention des données simulées du déneigement (contrôle d'attribution, vidéo de la visite). */
+export const SNOW_SIM_CREDIT = "Feux, ressources et avancement : simulation";
+
+/**
+ * Crédits de la vidéo de la visite (accueil, Aqueduc, Déneigement) : l'union des attributions
+ * affichées pendant la visite, puis les deux mentions de simulation. Bandeau sous l'image et légende
+ * de la vidéo du visiteur sans l'API.
+ */
+export const VISIT_CREDITS = [
+  `${ATTRIBUTIONS[0]} · ${ZONES_ATTRIBUTION}`,
+  `${METEO_ATTRIBUTION} · ${BASEMAP_ATTRIBUTION}`,
+  `${SIM_CREDIT} · ${SNOW_SIM_CREDIT}`,
+] as const;
 
 export interface Source {
   dataset: string;

@@ -5,7 +5,7 @@ import { test } from "node:test";
 import { originTrialMeta } from "../src/lib/origin-trial";
 import { SCENARIO_DAY } from "../src/lib/aqueduc/scenario";
 import { aqueducAlerts, deneigementAlerts } from "../src/lib/territoire/alerts";
-import { ATTRIBUTIONS, DEMO_CONSTANTS, NON_OFFICIAL, REALITY, SOURCES } from "../src/lib/territoire/about";
+import { ATTRIBUTIONS, DEMO_CONSTANTS, NON_OFFICIAL, REALITY, SOURCES, VISIT_CREDITS } from "../src/lib/territoire/about";
 import { atHour, DAY_TIMES, type EnvAction } from "../src/lib/territoire/day";
 import { ENVS } from "../src/lib/territoire/envs";
 import { alertFocus, aqueducStatus, deneigementStatus, envHref, homeEnvs, homeSnapshot, hourLabel, overviewStamp } from "../src/lib/territoire/home";
@@ -154,4 +154,11 @@ test("À propos : phrase « non officielle » mot pour mot, quatre attributions,
   for (const s of SOURCES) assert.ok(s.publisher && s.licence && s.href.startsWith("https://") && s.licenceHref.startsWith("https://"), s.dataset);
   assert.deepEqual(Object.keys(REALITY), Object.keys(ENVS));
   for (const t of [DAY_TIMES.defaultDecisionAt, DAY_TIMES.decisionDeadline, DAY_TIMES.banStart]) assert.ok(DEMO_CONSTANTS.some((c) => c.value === t), t);
+});
+
+test("vidéo de la visite : les crédits contiennent les quatre attributions et les deux mentions de simulation", () => {
+  const all = VISIT_CREDITS.join(" · ");
+  for (const a of ATTRIBUTIONS) assert.ok(all.includes(a), a);
+  assert.match(all, /Capteurs, mesures et incidents : simulation/);
+  assert.match(all, /Feux, ressources et avancement : simulation/);
 });
