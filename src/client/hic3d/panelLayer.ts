@@ -228,7 +228,9 @@ export class PanelLayer implements CustomLayerInterface {
           placement = placePanel(m, p.w, p.h, m.meterInMercatorCoordinateUnits(), mPerPx, a.lift, orientation, bearing, pitch, a.facade);
         }
       }
-      if (!placement || !p.el) continue;
+      // élément déjà retiré du canvas (démontage de l'hôte, avant le nettoyage de la couche) :
+      // updateElementGeometry lèverait une exception pendant le rendu
+      if (!placement || !p.el?.isConnected) continue;
       p.model = modelMatrix(placement);
       p.proj = new PanelProjection(mul(screenFromWorld, p.model));
       this.opt.setGeometry(p.el, DOMMatrix.fromFloat64Array(p.proj.m as Float64Array<ArrayBuffer>));
