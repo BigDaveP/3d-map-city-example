@@ -130,6 +130,14 @@ test("météo de l'accueil : conditions actuelles, ce soir et neige des prochain
   assert.match(html, /Bulletin météorologique spécial/);
 });
 
+test("météo de l'accueil : une prévision périmée (ECCC muet) le dit", () => {
+  const f = parseCityPage(JSON.parse(readFileSync("tests/fixtures/eccc-citypage-qc-130.json", "utf8")));
+  assert.doesNotMatch(renderWeather(JSON.stringify(f)), /Dernière prévision reçue/);
+  const html = renderWeather(JSON.stringify({ ...f, stale: true }));
+  assert.match(html, /Prévision publiée à/);
+  assert.match(html, /Dernière prévision reçue : Environnement Canada ne répond pas/);
+});
+
 test("météo de l'accueil : icône de 48 px des conditions actuelles, icônes de 16 px des prochaines heures", () => {
   const f = parseCityPage(JSON.parse(readFileSync("tests/fixtures/eccc-citypage-qc-130.json", "utf8")));
   // 12 h 30 à Trois-Rivières : soleil (code 00), puis la nuit tombe (lune, code 30, coucher à 16 h 09)

@@ -97,6 +97,11 @@ export function WeatherSummary({ forecast, now = Date.now() }: { forecast: Forec
           {forecast.issuedAt && Number.isFinite(Date.parse(forecast.issuedAt)) && (
             <p className="tr-weather-issued">Prévision publiée à {hourLabel(Date.parse(forecast.issuedAt))}</p>
           )}
+          {forecast.stale && (
+            <p className="tr-weather-issued" role="status">
+              Dernière prévision reçue : Environnement Canada ne répond pas pour l&apos;instant.
+            </p>
+          )}
         </>
       ) : (
         <div className="tr-weather-off" role="status">

@@ -23,7 +23,8 @@ export const viewport: Viewport = { themeColor: "#ffffff" };
 export default async function HomePage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const { mode } = await searchParams;
   const m: Mode | null = mode === "classic" || mode === "hic" ? mode : null;
-  // délai de 5 s au plus, cache de 30 min ; null si indisponible (neige simulée)
+  // délai de 5 s au plus, cache de 30 min, échec gardé 90 s (pas d'attente à chaque requête) ;
+  // dernière prévision reçue si ECCC ne répond plus, sinon null (neige simulée)
   const forecast = await getForecast();
   // alertes : allAlerts(maintenant, aucune action, snowSource(prévision)), avec l'état de chaque environnement
   const snapshot = homeSnapshot(Date.now(), [], forecast, m);

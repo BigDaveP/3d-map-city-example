@@ -13,6 +13,8 @@ export interface Forecast {
   warnings: { title: string; type: string; expires: string }[];
   /** lever et coucher du soleil du jour de la fiche (ms), null s'ils ne sont pas publiés */
   sun: { rise: number; set: number } | null;
+  /** vrai : ECCC ne répond pas, c'est la dernière prévision reçue (servie par le cache du serveur) */
+  stale?: boolean;
 }
 
 export const SNOW_THRESHOLD_CM = 5;

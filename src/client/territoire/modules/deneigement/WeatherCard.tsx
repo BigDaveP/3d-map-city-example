@@ -2,7 +2,8 @@
 /**
  * Météo du panneau du déneigement : neige des prochaines 36 h et sa source (« Environnement Canada »
  * quand la vraie prévision annonce assez de neige ou un avertissement, sinon « Simulation »),
- * avertissement en cours, crédit de la météo. API indisponible : « Météo indisponible », la journée
+ * avertissement en cours, crédit de la météo. Prévision périmée servie par le cache du serveur
+ * (`stale`) : elle le dit. API indisponible : « Météo indisponible », la journée
  * garde sa neige simulée, et « Réessayer » redemande la prévision (le store réessaie aussi seul).
  */
 import { METEO_ATTRIBUTION, SNOW_THRESHOLD_CM, snowTonightCm, snowWarning, warningTitle } from "@/lib/territoire/meteo";
@@ -45,6 +46,7 @@ export function WeatherCard() {
           Prévision réelle : {cm(snowTonightCm(f))} cm, sous le seuil de {SNOW_THRESHOLD_CM} cm
         </p>
       )}
+      {f?.stale && <p className="dn-weather-note">Dernière prévision reçue : Environnement Canada ne répond pas pour l&apos;instant.</p>}
       {warning && (
         <p className="dn-weather-warn" role="note">
           {warningTitle(warning)}
