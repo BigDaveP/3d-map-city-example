@@ -31,11 +31,11 @@ function fakeMap() {
 
 const data: DeneigementData = getDeneigementData();
 
-test("applySnowLayers : sources dn-zones et dn-lights (id promu), couches dn-zone-fill, dn-zone-line, dn-lights", () => {
+test("applySnowLayers : sources dn-zones et dn-lights (id promu), couches dn-zone-fill, dn-zone-line, dn-lights-halo, dn-lights", () => {
   const f = fakeMap();
   applySnowLayers(f.map, data);
   assert.deepEqual([...f.sources.keys()], ["dn-zones", "dn-lights"]);
-  assert.deepEqual(f.layers.map((l) => l.id), ["dn-zone-fill", "dn-zone-line", "dn-lights"]);
+  assert.deepEqual(f.layers.map((l) => l.id), ["dn-zone-fill", "dn-zone-line", "dn-lights-halo", "dn-lights"]);
   const zones = f.sources.get("dn-zones") as { promoteId: string; data: { features: unknown[] } };
   const lights = f.sources.get("dn-lights") as { promoteId: string; data: { features: unknown[] } };
   assert.equal(zones.promoteId, "id");
@@ -73,17 +73,32 @@ test("setSelectedZone : la zone choisie seule est sélectionnée", () => {
   assert.deepEqual(f.states.map((s) => [s.target.id, s.state.selected]), [["A", false], ["B", true], ["C", false]]);
 });
 
-test("blink : opacité des feux allumés alternée par setPaintProperty, les autres restent pleins", () => {
+test("blink : remplissage des feux allumés de 1 à 0,4 et halo suivant, les autres états intacts", () => {
   const f = fakeMap();
   applySnowLayers(f.map, data);
   blink(f.map, false);
   blink(f.map, true);
-  const op = f.paints.filter((p) => p.prop === "circle-opacity").map((p) => p.value as unknown[]);
-  assert.equal(op.length, 2);
-  // ["case", <allumé>, valeur si allumé, 1]
-  assert.equal(op[0][2], 0.15);
-  assert.equal(op[0][3], 1);
-  assert.equal(op[1][2], 1);
+  const fill = f.paints.filter((p) => p.layer === "dn-lights" && p.prop === "circle-opacity").map((p) => p.value as unknown[]);
+  const halo = f.paints.filter((p) => p.layer === "dn-lights-halo" && p.prop === "circle-opacity").map((p) => p.value as unknown[]);
+  assert.equal(fill.length, 2);
+  assert.equal(halo.length, 2);
+  // ["case", <allumé>, valeur si allumé, autres]
+  assert.deepEqual([fill[0][2], fill[0][3], fill[1][2]], [0.4, 1, 1]);
+  assert.deepEqual([halo[0][2], halo[0][3], halo[1][2]], [0.2, 0, 0.55]);
+  // l'anneau blanc des feux allumés ne clignote pas
+  assert.equal(f.paints.some((p) => p.prop === "circle-stroke-opacity"), false);
+});
+
+test("feux : l'état allumé est le plus gros et cerclé de blanc ; ronds à l'écran malgré l'inclinaison", () => {
+  const f = fakeMap();
+  applySnowLayers(f.map, data);
+  const paint = f.layers.find((l) => l.id === "dn-lights")!.spec.paint as Record<string, unknown[]>;
+  assert.equal(paint["circle-pitch-alignment"] as unknown, "viewport");
+  // rayon à 11,4 (vue d'ouverture) : ["match", état, "allume", r, "programme", r, r]
+  const at114 = paint["circle-radius"][paint["circle-radius"].indexOf(11.4) + 1] as unknown[];
+  const [lit, scheduled, off] = [at114[3], at114[5], at114[6]] as number[];
+  assert.ok(lit >= 3.5 && lit > scheduled && scheduled > off, JSON.stringify(at114));
+  assert.deepEqual(paint["circle-stroke-color"], ["match", ["coalesce", ["feature-state", "lights"], "eteint"], "programme", "#d98a12", "#ffffff"]);
 });
 
 test("removeSnowLayers : plus aucune couche ni source dn-*, et plus d'état des feux", () => {

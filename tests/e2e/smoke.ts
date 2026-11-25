@@ -8,8 +8,9 @@
  *   SHOT_NOAPI / SHOT_BAR_1440 / SHOT_BAR_1024=chemin.png : bandeau sans l'API, barre à 1440 et 1024 px ;
  *   SHOT_SWITCHER=chemin.png : sélecteur d'environnement ouvert (HTML-in-Canvas) ;
  *   SHOT_HOME / SHOT_BELL / SHOT_ABOUT=chemin.png : accueil à 14:05, cloche ouverte, « À propos » ;
- *   SHOT_DN_1030 / SHOT_DN_2330 / SHOT_DN_CARD=chemin.png : Déneigement (HTML-in-Canvas) à 10:30, à
- *   23:30 avec les zones A et B en vigueur, puis la fiche de la zone A.
+ *   SHOT_DN_1030 / SHOT_DN_2330 / SHOT_DN_2330_LOW / SHOT_DN_CARD=chemin.png : Déneigement
+ *   (HTML-in-Canvas) à 10:30, à 23:30 avec les zones A et B en vigueur (feux allumés en phase haute,
+ *   puis basse du clignotement), puis la fiche de la zone A.
  * Chaque page de l'application a son horloge épinglée à 12:00 de la journée de référence
  * (`pin`) : les vérifications ne dépendent pas de l'heure du lancement.
  * Sortie : une ligne OK/ÉCHEC par point de contrôle ; code de sortie 1 si un échec.
@@ -1307,10 +1308,23 @@ async function deneigement(b: Browser, mode: "hic" | "classic") {
     return { state: el?.querySelector(".dn-mark-state")?.textContent, fig: el?.querySelector(".dn-mark-fig")?.textContent };
   }, mode === "hic");
   check("marquage de A : « Stationnement interdit · 23 h – 6 h » et l'avancement en %", night.state === "Stationnement interdit · 23 h – 6 h" && /%\s*déneigé/.test(night.fig ?? ""), JSON.stringify(night));
-  if (mode === "hic" && process.env.SHOT_DN_2330) {
-    await p.waitForTimeout(1500);
-    await p.screenshot({ path: process.env.SHOT_DN_2330 });
-    console.log(`capture : ${process.env.SHOT_DN_2330}`);
+  // captures dans chaque phase du clignotement : début de phase repéré, puis une image dessinée
+  for (const [want, path] of [[1, process.env.SHOT_DN_2330], [0.4, process.env.SHOT_DN_2330_LOW]] as const) {
+    if (mode !== "hic" || !path) continue;
+    await p.waitForFunction(
+      (v) => {
+        const w = window as any;
+        const cur = w.__territoire.map.getPaintProperty("dn-lights", "circle-opacity")[2];
+        const fresh = cur === v && w.__dnPhase !== v;
+        w.__dnPhase = cur;
+        return fresh;
+      },
+      want,
+      { timeout: 5_000, polling: 30 },
+    ).catch(() => {});
+    await p.waitForTimeout(120);
+    await p.screenshot({ path });
+    console.log(`capture : ${path}`);
   }
 
   // clic sur le marquage de A → fiche
