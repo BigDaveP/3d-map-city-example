@@ -4,10 +4,11 @@
  * incident, capteurs) sont ici des étiquettes plates en DOM, des marqueurs MapLibre toujours au
  * premier plan : ni perspective, ni masquage par les bâtiments. Mêmes composants, même contenu.
  */
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { Map as MlMap, PositionAnchor } from "maplibre-gl";
 import { CITY } from "@/lib/aqueduc/city";
+import type { Metrics } from "../../metrics";
 import { lineCenter, segment, type NetIndex } from "../net";
 import { IncidentMark } from "../scene/IncidentMark";
 import { SectorMark, useVisibleSectors } from "../scene/SectorMark";
@@ -45,7 +46,9 @@ function Pin({ ml, map, at, anchor, className, children }: { ml: ML; map: MlMap;
   return el ? createPortal(children, el) : null;
 }
 
-export function ClassicScene({ ml, map, net }: { ml: ML; map: MlMap; net: NetIndex }) {
+export function ClassicScene({ ml, map, net, metrics }: { ml: ML; map: MlMap; net: NetIndex; metrics: Metrics }) {
+  // latence lecture → pixel : le DOM du marqueur vient d'être modifié, l'image suivante l'affiche
+  const onShown = useCallback((at: number) => requestAnimationFrame(() => metrics.latency(performance.now() - at)), [metrics]);
   const sectors = useVisibleSectors(map, net);
   const incident = useAq((s) => s.incident !== null);
   const brk = useMemo(() => {
@@ -93,7 +96,7 @@ export function ClassicScene({ ml, map, net }: { ml: ML; map: MlMap; net: NetInd
       )}
       {tagged.map((s) => (
         <Pin key={s.id} ml={ml} map={map} at={s.at} anchor="bottom" className="aq-pin">
-          <SensorTag sensor={s} />
+          <SensorTag sensor={s} onShown={onShown} />
           <span className="aq-stem" aria-hidden="true" />
         </Pin>
       ))}

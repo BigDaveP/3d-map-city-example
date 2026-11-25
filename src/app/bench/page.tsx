@@ -1,6 +1,7 @@
 import Link from "next/link";
 import DemoNav from "@/client/shell/DemoNav";
 import { loadBench, type BenchRow } from "@/server/bench";
+import { AqueducSection } from "./Aqueduc";
 import { Bars, Legend, type Series } from "./Bars";
 import "./bench.css";
 
@@ -56,6 +57,7 @@ export default function BenchPage() {
       <main className="bench">
         <h1>Banc de mesures</h1>
         <p>Aucun résultat. Lancez <code>npm run bench</code> (voir README).</p>
+        <AqueducSection />
       </main>
     );
   }
@@ -184,6 +186,7 @@ export default function BenchPage() {
           <Table rows={rows.filter((r) => r.n === n)} />
         </details>
       ))}
+      <AqueducSection />
     </main>
   );
 }

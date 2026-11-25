@@ -363,6 +363,11 @@ function chlorineAt(m: Model, node: number, minute: number): number {
 
 const round2 = (x: number) => Math.round(x * 100) / 100;
 
+function pressureReading(m: Model, node: number, d: number, minute: number, st: IncidentState | null): Reading {
+  const v = round2(pressureAt(m, node, d, minute, st));
+  return { value: v, unit: "bar", status: v < THRESHOLDS.pressureMin ? "alerte" : v < 2.5 ? "attention" : "ok" };
+}
+
 /** Débit nominal (L/s) d'une conduite de `diameterMm` à la demande relative d (vitesse 0,6 m/s à demande 1). */
 export function nominalFlowLs(diameterMm: number, d: number): number {
   return MAIN_VELOCITY * Math.PI * (diameterMm / 2000) ** 2 * 1000 * d;
@@ -376,10 +381,7 @@ export function readingsAt(m: Model, tSim: number, inc: IncidentInput | null): R
   const st = incidentState(m, tSim, inc);
   const n = m.network;
   return m.sensors.map((s): Reading => {
-    if (s.kind === "pression") {
-      const v = round2(pressureAt(m, s.node, d, minute, st));
-      return { value: v, unit: "bar", status: v < THRESHOLDS.pressureMin ? "alerte" : v < 2.5 ? "attention" : "ok" };
-    }
+    if (s.kind === "pression") return pressureReading(m, s.node, d, minute, st);
     if (s.kind === "debit") {
       // débit nominal selon le plus gros diamètre de maîtresse au nœud
       let dia = 0;
@@ -405,6 +407,17 @@ export function readingsAt(m: Model, tSim: number, inc: IncidentInput | null): R
     const level = round2(72 + 14 * Math.cos((2 * Math.PI * (h - 5)) / 24) + 5 * noise(s.node, 0, 7) + 0.3 * noise(s.node, minute, 8));
     return { value: level, unit: "%", status: level < 30 ? "alerte" : level < 50 ? "attention" : "ok" };
   });
+}
+
+/**
+ * Pression simulée (bar) aux nœuds donnés, avec le statut des capteurs de pression : points de mesure
+ * supplémentaires du banc (`extraTagNodes`, R7). Même modèle que `readingsAt`.
+ */
+export function pointReadings(m: Model, tSim: number, inc: IncidentInput | null, nodes: readonly number[]): Reading[] {
+  const minute = Math.floor(tSim / 60_000);
+  const d = demand(localHour(tSim));
+  const st = incidentState(m, tSim, inc);
+  return nodes.map((node) => pressureReading(m, node, d, minute, st));
 }
 
 /** Valeur par segment pour colorer les conduites : pression (bar) ou chlore résiduel (mg/L). */

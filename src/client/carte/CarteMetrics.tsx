@@ -44,6 +44,12 @@ export function CarteMetrics({ metrics, mode: modeProp, rows }: { metrics: Metri
       <div className="row"><span>FPS</span><b>{f(m.fps, 0)}</b></div>
       <div className="row"><span>Frame p50 / p95</span><b>{f(m.frameP50)} / {f(m.frameP95)} ms</b></div>
       <div className="row"><span>JS / frame p95</span><b>{f(m.workP95)} ms</b></div>
+      {m.updMax > 0 && (
+        <>
+          <div className="row"><span>JS / mise à jour p95 / max</span><b>{f(m.updP95)} / {f(m.updMax)} ms</b></div>
+          <div className="row"><span>JS des mises à jour</span><b>{f(m.updMsPerSec)} ms/s</b></div>
+        </>
+      )}
       <div className="row"><span>Captures / min</span><b>{f(perMin, 0)}</b></div>
       <div className="row"><span>Latence statut → pixel p50 / p95</span><b>{f(m.latP50, 0)} / {f(m.latP95, 0)} ms</b></div>
       <div className="row"><span>Textures</span><b>{f(m.gpuMB)} Mo</b></div>

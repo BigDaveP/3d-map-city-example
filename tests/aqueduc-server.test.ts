@@ -7,7 +7,7 @@ import { CITY } from "../src/lib/aqueduc/city";
 import { isolate } from "../src/lib/aqueduc/graph";
 import { breakHistory } from "../src/lib/aqueduc/sim";
 import { segmentsInBox } from "../src/lib/aqueduc/network";
-import { getModel } from "../src/server/aqueduc";
+import { EXTRA_TAGS_MAX, getExtraTagNodes, getModel } from "../src/server/aqueduc";
 
 const T0 = Date.UTC(2026, 10, 24, 15, 15);
 
@@ -126,4 +126,20 @@ test("network : 13C1949 présent, attribution exacte, demoSegments aligné", asy
   assert.equal(j.sensors.length, m.sensors.length);
   assert.equal(j.sectors.length, m.sectors.length);
   assert.equal(j.valves.length, m.valves.size);
+});
+
+test("banc (R7) : points supplémentaires dans le réseau et, sur demande, dans le flux", async () => {
+  const j = await (await getNetwork()).json();
+  assert.equal(j.extraTags.length, EXTRA_TAGS_MAX);
+  assert.equal(j.extraTags[0].id, "X-001");
+  assert.deepEqual(j.extraTags.map((x: any) => x.node), getExtraTagNodes());
+  const plain = (await firstEvents(`t0=${T0}&speed=1`)).events[0];
+  assert.equal(plain.x, undefined);
+  const e = (await firstEvents(`t0=${T0}&speed=1&extra=30`)).events[0];
+  assert.equal(e.x.length, 30);
+  assert.ok(e.x.every(([v, st]: number[]) => Number.isFinite(v) && [0, 1, 2].includes(st)));
+  for (const bad of ["-1", "1.5", "abc", String(EXTRA_TAGS_MAX + 1)]) {
+    const res = await getStream(new Request(`http://x/api/aqueduc/stream?t0=${T0}&speed=1&extra=${bad}`));
+    assert.equal(res.status, 400, `extra=${bad}`);
+  }
 });

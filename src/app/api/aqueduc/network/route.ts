@@ -3,12 +3,13 @@
  * plan d'isolation du tronçon du scénario (vannes à fermer, calculées ici : le client n'a pas le modèle).
  * Propriétés : i (index), id, d (mm), m (matériau), y (année), c (classe), s (secteur), l (longueur en m,
  * donnée source), b (bris antérieurs simulés depuis 2009).
+ * `extraTags` : points de mesure supplémentaires, simulés, réservés au banc (`setTags`, R7).
  */
 import { CITY } from "@/lib/aqueduc/city";
 import { isolate, isolationPath } from "@/lib/aqueduc/graph";
 import { SCENARIO_STEPS, scenarioIncident } from "@/lib/aqueduc/scenario";
 import { breakHistory, incidentImpact } from "@/lib/aqueduc/sim";
-import { getDemoSegments, getModel } from "@/server/aqueduc";
+import { getDemoSegments, getExtraTagNodes, getModel } from "@/server/aqueduc";
 
 export const dynamic = "force-static";
 
@@ -52,6 +53,7 @@ export async function GET() {
     sectors: m.sectors.map((s, k) => ({ id: s.id, name: s.name, addresses: s.addresses, at: CITY.sectorSeeds[k].at })),
     valves: [...m.valves].sort((a, b) => a - b).map((node) => ({ node, at: nodePos(node) })),
     scenario,
+    extraTags: getExtraTagNodes().map((node, k) => ({ id: `X-${String(k + 1).padStart(3, "0")}`, node, at: nodePos(node) })),
     attribution: CITY.attribution,
   };
   return new Response(JSON.stringify(body), {

@@ -22,11 +22,12 @@ import {
   setSensorStatus,
   type NetworkData,
 } from "./pipes";
-import { attachScenario, exploreFreely, faceBearing, goToStep, startScenario, STEP_VIEW, stepSelection, type CameraTarget } from "./scenarioController";
+import { attachScenario, closeValves, exploreFreely, faceBearing, goToStep, startScenario, STEP_VIEW, stepSelection, type CameraTarget, type StepId } from "./scenarioController";
 import { cutLayout } from "./scene/cut";
 import { attachUnderground, type TubeLayer } from "./scene/tubes";
 import { SceneSurfaces } from "./scene/Surfaces";
 import { aqueducStore, select, type AqState, type Mode, type Selection } from "./store";
+import { setTagWorkSink } from "./tagWork";
 import { AppBar } from "./ui/AppBar";
 import { Inspector } from "./ui/Inspector";
 import { Layers } from "./ui/Layers";
@@ -204,9 +205,11 @@ export default function AqueducApp({ initialMode }: { initialMode?: Mode }) {
     });
   }, [ctx]);
 
-  // --- mesure des images
+  // --- mesure des images ; re-rendus des étiquettes comptés comme mises à jour de données
   useEffect(() => {
     if (!ctx) return;
+    // lot commencé pendant le traitement d'un message du flux : déjà compté dans ce message
+    setTagWorkSink((ms, start) => ctx.metrics.update(ms, start));
     let raf = 0;
     const tick = (now: number) => {
       ctx.metrics.frameEnd(ctx.metrics.pendingWork());
@@ -214,7 +217,10 @@ export default function AqueducApp({ initialMode }: { initialMode?: Mode }) {
       raf = requestAnimationFrame(tick);
     };
     raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
+    return () => {
+      cancelAnimationFrame(raf);
+      setTagWorkSink(null);
+    };
   }, [ctx]);
 
   // --- vue souterraine : tubes 3D sous la rue, fond estompé
@@ -245,6 +251,17 @@ export default function AqueducApp({ initialMode }: { initialMode?: Mode }) {
       net: ctx.net,
       tubes,
       scenario: { start: startScenario, goTo: goToStep, explore: exploreFreely },
+      /** banc (R7) : n étiquettes (capteurs réels de la zone, puis points simulés) ; null : usage normal */
+      setTags: (n: number | null) => aqueducStore.setState({ benchTags: n === null ? null : Math.max(0, Math.floor(n)) }),
+      /** banc : lance le scénario au besoin et va à l'étape ; « close » ferme les vannes (serveur) */
+      play: (step: StepId | "close") => {
+        if (step === "close") return closeValves();
+        if (!aqueducStore.getState().scenario.active) {
+          startScenario();
+          if (step === "detection") return;
+        }
+        goToStep(step);
+      },
     };
     return () => void delete w.__aqueduc;
   }, [ctx, tubes]);
@@ -265,7 +282,7 @@ export default function AqueducApp({ initialMode }: { initialMode?: Mode }) {
             {error}
           </p>
         )}
-        {ctx && mode === "classic" && <ClassicScene ml={ctx.ml} map={ctx.map} net={ctx.net} />}
+        {ctx && mode === "classic" && <ClassicScene ml={ctx.ml} map={ctx.map} net={ctx.net} metrics={ctx.metrics} />}
         {ctx && mode === "hic" && <SceneSurfaces ml={ctx.ml} map={ctx.map} metrics={ctx.metrics} net={ctx.net} />}
         <Layers />
         {ctx && <Story map={ctx.map} net={ctx.net} />}

@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { convexOverlap, impactBySector, inBox, LAYER_KINDS, pickTags, sectorFigure, TAG_MAX } from "../src/client/aqueduc/scene/marks";
+import { benchTags, convexOverlap, impactBySector, inBox, isExtraTag, LAYER_KINDS, pickTags, sectorFigure, TAG_MAX } from "../src/client/aqueduc/scene/marks";
 import { CITY } from "../src/lib/aqueduc/city";
 import { isolate } from "../src/lib/aqueduc/graph";
 import { segmentsInBox } from "../src/lib/aqueduc/network";
-import { buildModel, incidentImpact, segmentValues, THRESHOLDS, type IncidentInput } from "../src/lib/aqueduc/sim";
+import { buildModel, extraTagNodes, incidentImpact, segmentValues, THRESHOLDS, type IncidentInput } from "../src/lib/aqueduc/sim";
 import { loadNetwork } from "./aqueduc-fixture";
 
 const n = loadNetwork();
@@ -124,4 +124,25 @@ test("convexOverlap : rectangles et quadrilatères à l'écran", () => {
   const band: [number, number][] = [[20, 0], [30, 0], [0, 30], [-10, 30]];
   assert.ok(!convexOverlap(sq(16, 16, 10, 10), band));
   assert.ok(convexOverlap(sq(8, 8, 6, 6), band));
+});
+
+test("benchTags (R7) : n étiquettes, capteurs réels de la zone d'abord, puis points simulés, sans plafond", () => {
+  const pos = (node: number) => {
+    const s = n.segments[n.adj[node][0]];
+    const k = s.a === node ? 0 : s.coords.length - 2;
+    return [s.coords[k], s.coords[k + 1]] as [number, number];
+  };
+  const extra = extraTagNodes(m, 120).map((node, k) => ({ id: `X-${String(k + 1).padStart(3, "0")}`, at: pos(node) }));
+  const inside = m.sensors.filter((s) => inBox(s.at, CITY.demoBox)).length;
+  for (const k of [20, 60, 120]) {
+    const ids = benchTags(m.sensors, extra, k, CITY.center, CITY.demoBox);
+    assert.equal(ids.length, k);
+    assert.equal(new Set(ids).size, k);
+    const firstExtra = ids.findIndex(isExtraTag);
+    // réels d'abord (tous ceux de la zone avant le premier point simulé)
+    if (firstExtra >= 0) assert.equal(firstExtra, inside);
+    assert.ok(ids.slice(0, Math.min(k, inside)).every((id) => !isExtraTag(id)));
+  }
+  assert.ok(inside < 60, `capteurs réels dans la zone : ${inside}`);
+  assert.ok(TAG_MAX < 20);
 });

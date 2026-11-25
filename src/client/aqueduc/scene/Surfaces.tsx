@@ -96,7 +96,7 @@ function layerOptions(ml: ML, map: MlMap, net: NetIndex): HicHostProps["layerOpt
       const s = net.sectorById.get(k.id);
       if (s) a = at(s.at, SECTOR_HEADING);
     } else if (k?.kind === "sensor") {
-      const s = net.sensorById.get(k.id);
+      const s = net.sensorById.get(k.id) ?? net.extraById.get(k.id);
       if (s) a = at(s.at);
     } else if (k?.kind === "incident") {
       const i = net.segById.get(k.id);
@@ -208,6 +208,18 @@ export function SceneSurfaces({ ml, map, metrics, net }: { ml: ML; map: MlMap; m
     };
   }, [ml, map, options, sectors, incident, showCut, cut]);
   const tagged = useTaggedSensors(map, net, cover);
+  // latence lecture → pixel : instant de réception de la valeur affichée par chaque étiquette, lu par
+  // HicHost à l'upload de sa texture (la latence est émise au dessin qui suit, hors première capture)
+  const shownAt = useMemo(() => new Map<string, number>(), []);
+  // un rappel stable par étiquette
+  const shownBy = useMemo(() => {
+    const fns = new Map<string, (at: number) => void>();
+    return (id: string) => {
+      let f = fns.get(id);
+      if (!f) fns.set(id, (f = (at: number) => void shownAt.set(id, at)));
+      return f;
+    };
+  }, [shownAt]);
   const surfaces = useMemo<SurfaceSpec[]>(
     () => [
       ...sectors.map((s) => ({
@@ -235,7 +247,8 @@ export function SceneSurfaces({ ml, map, metrics, net }: { ml: ML; map: MlMap; m
         ...SURFACE_SIZE.sensor,
         version: 0,
         focusable: true,
-        render: () => <SensorTag sensor={s} drawable />,
+        changedAt: () => shownAt.get(s.id) ?? 0,
+        render: () => <SensorTag sensor={s} drawable onShown={shownBy(s.id)} />,
       })),
       ...(showCut && cut
         ? [
@@ -249,7 +262,7 @@ export function SceneSurfaces({ ml, map, metrics, net }: { ml: ML; map: MlMap; m
           ]
         : []),
     ],
-    [sectors, incident, tagged, net, showCut, cut],
+    [sectors, incident, tagged, net, showCut, cut, shownAt, shownBy],
   );
   return <HicHost ml={ml} map={map} metrics={metrics} surfaces={surfaces} layerOptions={options} onFallback={onFallback} onActive={onActive} />;
 }

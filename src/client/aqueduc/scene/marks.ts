@@ -126,6 +126,28 @@ export function pickTags(
   return ranked.slice(0, max).map((r) => r.id);
 }
 
+/** Point supplémentaire du banc (identifiant « X-001 »), pas un capteur du réseau. */
+export const isExtraTag = (id: string) => id.startsWith("X-");
+
+/**
+ * Banc (R7) : n étiquettes, les capteurs réels de `box` d'abord, puis les points supplémentaires
+ * simulés, chacun du plus proche au plus éloigné de `center` ; ni filtre de pertinence ni plafond
+ * (R13 ne vaut que pour l'usage normal).
+ */
+export function benchTags(
+  sensors: readonly { id: string; at: readonly [number, number] | number[] }[],
+  extra: readonly { id: string; at: readonly [number, number] | number[] }[],
+  n: number,
+  center: readonly [number, number],
+  box: readonly [number, number, number, number],
+): string[] {
+  const kx = Math.cos((center[1] * Math.PI) / 180);
+  const d = (at: readonly number[]) => Math.hypot((at[0] - center[0]) * kx, at[1] - center[1]);
+  const near = (a: { at: readonly number[] }, b: { at: readonly number[] }) => d(a.at) - d(b.at);
+  const real = sensors.filter((s) => inBox(s.at, box)).sort(near);
+  return [...real, ...extra.slice().sort(near)].slice(0, Math.max(0, n)).map((s) => s.id);
+}
+
 export type Quad = readonly (readonly [number, number])[];
 
 /** Deux polygones convexes (px écran) se recouvrent-ils ? Axes séparateurs. */

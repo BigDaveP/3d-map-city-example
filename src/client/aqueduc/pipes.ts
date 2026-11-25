@@ -157,6 +157,14 @@ export interface NetworkData {
   };
   attribution: string;
   demoSegments: number[];
+  /** points de mesure supplémentaires, simulés, réservés au banc (`setTags`, R7) */
+  extraTags: ExtraTag[];
+}
+export interface ExtraTag {
+  /** « X-001 » */
+  id: string;
+  node: number;
+  at: [number, number];
 }
 export interface SegmentProps {
   i: number;

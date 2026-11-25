@@ -8,6 +8,7 @@ import {
   extraTagNodes,
   FLUSHING_2026,
   incidentImpact,
+  pointReadings,
   readingsAt,
   sectorStats,
   segmentValues,
@@ -223,4 +224,17 @@ test("extraTagNodes : points supplémentaires distincts, déterministes", () => 
   assert.equal(new Set(extra).size, 80);
   assert.deepEqual(extraTagNodes(m, 80), extra);
   assert.deepEqual(extraTagNodes(m, 20), extra.slice(0, 20));
+});
+
+test("pointReadings : pression des points supplémentaires, même modèle que les capteurs de pression", () => {
+  const t = Date.UTC(2026, 10, 24, 15, 15);
+  const p = m.sensors.filter((s) => s.kind === "pression");
+  const all = readingsAt(m, t, null);
+  assert.deepEqual(
+    pointReadings(m, t, null, p.map((s) => s.node)),
+    p.map((s) => all[s.idx]),
+  );
+  const extra = pointReadings(m, t, null, extraTagNodes(m, 20));
+  assert.equal(extra.length, 20);
+  assert.ok(extra.every((r) => r.unit === "bar" && Number.isFinite(r.value)));
 });

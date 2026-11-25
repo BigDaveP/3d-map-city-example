@@ -53,3 +53,54 @@ export function loadBench(): { rows: BenchRow[]; meta: Record<string, unknown> |
   } catch {}
   return { rows, meta, reps: Math.max(...rows.map((r) => Number(r.rep))) };
 }
+
+/** Banc de la démo réseau d'eau (`bench/run-aqueduc.ts`) : une ligne par configuration et phase. */
+export interface AqueducRow {
+  mode: string;
+  tags: number;
+  underground: string;
+  tubes: string;
+  phase: string;
+  /** répétitions moyennées */
+  rep: number;
+  [metric: string]: number | string;
+}
+
+const AQ_TEXT = ["mode", "underground", "tubes", "phase"];
+
+export function readAqueducCsv(): string | null {
+  try {
+    return readFileSync(path.join(DIR, "aqueduc.csv"), "utf8");
+  } catch {
+    return null;
+  }
+}
+
+/** Lignes moyennées sur les répétitions par (mode, étiquettes, souterrain, tubes, phase), et méta. */
+export function loadAqueducBench(): { rows: AqueducRow[]; meta: Record<string, unknown> | null } | null {
+  const csv = readAqueducCsv();
+  if (!csv) return null;
+  const [head, ...lines] = csv.trim().split("\n");
+  const cols = head.split(",");
+  const groups = new Map<string, Record<string, number | string>[]>();
+  for (const l of lines) {
+    const v = l.split(",");
+    const r: Record<string, number | string> = {};
+    cols.forEach((c, i) => (r[c] = AQ_TEXT.includes(c) ? v[i] : Number(v[i])));
+    const k = `${r.mode}|${r.tags}|${r.underground}|${r.tubes}|${r.phase}`;
+    groups.set(k, [...(groups.get(k) ?? []), r]);
+  }
+  const rows = [...groups.values()].map((g) => {
+    const out = { ...g[0] } as AqueducRow;
+    for (const c of cols) if (![...AQ_TEXT, "tags", "rep"].includes(c)) out[c] = g.reduce((a, r) => a + Number(r[c]), 0) / g.length;
+    // échantillons de latence : total des répétitions (les percentiles restent des moyennes)
+    out.latSamples = g.reduce((a, r) => a + Number(r.latSamples), 0);
+    out.rep = g.length;
+    return out;
+  });
+  let meta: Record<string, unknown> | null = null;
+  try {
+    meta = JSON.parse(readFileSync(path.join(DIR, "aqueduc-meta.json"), "utf8"));
+  } catch {}
+  return { rows, meta };
+}

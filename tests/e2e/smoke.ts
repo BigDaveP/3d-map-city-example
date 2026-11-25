@@ -23,7 +23,7 @@ function check(name: string, ok: boolean, detail = "") {
 function collectErrors(p: Page) {
   const errors: string[] = [];
   p.on("pageerror", (e) => errors.push(`exception : ${e.message}`));
-  // le sondage HEAD de la vidéo (absente tant qu'elle n'est pas publiée) laisse un 404 attendu dans la console
+  // le cas « sans fichier vidéo » du visiteur sans l'API simule un 404 (page.route) : erreur console attendue
   p.on("console", (m) => m.type() === "error" && !m.location().url.endsWith("/aqueduc/scenario-hic.webm") && errors.push(`console : ${m.text()}`));
   return errors;
 }
@@ -612,16 +612,17 @@ async function appBar(b: Browser) {
 
 /**
  * Visiteur sans l'API (Chromium lancé sans CanvasDrawElement) : mode classique, bandeau, vidéo
- * seulement si le fichier répond 200 (faux fichier par `page.route`, il n'existe qu'après la tâche 12),
+ * seulement si le fichier répond 200 (publié : public/aqueduc/scenario-hic.webm ; absence simulée par un 404),
  * explication « Comment l'activer », fermeture retenue pour la session.
  */
 async function withoutApi() {
   console.log("\n== / sans l'API HTML-in-Canvas");
   const nb = await chromium.launch({ args: ["--disable-blink-features=CanvasDrawElement"] });
   try {
-    const open = async (route: boolean, path = "/", width = 1440) => {
+    const open = async (video: boolean, path = "/", width = 1440) => {
       const ctx = await nb.newContext({ viewport: { width, height: 860 }, deviceScaleFactor: 1 });
-      if (route) await ctx.route("**/aqueduc/scenario-hic.webm", (r) => r.fulfill({ status: 200, contentType: "video/webm", body: Buffer.alloc(32) }));
+      // le fichier est publié (tâche 12) : son absence est simulée par un 404, sa présence par un vrai 200
+      if (!video) await ctx.route("**/aqueduc/scenario-hic.webm", (r) => r.fulfill({ status: 404, body: "" }));
       const p = await ctx.newPage();
       const errors = collectErrors(p);
       await p.goto(`${BASE}${path}`);

@@ -59,8 +59,18 @@ export interface AqState {
     pressure: Float32Array;
     chlorine: Float32Array;
     sectors: SectorStat[];
+    /** [valeur, statut] des points supplémentaires du banc (vide hors banc) */
+    extra: [number, number][];
+    /** instant (performance.now) de réception du message : latence lecture → pixel */
+    receivedAt: number;
   };
   notices: Notice[];
+  /**
+   * Banc de mesures seulement (`window.__aqueduc.setTags(n)`, R7) : n étiquettes, capteurs réels de la
+   * zone d'abord puis points supplémentaires simulés, sans le filtre de pertinence ni le plafond de 8
+   * (R13). null : usage normal.
+   */
+  benchTags: number | null;
   api: "absente" | "détectée" | "active";
   fallback: string;
 }
@@ -74,8 +84,9 @@ const initial = (): AqState => ({
   clock: { t0: Date.now(), speed: 1, startedAt: Date.now() },
   scenario: { active: false, step: "detection", valvesClosed: false, resumeAt: null, resumeSpeed: 1, resumeLayer: "pression", resumeUnderground: false, valvesTurned: [], error: "" },
   incident: null,
-  live: { t: 0, readings: [], pressure: new Float32Array(0), chlorine: new Float32Array(0), sectors: [] },
+  live: { t: 0, readings: [], pressure: new Float32Array(0), chlorine: new Float32Array(0), sectors: [], extra: [], receivedAt: 0 },
   notices: [],
+  benchTags: null,
   api: "absente",
   fallback: "",
 });

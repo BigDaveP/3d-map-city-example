@@ -230,7 +230,8 @@ export function HicHost({ ml, map, metrics, surfaces, layerOptions, onFallback, 
       gl.activeTexture(prevUnit);
       gl.bindTexture(gl.TEXTURE_2D, prevTex);
       metrics.gpuBytes = [...layer.panels.values()].reduce((a, p) => a + p.tw * p.th * 4, 0);
-      metrics.addWork(performance.now() - t0);
+      // captures : travail des mises à jour de données (série `upd*` des métriques)
+      metrics.update(performance.now() - t0);
       if (n < todo.length) canvas.requestPaint?.();
       map.triggerRepaint();
     };
