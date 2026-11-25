@@ -47,8 +47,18 @@ function Pin({ ml, map, at, anchor, className, children }: { ml: ML; map: MlMap;
 }
 
 export function ClassicScene({ ml, map, net, metrics }: { ml: ML; map: MlMap; net: NetIndex; metrics: Metrics }) {
-  // latence lecture → pixel : le DOM du marqueur vient d'être modifié, l'image suivante l'affiche
-  const onShown = useCallback((at: number) => requestAnimationFrame(() => metrics.latency(performance.now() - at)), [metrics]);
+  // latence lecture → pixel : le DOM du marqueur vient d'être modifié, l'image suivante l'affiche ;
+  // seulement pour un marqueur à l'écran (en HTML-in-Canvas, la latence est émise au dessin de la surface)
+  const onShown = useCallback(
+    (at: number, el: HTMLElement | null) =>
+      requestAnimationFrame(() => {
+        const t = performance.now();
+        const b = el?.getBoundingClientRect();
+        const c = map.getContainer().getBoundingClientRect();
+        if (b && b.right > c.left && b.left < c.right && b.bottom > c.top && b.top < c.bottom) metrics.latency(t - at);
+      }),
+    [metrics, map],
+  );
   const sectors = useVisibleSectors(map, net);
   const incident = useAq((s) => s.incident !== null);
   const brk = useMemo(() => {

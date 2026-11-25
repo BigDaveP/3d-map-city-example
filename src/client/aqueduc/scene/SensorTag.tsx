@@ -54,10 +54,12 @@ export function useTaggedSensors(map: MlMap, net: NetIndex, cover: TagCover): Se
 }
 
 /**
- * `onShown(receivedAt)` : la valeur affichée vient de changer (commit du DOM), avec l'instant de
- * réception du message qui l'a apportée ; pas au montage. Sert à la latence lecture → pixel.
+ * `onShown(receivedAt, el)` : la valeur affichée vient de changer (commit du DOM), avec l'instant de
+ * réception du message qui l'a apportée et le bouton de l'étiquette ; pas au montage. Sert à la
+ * latence lecture → pixel.
  */
-export function SensorTag({ sensor, drawable, onShown }: { sensor: Sensor; drawable?: boolean; onShown?: (receivedAt: number) => void }) {
+export function SensorTag({ sensor, drawable, onShown }: { sensor: Sensor; drawable?: boolean; onShown?: (receivedAt: number, el: HTMLElement | null) => void }) {
+  const btn = useRef<HTMLButtonElement>(null);
   const extra = isExtraTag(sensor.id);
   // valeur et statut en une chaîne : comparée par valeur, recapturée au plus toutes les 2 s
   const raw = useAq((s) => {
@@ -79,7 +81,7 @@ export function SensorTag({ sensor, drawable, onShown }: { sensor: Sensor; drawa
     lastShown.current = shown;
     tagCommitted();
     const at = receivedAt.current.get(shown);
-    if (at) onShown?.(at);
+    if (at) onShown?.(at, btn.current);
   }, [shown, onShown]);
   const selected = useAq((s) => s.selection?.kind === "sensor" && s.selection.id === sensor.id);
   const [v, st] = shown ? shown.split("|").map(Number) : [NaN, 0];
@@ -87,6 +89,7 @@ export function SensorTag({ sensor, drawable, onShown }: { sensor: Sensor; drawa
   const scene = drawable ? { "data-panel": surfaceKey("sensor", sensor.id), drawable: "", style: { width: SURFACE_SIZE.sensor.w, height: SURFACE_SIZE.sensor.h } } : {};
   return (
     <button
+      ref={btn}
       type="button"
       className="aq-tag"
       data-tone={TONE[st] ?? "good"}
