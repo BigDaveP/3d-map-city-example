@@ -1,0 +1,238 @@
+{
+  "environment": {
+    "date": "2026-11-25T02:46:22.887Z",
+    "browser": "Chromium 158.0.8127.36",
+    "flags": [
+      "--enable-blink-features=CanvasDrawElement"
+    ],
+    "webgl": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+    "gpu": false,
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz × 4",
+    "viewport": {
+      "width": 1440,
+      "height": 860
+    },
+    "deviceScaleFactor": 1,
+    "base": "http://localhost:3300"
+  },
+  "occlusion_classic": {
+    "state": {
+      "mode": "classic",
+      "api": "détectée",
+      "fallback": ""
+    },
+    "camera": {
+      "center": [
+        -72.543,
+        46.344
+      ],
+      "zoom": 17.3,
+      "pitch": 70,
+      "bearing": 200
+    },
+    "etiquetteCentreVille": {
+      "x": 720,
+      "y": 481.5,
+      "building": true
+    },
+    "clic": {
+      "point": {
+        "x": 720,
+        "y": 481.5,
+        "building": true
+      },
+      "elementFromPoint": "button",
+      "passThrough": 0,
+      "queries": 0,
+      "selection": {
+        "kind": "sector",
+        "id": "centre-ville"
+      }
+    },
+    "errors": []
+  },
+  "occlusion_hic": {
+    "state": {
+      "mode": "hic",
+      "api": "active",
+      "fallback": ""
+    },
+    "camera": {
+      "center": [
+        -72.543,
+        46.344
+      ],
+      "zoom": 17.3,
+      "pitch": 70,
+      "bearing": 200
+    },
+    "glyphes": {
+      "hidden": {
+        "x": 648.6696903912999,
+        "y": 496.9750275615557
+      },
+      "open": {
+        "x": 747.3269940188818,
+        "y": 462.03057769415614
+      }
+    },
+    "clicMasque": {
+      "point": {
+        "x": 648.6696903912999,
+        "y": 496.9750275615557
+      },
+      "elementFromPoint": "canvas",
+      "passThrough": 1,
+      "queries": 1,
+      "selection": null
+    },
+    "clicDegage": {
+      "point": {
+        "x": 747.3269940188818,
+        "y": 462.03057769415614
+      },
+      "elementFromPoint": "span@sector:centre-ville",
+      "passThrough": 0,
+      "queries": 1,
+      "selection": {
+        "kind": "sector",
+        "id": "centre-ville"
+      }
+    },
+    "errors": []
+  },
+  "sol_hic": {
+    "state": {
+      "mode": "hic",
+      "api": "active",
+      "fallback": ""
+    },
+    "surfaces": [
+      "sector:centre-ville",
+      "sector:sainte-cecile",
+      "sector:saint-philippe",
+      "sensor:P-01",
+      "sensor:D-10",
+      "sensor:P-27",
+      "sensor:P-24",
+      "sensor:D-04",
+      "sector:saint-sacrement",
+      "sector:notre-dame-des-sept-allegresses",
+      "sensor:P-28",
+      "sensor:P-21",
+      "sensor:P-23"
+    ]
+  },
+  "coupe_hic": {
+    "state": {
+      "mode": "hic",
+      "api": "active",
+      "fallback": ""
+    },
+    "cut": true,
+    "valves": [
+      "V-1878 · à fermer",
+      "V-3573 · à fermer"
+    ],
+    "errors": []
+  },
+  "souterrain_hic": {
+    "state": {
+      "mode": "hic",
+      "api": "active",
+      "fallback": ""
+    },
+    "instances": 12568,
+    "errors": []
+  },
+  "aria_classic": {
+    "capteurs": [
+      "- 'button \"Capteur de pression P-01 (simulation) : 4,5 bar, normal\"': 4,5 bar",
+      "- 'button \"Capteur de pression P-28 (simulation) : 4,8 bar, normal\"': 4,8 bar",
+      "- 'button \"Débitmètre D-10 (simulation) : 32,1 L/s, normal\"': 32,1 L/s",
+      "- 'button \"Capteur de pression P-27 (simulation) : 4,4 bar, normal\"': 4,4 bar",
+      "- 'button \"Capteur de pression P-24 (simulation) : 4,5 bar, normal\"': 4,5 bar",
+      "- 'button \"Débitmètre D-04 (simulation) : 70,8 L/s, normal\"': 70,8 L/s",
+      "- 'button \"Capteur de pression P-12 (simulation) : 5,1 bar, normal\"': 5,1 bar",
+      "- 'button \"Débitmètre D-03 (simulation) : 71,7 L/s, normal\"': 71,7 L/s"
+    ],
+    "secteurs": [
+      "- 'button \"Secteur Centre-ville (simulé) : 2 417 adresses desservies\"': CENTRE-VILLE 2 417 adresses desservies",
+      "- 'button \"Secteur Sainte-Cécile (simulé) : 986 adresses desservies\"': SAINTE-CÉCILE 986 adresses desservies",
+      "- 'button \"Secteur Saint-Philippe (simulé) : 4 731 adresses desservies\"': SAINT-PHILIPPE 4 731 adresses desservies"
+    ]
+  },
+  "focus_classic": {
+    "tabs": 9,
+    "sensor": "P-01",
+    "inCanvas": false,
+    "label": "Capteur de pression P-01 (simulation) : 4,5 bar, normal",
+    "enterOpensInspector": true,
+    "inspector": "× · P-01 · Capteur de pression · simulation · Centre-ville"
+  },
+  "aria_hic": {
+    "capteurs": [
+      "- 'button \"Capteur de pression P-01 (simulation) : 4,5 bar, normal\"': 4,5 bar",
+      "- 'button \"Débitmètre D-10 (simulation) : 32,1 L/s, normal\"': 32,1 L/s",
+      "- 'button \"Capteur de pression P-27 (simulation) : 4,4 bar, normal\"': 4,4 bar",
+      "- 'button \"Capteur de pression P-24 (simulation) : 4,5 bar, normal\"': 4,5 bar",
+      "- 'button \"Débitmètre D-04 (simulation) : 70,8 L/s, normal\"': 70,8 L/s",
+      "- 'button \"Capteur de pression P-12 (simulation) : 5,1 bar, normal\"': 5,1 bar",
+      "- 'button \"Débitmètre D-03 (simulation) : 71,7 L/s, normal\"': 71,7 L/s",
+      "- 'button \"Sonde de réservoir R-01 (simulation) : 70 %, normal\"': 70 %"
+    ],
+    "secteurs": [
+      "- 'button \"Secteur Centre-ville (simulé) : 2 417 adresses desservies\"': CENTRE-VILLE 2 417 adresses desservies",
+      "- 'button \"Secteur Sainte-Cécile (simulé) : 986 adresses desservies\"': SAINTE-CÉCILE 986 adresses desservies",
+      "- 'button \"Secteur Saint-Philippe (simulé) : 4 731 adresses desservies\"': SAINT-PHILIPPE 4 731 adresses desservies"
+    ]
+  },
+  "focus_hic": {
+    "tabs": 12,
+    "sensor": "P-01",
+    "inCanvas": true,
+    "label": "Capteur de pression P-01 (simulation) : 4,5 bar, normal",
+    "enterOpensInspector": true,
+    "inspector": "× · P-01 · Capteur de pression · simulation · Centre-ville"
+  },
+  "video_classic": {
+    "file": "docs/aqueduc/video-classic.webm",
+    "octets": 1013887,
+    "message": "Vidéo enregistrée : scenario-bris.webm, 1,0 Mo, 10,3 s.",
+    "wallMs": 10626,
+    "errors": [],
+    "ffprobe": {
+      "stream": "vp9,1440,870",
+      "frames": 56,
+      "lastFrameS": 9.828
+    },
+    "image5s": "docs/aqueduc/video-classic-image-5s.png"
+  },
+  "video_hic": {
+    "file": "docs/aqueduc/video-hic.webm",
+    "octets": 896653,
+    "message": "Vidéo enregistrée : scenario-bris.webm, 0,9 Mo, 10,2 s.",
+    "wallMs": 10633,
+    "errors": [],
+    "ffprobe": {
+      "stream": "vp9,1440,870",
+      "frames": 55,
+      "lastFrameS": 9.844
+    },
+    "image5s": "docs/aqueduc/video-hic-image-5s.png"
+  },
+  "publicVideo": {
+    "file": "public/aqueduc/scenario-hic.webm",
+    "octets": 896653
+  },
+  "sans_api": {
+    "state": {
+      "mode": "classic",
+      "api": "absente",
+      "fallback": "Mode classique : API HTML-in-Canvas absente (ni texElementSubImage2D ni texElementImage2D (activez chrome://flags/#canvas-draw-element))."
+    },
+    "hicLayer": null,
+    "bandeau": "Votre navigateur n'active pas HTML-in-Canvas : vous voyez la version classique.\n\nVoir la version HTML-in-Canvas en vidéo\nComment l'activer\n×",
+    "boutonVideo": 1
+  }
+}

@@ -4,7 +4,7 @@
  * Elle partage le contexte GL et le buffer de profondeur de MapLibre : les bâtiments
  * (fill-extrusion) dessinés avant elle masquent les panneaux placés derrière.
  * À chaque image :
- *  1. calcule le placement de chaque panneau (face caméra ou façade) ;
+ *  1. calcule le placement de chaque panneau (face caméra ou façade, ou placement libre `place`) ;
  *  2. met à jour la géométrie de hit testing (updateElementGeometry, matrice projective, px CSS) ;
  *  3. dessine ombres au sol, panneaux (test de profondeur, brouillard, transition), panneau focalisé
  *     « en rayons X » (sans test de profondeur) ;
@@ -12,7 +12,7 @@
  *     le curseur quand on la demande (hit testing avec occlusion).
  */
 import type { CustomLayerInterface, Map as MlMap } from "maplibre-gl";
-import { metersPerPixel, modelMatrix, mul, PanelProjection, placePanel, viewportMatrix } from "./geometry";
+import { metersPerPixel, modelMatrix, mul, PanelProjection, type PanelPlacement, placePanel, viewportMatrix } from "./geometry";
 
 type ML = typeof import("maplibre-gl");
 
@@ -53,21 +53,34 @@ export interface PixelRequest {
 }
 
 export interface PanelLayerOptions {
-  anchor(key: string): PanelAnchor | null;
-  orientation(): "billboard" | "facade";
+  /** ancre d'un panneau ; sert aussi à l'ombre au sol (sans ancre : pas d'ombre) */
+  anchor?(key: string): PanelAnchor | null;
+  orientation?(): "billboard" | "facade";
+  /**
+   * Placement libre (Mercator, par px CSS) : s'il est fourni, il remplace `anchor` + `orientation`
+   * pour le placement ; `null` = surface non dessinée à cette image.
+   */
+  place?(key: string, ctx: { bearing: number; pitch: number; zoom: number }): PanelPlacement | null;
   effects(): { fog: boolean; shadow: boolean; transition: "dissolve" | "sweep" | "none"; transitionMs: number };
-  focused(): string | null;
+  /**
+   * Opacité (0..1) des parties d'une surface cachées par des bâtiments : 0 (défaut) = invisibles.
+   * Les bâtiments étant translucides, un marquage au sol peut transparaître comme le fond de carte
+   * qu'ils laissent voir. Seulement l'image : le hit testing reste bloqué là où la surface est cachée.
+   */
+  ghost?(key: string): number;
+  /** clé du panneau qui a le focus clavier (dessiné au travers des bâtiments) */
+  focused?(): string | null;
   setGeometry(el: HTMLElement, m: DOMMatrix): void;
-  onRender(ms: number, latencies: number[]): void;
+  onRender(ms: number, latencies: { key: string; ms: number }[]): void;
 }
 
 const VS = `#version 300 es
 layout(location=0) in vec2 a;
-uniform mat4 u_mvp; uniform mat4 u_model; uniform vec2 u_size;
+uniform mat4 u_mvp; uniform vec2 u_size;           // u_mvp = projection × modèle, calculé en Float64
 out vec2 v_uv; out float v_w;
 void main() {
   v_uv = a;
-  gl_Position = u_mvp * u_model * vec4(a * u_size, 0.0, 1.0);
+  gl_Position = u_mvp * vec4(a * u_size, 0.0, 1.0);
   v_w = gl_Position.w;
 }`;
 const FS = `#version 300 es
@@ -76,7 +89,7 @@ in vec2 v_uv; in float v_w; out vec4 o;
 uniform sampler2D u_tex; uniform vec2 u_uvMax;
 uniform float u_t; uniform int u_trans;           // transition : 0 aucune, 1 dissolution, 2 balayage
 uniform int u_fogOn; uniform vec2 u_fog; uniform vec3 u_fogColor;
-uniform float u_xray; uniform int u_shadow;
+uniform float u_xray; uniform int u_shadow; uniform float u_alpha;
 float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
 void main() {
   vec4 c = texture(u_tex, v_uv * u_uvMax);
@@ -97,7 +110,7 @@ void main() {
     vec2 d = min(v_uv, 1.0 - v_uv);
     if (min(d.x, d.y * 0.75) < 0.012) col = vec3(0.11, 0.37, 0.82);
   }
-  o = vec4(col, 1.0);
+  o = vec4(col, u_alpha);
 }`;
 
 function compile(gl: WebGL2RenderingContext) {
@@ -118,6 +131,16 @@ function compile(gl: WebGL2RenderingContext) {
 
 export const TRANSITION_MS = 700;
 
+/**
+ * Matrice élément (px CSS) -> clip : projection × modèle, multipliée en Float64 sur le CPU puis
+ * envoyée en Float32. Multipliées dans le shader (Float32), les deux matrices perdaient des mètres
+ * de profondeur (modèle en Mercator ~0,3 à ~1 m près, projection en unités du monde) : un
+ * marquage au sol passait devant les toits bas.
+ */
+function clipFrom(mvp: ArrayLike<number>, model: ArrayLike<number>): Float32Array {
+  return new Float32Array(mul(mvp, model));
+}
+
 export class PanelLayer implements CustomLayerInterface {
   id = "hic-panels";
   type = "custom" as const;
@@ -126,11 +149,14 @@ export class PanelLayer implements CustomLayerInterface {
   pixelRequests: PixelRequest[] = [];
   drawn = 0;
   private map!: MlMap;
+  private mvp: ArrayLike<number> = new Float64Array(16);
   private gl!: WebGL2RenderingContext;
   private prog!: WebGLProgram;
   private vao!: WebGLVertexArrayObject;
   private u = new Map<string, WebGLUniformLocation | null>();
-  constructor(private ml: ML, private opt: PanelLayerOptions) {}
+  constructor(private ml: ML, private opt: PanelLayerOptions) {
+    if (!opt.place && !opt.anchor) throw new Error("PanelLayer : `place` ou `anchor` requis");
+  }
 
   onAdd(map: MlMap, gl: WebGL2RenderingContext) {
     this.map = map;
@@ -164,6 +190,7 @@ export class PanelLayer implements CustomLayerInterface {
     const ml = this.ml;
     const map = this.map;
     const mvp = o.defaultProjectionData.mainMatrix;
+    this.mvp = mvp;
     const canvas = map.getCanvas();
     const vp = viewportMatrix(canvas.clientWidth, canvas.clientHeight);
     const screenFromWorld = mul(vp, mvp);
@@ -171,11 +198,13 @@ export class PanelLayer implements CustomLayerInterface {
     const mPerPx = 0.8 * metersPerPixel(center.lat, map.getZoom());
     const bearing = map.getBearing();
     const pitch = map.getPitch();
-    const orientation = this.opt.orientation();
+    const zoom = map.getZoom();
+    const place = this.opt.place;
+    const orientation = this.opt.orientation?.() ?? "billboard";
     const fx = this.opt.effects();
-    const focused = this.opt.focused();
+    const focused = this.opt.focused?.() ?? null;
     const now = performance.now();
-    const latencies: number[] = [];
+    const latencies: { key: string; ms: number }[] = [];
     // brouillard : distance (w de clip) du centre de la vue comme référence
     const c = ml.MercatorCoordinate.fromLngLat(center, 0);
     const cw = mvp[3] * c.x + mvp[7] * c.y + mvp[11] * c.z + mvp[15];
@@ -183,10 +212,16 @@ export class PanelLayer implements CustomLayerInterface {
     // 1-2. placement et géométrie de hit testing
     const ready: PanelGpu[] = [];
     for (const p of this.panels.values()) {
-      const a = this.opt.anchor(p.key);
-      if (!a || !p.el) continue;
-      const m = ml.MercatorCoordinate.fromLngLat([a.lng, a.lat], 0);
-      const placement = placePanel(m, p.w, p.h, m.meterInMercatorCoordinateUnits(), mPerPx, a.lift, orientation, bearing, pitch, a.facade);
+      let placement: PanelPlacement | null = null;
+      if (place) placement = p.el ? place(p.key, { bearing, pitch, zoom }) : null;
+      else {
+        const a = this.opt.anchor!(p.key);
+        if (a && p.el) {
+          const m = ml.MercatorCoordinate.fromLngLat([a.lng, a.lat], 0);
+          placement = placePanel(m, p.w, p.h, m.meterInMercatorCoordinateUnits(), mPerPx, a.lift, orientation, bearing, pitch, a.facade);
+        }
+      }
+      if (!placement || !p.el) continue;
       p.model = modelMatrix(placement);
       p.proj = new PanelProjection(mul(screenFromWorld, p.model));
       this.opt.setGeometry(p.el, DOMMatrix.fromFloat64Array(p.proj.m as Float64Array<ArrayBuffer>));
@@ -194,7 +229,6 @@ export class PanelLayer implements CustomLayerInterface {
     }
 
     gl.useProgram(this.prog);
-    gl.uniformMatrix4fv(this.loc("u_mvp"), false, mvp as Float32Array);
     gl.uniform1i(this.loc("u_tex"), 0);
     gl.uniform1i(this.loc("u_fogOn"), fx.fog ? 1 : 0);
     gl.uniform2f(this.loc("u_fog"), cw * 1.15, cw * 2.6);
@@ -205,7 +239,7 @@ export class PanelLayer implements CustomLayerInterface {
     gl.enable(gl.DEPTH_TEST);
     gl.depthFunc(gl.LEQUAL);
     const draw = (p: PanelGpu, model: ArrayLike<number>) => {
-      gl.uniformMatrix4fv(this.loc("u_model"), false, model as Float32Array);
+      gl.uniformMatrix4fv(this.loc("u_mvp"), false, clipFrom(mvp, model));
       gl.uniform2f(this.loc("u_size"), p.w, p.h);
       gl.uniform2f(this.loc("u_uvMax"), Math.min(1, (p.w * this.scale()) / p.tw), Math.min(1, (p.h * this.scale()) / p.th));
       gl.bindTexture(gl.TEXTURE_2D, p.tex);
@@ -221,7 +255,8 @@ export class PanelLayer implements CustomLayerInterface {
       gl.uniform1i(this.loc("u_trans"), 0);
       gl.uniform1f(this.loc("u_xray"), 0);
       for (const p of ready) {
-        const a = this.opt.anchor(p.key)!;
+        const a = this.opt.anchor?.(p.key);
+        if (!a) continue;
         const g = ml.MercatorCoordinate.fromLngLat([a.lng, a.lat], 0.3).z;
         // ombre : x' = x + 0.45 (z - g), y' = y + 0.3 (z - g), z' = g
         const S = new Float64Array([1, 0, 0, 0, 0, 1, 0, 0, 0.45, 0.3, 0, 0, -0.45 * g, -0.3 * g, g, 1]);
@@ -229,11 +264,33 @@ export class PanelLayer implements CustomLayerInterface {
       }
     }
 
+    // 3a bis. parties cachées des surfaces « fantômes » : seulement là où un bâtiment est devant
+    // (GREATER), en fondu, sans écrire la profondeur ; avant les panneaux, qui les recouvrent
+    gl.uniform1i(this.loc("u_shadow"), 0);
+    gl.uniform1f(this.loc("u_xray"), 0);
+    gl.uniform1f(this.loc("u_alpha"), 1);
+    const ghost = this.opt.ghost;
+    if (ghost) {
+      gl.enable(gl.BLEND);
+      // alpha du tampon inchangé : le canvas reste opaque
+      gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ZERO, gl.ONE);
+      gl.depthMask(false);
+      gl.depthFunc(gl.GREATER);
+      gl.uniform1i(this.loc("u_trans"), 0);
+      for (const p of ready) {
+        const a = ghost(p.key);
+        if (a <= 0 || now - p.openedAt < fx.transitionMs) continue;
+        gl.uniform1f(this.loc("u_alpha"), a);
+        draw(p, p.model!);
+      }
+      gl.uniform1f(this.loc("u_alpha"), 1);
+      gl.depthFunc(gl.LEQUAL);
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    }
+
     // 3b. panneaux, avec test de profondeur et requête d'occlusion par panneau
     gl.disable(gl.BLEND);
     gl.depthMask(true);
-    gl.uniform1i(this.loc("u_shadow"), 0);
-    gl.uniform1f(this.loc("u_xray"), 0);
     let drawn = 0;
     for (const p of ready) {
       const t = Math.min(1, (now - p.openedAt) / fx.transitionMs);
@@ -254,7 +311,7 @@ export class PanelLayer implements CustomLayerInterface {
       }
       drawn++;
       if (p.pendingLatency) {
-        latencies.push(now - p.pendingLatency);
+        latencies.push({ key: p.key, ms: now - p.pendingLatency });
         p.pendingLatency = 0;
       }
     }
@@ -312,7 +369,7 @@ export class PanelLayer implements CustomLayerInterface {
       gl.enable(gl.DEPTH_TEST);
       gl.uniform1i(this.loc("u_trans"), 0);
       gl.uniform1i(this.loc("u_shadow"), 0);
-      gl.uniformMatrix4fv(this.loc("u_model"), false, p.model as unknown as Float32Array);
+      gl.uniformMatrix4fv(this.loc("u_mvp"), false, clipFrom(this.mvp, p.model));
       gl.uniform2f(this.loc("u_size"), p.w, p.h);
       gl.bindTexture(gl.TEXTURE_2D, p.tex);
       gl.beginQuery(gl.ANY_SAMPLES_PASSED, r.query);

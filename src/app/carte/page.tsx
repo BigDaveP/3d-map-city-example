@@ -1,6 +1,7 @@
 import { CITIES, RESTAURANTS, type CityId } from "@/lib/carte/catalog";
 import { restaurantAt } from "@/lib/carte/sim";
 import { listRestaurantState } from "@/server/carte-repo";
+import DemoNav from "@/client/shell/DemoNav";
 import CarteShell from "./CarteShell";
 
 export const dynamic = "force-dynamic";
@@ -22,6 +23,7 @@ export default async function CartePage({ searchParams }: { searchParams: Promis
       <p className="sim-banner" role="note">
         ⚠️ Données entièrement simulées : restaurants, livreurs et commandes sont fictifs (positions dans des quartiers réels).
       </p>
+      <DemoNav current="carte" />
       <aside className="overview" aria-labelledby="carte-title">
         <h1 id="carte-title">Carte opérationnelle</h1>
         <p className="note">Vue rendue côté serveur. {RESTAURANTS.length} restaurants, {alerts.length} en alerte.</p>

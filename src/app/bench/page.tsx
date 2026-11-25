@@ -1,5 +1,7 @@
 import Link from "next/link";
+import DemoNav from "@/client/shell/DemoNav";
 import { loadBench, type BenchRow } from "@/server/bench";
+import { AqueducSection } from "./Aqueduc";
 import { Bars, Legend, type Series } from "./Bars";
 import "./bench.css";
 
@@ -55,6 +57,7 @@ export default function BenchPage() {
       <main className="bench">
         <h1>Banc de mesures</h1>
         <p>Aucun résultat. Lancez <code>npm run bench</code> (voir README).</p>
+        <AqueducSection />
       </main>
     );
   }
@@ -76,10 +79,11 @@ export default function BenchPage() {
   return (
     <main className="bench viz-root">
       <p className="sim-banner" role="note">⚠️ Données simulées — mesures prises sur la machine décrite ci-dessous.</p>
+      <DemoNav current="bench" />
       <h1>Banc : DOM virtualisé vs HTML-in-Canvas</h1>
       <p className="lead">
         Même mur, même parcours (vitesse ×10) : vue d&apos;ensemble → zoom région → pan → zoom carte → saisie → dézoom → tempête. Moyenne de {reps} répétition
-        {reps > 1 ? "s" : ""}. <a href="/bench/results.csv">Télécharger le CSV</a> · <Link href="/">Retour au mur</Link>
+        {reps > 1 ? "s" : ""}. <a href="/bench/results.csv">Télécharger le CSV</a> · <Link href="/mur">Retour au mur</Link>
       </p>
       {meta && (
         <p className="meta">
@@ -182,6 +186,7 @@ export default function BenchPage() {
           <Table rows={rows.filter((r) => r.n === n)} />
         </details>
       ))}
+      <AqueducSection />
     </main>
   );
 }

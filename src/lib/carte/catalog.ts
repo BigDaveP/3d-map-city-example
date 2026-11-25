@@ -99,3 +99,9 @@ export const COURIERS: Courier[] = Array.from({ length: 40 }, (_, idx) => {
 });
 
 export const restaurantsOf = (city: CityId) => RESTAURANTS.filter((r) => r.city === city);
+
+/** Crédits incrustés sous la vidéo exportée de /carte : fond de carte (attribution du style) et données simulées. */
+export const CARTE_VIDEO_CREDITS = [
+  "Fond de carte : OpenFreeMap, OpenMapTiles, OpenStreetMap",
+  "Données entièrement simulées : restaurants, livreurs et commandes sont fictifs",
+] as const;

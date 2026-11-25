@@ -77,6 +77,75 @@ export function placePanel(
   return { o, r: R, d: D };
 }
 
+/** Hauteur d'un marquage au sol (m) : juste au-dessus des routes, sous tout bâtiment. */
+export const GROUND_LIFT_M = 0.3;
+
+/**
+ * Marquage au sol de w×h px CSS centré sur `center` : plan horizontal à 0,3 m du sol.
+ * `headingDeg` = cap (degrés, sens horaire depuis le nord) vers lequel pointe le haut du texte ;
+ * le texte se lit de face quand ce cap est celui de la caméra. Vu de l'autre côté
+ * (cos(orientation − cap) < 0), il est retourné de 180° pour ne jamais se lire à l'envers.
+ * `unit` = mètres -> Mercator au centre ; `mPerPx` = taille d'un px CSS du marquage en mètres.
+ */
+export function placeGround(
+  center: { x: number; y: number; z: number },
+  w: number,
+  h: number,
+  unit: number,
+  mPerPx: number,
+  headingDeg: number,
+  bearingDeg: number,
+): PanelPlacement {
+  let t = (headingDeg * Math.PI) / 180;
+  if (Math.cos(t - (bearingDeg * Math.PI) / 180) < 0) t += Math.PI;
+  const s = unit * mPerPx;
+  // x = est, y = sud : « droite » du texte au cap t + 90°, « bas » vers le cap t + 180°
+  const R: [number, number, number] = [Math.cos(t) * s, Math.sin(t) * s, 0];
+  const D: [number, number, number] = [-Math.sin(t) * s, Math.cos(t) * s, 0];
+  const z = center.z + GROUND_LIFT_M * unit;
+  return { o: [center.x - (w / 2) * R[0] - (h / 2) * D[0], center.y - (w / 2) * R[1] - (h / 2) * D[1], z], r: R, d: D };
+}
+
+/** Marge (cosinus, ≈ 8,6°) que la caméra doit franchir pour retourner une coupe déjà orientée. */
+export const FLIP_MARGIN = 0.15;
+
+/**
+ * La coupe `from` -> `to` doit-elle être parcourue à l'envers (`to` -> `from`) pour se lire de face ?
+ * Sa normale pointe vers la caméra si cos(angle du segment − cap) > 0. Avec l'état précédent
+ * (`prev`), la décision ne change qu'au-delà de `FLIP_MARGIN` : quand la caméra regarde dans l'axe
+ * du segment, la coupe ne bascule pas d'une image à l'autre.
+ */
+export function verticalFlip(from: [number, number], to: [number, number], bearingDeg: number, prev?: boolean): boolean {
+  const c = Math.cos(Math.atan2(to[1] - from[1], to[0] - from[0]) - (bearingDeg * Math.PI) / 180);
+  if (prev === undefined) return c < 0;
+  return prev ? c < FLIP_MARGIN : c < -FLIP_MARGIN;
+}
+
+/**
+ * Plan vertical le long d'un segment (Mercator), sous la chaussée : coupe de w×h px CSS dont la
+ * largeur couvre exactement `from` -> `to` (pixels carrés : la hauteur suit l'échelle de la
+ * largeur) et dont le bord haut est à `depthTopM` mètres sous le sol. Le plan est parcouru dans
+ * le sens qui le rend lisible depuis la caméra (sinon `to` -> `from`) ; `flipped` impose ce sens
+ * (décision de `verticalFlip` avec hystérésis). `h` ne change pas le placement : la coupe descend
+ * de h × (longueur du segment / w) sous son bord haut.
+ */
+export function placeVertical(
+  from: [number, number],
+  to: [number, number],
+  depthTopM: number,
+  h: number,
+  unit: number,
+  bearingDeg: number,
+  w: number,
+  flipped: boolean = verticalFlip(from, to, bearingDeg),
+): PanelPlacement {
+  // normale r × d = (−r_y, r_x, 0)·s ; vers la caméra si cos(angle du segment − cap) > 0
+  const [a, b] = flipped ? [to, from] : [from, to];
+  const R: [number, number, number] = [(b[0] - a[0]) / w, (b[1] - a[1]) / w, 0];
+  const D: [number, number, number] = [0, 0, -Math.hypot(R[0], R[1])];
+  return { o: [a[0], a[1], -depthTopM * unit], r: R, d: D };
+}
+
 /** NDC -> px CSS du canvas (y vers le bas). */
 export function viewportMatrix(wCss: number, hCss: number): Float64Array {
   return new Float64Array([wCss / 2, 0, 0, 0, 0, -hCss / 2, 0, 0, 0, 0, 1, 0, wCss / 2, hCss / 2, 0, 1]);

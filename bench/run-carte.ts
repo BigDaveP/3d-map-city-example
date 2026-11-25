@@ -64,9 +64,9 @@ async function runOne(mode: "classic" | "hic", n: number, rep: number): Promise<
   let occl = { queries: 0, ms: 0 };
   if (mode === "hic") {
     const pts = await p.evaluate(() => {
-      const L = (window as any).__hicMap.layer;
+      const L = (window as any).__hicMap?.layer;
       const out: [number, number][] = [];
-      for (const pn of L.panels.values()) if (pn.proj) { const [x, y] = pn.proj.project(pn.w / 2, pn.h / 2); if (x > 0 && y > 0 && x < innerWidth && y < innerHeight) out.push([x, y]); }
+      for (const pn of L?.panels?.values() ?? []) if (pn.proj) { const [x, y] = pn.proj.project(pn.w / 2, pn.h / 2); if (x > 0 && y > 0 && x < innerWidth && y < innerHeight) out.push([x, y]); }
       return out.slice(0, 10);
     });
     const before = await p.evaluate(() => ({ ...(window as any).__occlusion }));

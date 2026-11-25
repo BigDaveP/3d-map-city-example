@@ -37,6 +37,11 @@ export interface MetricsSnapshot {
   latP50: number;
   latP95: number;
   latSamples: number;
+  /** travail JS des mises à jour de données (message du flux, re-rendu des étiquettes, captures) */
+  updP95: number;
+  updMax: number;
+  /** ms de JS par seconde consacrées aux mises à jour (5 dernières secondes) */
+  updMsPerSec: number;
   gpuMB: number;
   heapMB: number;
   domNodes: number;
@@ -51,6 +56,7 @@ interface Phase {
   captures: number[];
   captureMs: number[];
   latency: number[];
+  updates: number[];
   queue: number[];
   gpuMax: number;
   heapMax: number;
@@ -64,6 +70,11 @@ export class Metrics {
   private capFrames = new Ring(120);
   private capMs = new Ring(300);
   private lat = new Ring(600);
+  private upd = new Ring(600);
+  private updAt = new Ring(600);
+  private updOpen: { t0: number; pending0: number } | null = null;
+  /** fenêtre de la dernière mise à jour mesurée en temps écoulé (beginUpdate → endUpdate) */
+  private updLast = { t0: 0, t1: 0 };
   private lastFrame = 0;
   captureTotal = 0;
   queue = 0;
@@ -78,6 +89,40 @@ export class Metrics {
   /** Travail JS accumulé hors d'une boucle maîtrisée (couches MapLibre, handler paint). */
   addWork(ms: number) {
     this.pending += ms;
+  }
+  /**
+   * Travail d'une mise à jour de données, compté comme du travail de frame et à part (`upd*`) :
+   * un message du flux par seconde ne pèse rien dans le p95 par frame, d'où cette série.
+   * `start` (performance.now du début du travail) : un travail commencé pendant une mise à jour
+   * mesurée en temps écoulé (`beginUpdate` → `endUpdate`) y est déjà compté et n'est pas repris.
+   */
+  update(ms: number, start?: number) {
+    if (start !== undefined) {
+      const o = this.updOpen;
+      if (o && start >= o.t0) return;
+      if (start >= this.updLast.t0 && start <= this.updLast.t1) return;
+    }
+    this.pending += ms;
+    this.pushUpdate(ms);
+  }
+  /** Début d'une mise à jour mesurée en temps écoulé (le travail déjà compté par `addWork` n'est pas doublé). */
+  beginUpdate() {
+    this.updOpen = { t0: performance.now(), pending0: this.pending };
+  }
+  endUpdate() {
+    const o = this.updOpen;
+    if (!o) return;
+    this.updOpen = null;
+    const t1 = performance.now();
+    const ms = t1 - o.t0;
+    this.updLast = { t0: o.t0, t1 };
+    this.pending += Math.max(0, ms - (this.pending - o.pending0));
+    this.pushUpdate(ms);
+  }
+  private pushUpdate(ms: number) {
+    this.upd.push(ms);
+    this.updAt.push(performance.now());
+    this.phase?.updates.push(ms);
   }
   pendingWork() {
     const p = this.pending;
@@ -134,7 +179,11 @@ export class Metrics {
     const f = this.frames.values();
     const w = this.work.values();
     const l = this.lat.values();
+    const u = this.upd.values();
     const fm = mean(f);
+    const since = performance.now() - 5000;
+    const at = this.updAt.values();
+    const recent = u.reduce((a, v, i) => (at[i] >= since ? a + v : a), 0);
     return {
       fps: fm ? 1000 / fm : 0,
       frameP50: percentile(f, 50),
@@ -148,6 +197,9 @@ export class Metrics {
       latP50: percentile(l, 50),
       latP95: percentile(l, 95),
       latSamples: l.length,
+      updP95: percentile(u, 95),
+      updMax: u.length ? Math.max(...u) : 0,
+      updMsPerSec: recent / 5,
       gpuMB: this.gpuBytes / 1048576,
       heapMB: heap() / 1048576,
       domNodes: this.domNodes,
@@ -156,7 +208,7 @@ export class Metrics {
   }
 
   beginPhase(name: string) {
-    this.phase = { name, t0: performance.now(), frames: [], work: [], captures: [], captureMs: [], latency: [], queue: [], gpuMax: 0, heapMax: 0, domMax: 0, mountedMax: 0 };
+    this.phase = { name, t0: performance.now(), frames: [], work: [], captures: [], captureMs: [], latency: [], updates: [], queue: [], gpuMax: 0, heapMax: 0, domMax: 0, mountedMax: 0 };
   }
 
   endPhase() {
@@ -164,15 +216,17 @@ export class Metrics {
     this.phase = undefined;
     if (!p) return null;
     const fm = mean(p.frames);
+    const durationMs = performance.now() - p.t0;
     return {
       phase: p.name,
-      durationMs: performance.now() - p.t0,
+      durationMs,
       frames: p.frames.length,
       fps: fm ? 1000 / fm : 0,
       frameP50: percentile(p.frames, 50),
       frameP95: percentile(p.frames, 95),
       workP50: percentile(p.work, 50),
       workP95: percentile(p.work, 95),
+      workMax: Math.max(0, ...p.work),
       capturesTotal: p.captureMs.length,
       capturesPerFrame: mean(p.captures),
       captureMsAvg: mean(p.captureMs),
@@ -180,6 +234,11 @@ export class Metrics {
       latP50: percentile(p.latency, 50),
       latP95: percentile(p.latency, 95),
       latSamples: p.latency.length,
+      updates: p.updates.length,
+      updP50: percentile(p.updates, 50),
+      updP95: percentile(p.updates, 95),
+      updMax: Math.max(0, ...p.updates),
+      updMsPerSec: (p.updates.reduce((a, b) => a + b, 0) * 1000) / Math.max(1, durationMs),
       gpuMB: p.gpuMax / 1048576,
       heapMB: p.heapMax / 1048576,
       domNodes: p.domMax,

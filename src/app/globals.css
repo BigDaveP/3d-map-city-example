@@ -15,11 +15,11 @@ html, body { margin: 0; height: 100%; background: var(--bg); color: var(--fg); f
 button, select, input, textarea { font: inherit; color: inherit; }
 
 /* ------------------------------------------------------------------ app */
-.app { display: grid; grid-template-columns: 300px 1fr; grid-template-rows: auto 1fr; height: 100dvh; }
+.app { display: grid; grid-template-columns: 300px 1fr; grid-template-rows: auto auto 1fr; height: 100dvh; }
 .app.no-aside { grid-template-columns: 0 1fr; }
 .app.no-aside .overview { display: none; }
 .sim-banner { background: #3b2a00; color: #ffd479; font-size: 12px; padding: 2px 10px; text-align: center; grid-column: 1 / -1; }
-.overview { grid-row: 2; overflow: auto; border-right: 1px solid var(--line); background: var(--panel); padding: 12px 14px; }
+.overview { grid-row: 3; overflow: auto; border-right: 1px solid var(--line); background: var(--panel); padding: 12px 14px; }
 .overview h1 { font-size: 17px; margin: 0 0 4px; }
 .overview h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 16px 0 6px; }
 .overview table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -28,7 +28,7 @@ button, select, input, textarea { font: inherit; color: inherit; }
 .overview ul { padding-left: 18px; margin: 0; font-size: 13px; }
 .overview .crit { color: var(--crit); font-weight: 600; }
 .overview .note { color: var(--muted); font-size: 12px; }
-.stage { grid-row: 2; position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.stage { grid-row: 3; position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .noscript { padding: 16px; color: var(--muted); }
 
 /* ------------------------------------------------------------------ toolbar */

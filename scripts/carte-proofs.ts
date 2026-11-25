@@ -133,7 +133,7 @@ async function main() {
     const { p } = await open(b, "hic", { cam: { center: [-73.569, 45.5032], zoom: 16.4, pitch: 50, bearing: 200 }, restaurants: [], transition });
     // transition allongée à 5 s pour la photographier en cours, malgré le rendu logiciel
     await p.evaluate(() => (window as any).__carte.store.setState({ transitionMs: 5000, openRestaurants: [2] }));
-    await p.waitForFunction(() => (window as any).__hicMap.layer.panels.get("r2")?.tex, null, { timeout: 15_000 });
+    await p.waitForFunction(() => (window as any).__hicMap?.layer?.panels.get("r2")?.tex, null, { timeout: 15_000 });
     await p.waitForTimeout(1800);
     await shot(p, `transition-${transition}-hic`);
     const c = await textareaCenter(p, "R03");
@@ -142,7 +142,7 @@ async function main() {
       await p.evaluate(() => (window as any).__carte.store.setState({ openRestaurants: [] }));
       await p.waitForTimeout(500);
       await p.evaluate(() => (window as any).__carte.store.setState({ openRestaurants: [2] }));
-      await p.waitForFunction(() => (window as any).__hicMap.layer.panels.get("r2")?.tex, null, { timeout: 15_000 });
+      await p.waitForFunction(() => (window as any).__hicMap?.layer?.panels.get("r2")?.tex, null, { timeout: 15_000 });
       const c2 = await textareaCenter(p, "R03");
       if (c2) {
         await p.mouse.move(c2.x, c2.y);
@@ -151,7 +151,7 @@ async function main() {
         results.transitionInteractive = {
           focus: await p.evaluate(() => document.activeElement?.getAttribute("data-note")),
           // avancement de la transition au moment du clic (0..1) : preuve que le clic a eu lieu pendant
-          avancement: await p.evaluate(() => { const pn = (window as any).__hicMap.layer.panels.get("r2"); return Math.min(1, (performance.now() - pn.openedAt) / 5000); }),
+          avancement: await p.evaluate(() => { const pn = (window as any).__hicMap?.layer?.panels.get("r2"); return pn ? Math.min(1, (performance.now() - pn.openedAt) / 5000) : 0; }),
         };
       }
     }

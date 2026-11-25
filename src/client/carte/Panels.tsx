@@ -8,36 +8,13 @@
 import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { dispatchCourierAction, reassignCourierAction, saveRestaurantNoteAction, setPausedAction } from "@/app/carte/actions";
 import { COURIERS, RESTAURANTS } from "@/lib/carte/catalog";
+import { THROTTLE_MS, useThrottled } from "../hic3d/useThrottled";
 import { carteStore, couriers, toggleCourier, toggleRestaurant, useCarte, type RestaurantView } from "./store";
 
 export const PANEL_SIZE = { restaurant: { w: 300, h: 236 }, courier: { w: 220, h: 132 } } as const;
-export const THROTTLE_MS = 2000;
 
 /** Points d'accroche par mode (mesure de latence du mode classique). */
 export const panelHooks = { onRestaurantCommit: (_idx: number) => {} };
-
-/** Valeur mise à jour au plus une fois par `ms` (front montant immédiat, puis fin de fenêtre). */
-export function useThrottled<T>(value: T, ms = THROTTLE_MS): T {
-  const [shown, setShown] = useState(value);
-  const last = useRef(0);
-  const pending = useRef<ReturnType<typeof setTimeout>>(undefined);
-  useEffect(() => {
-    if (Object.is(value, shown)) return;
-    const wait = last.current + ms - performance.now();
-    clearTimeout(pending.current);
-    if (wait <= 0) {
-      last.current = performance.now();
-      setShown(value);
-    } else {
-      pending.current = setTimeout(() => {
-        last.current = performance.now();
-        setShown(value);
-      }, wait);
-    }
-    return () => clearTimeout(pending.current);
-  }, [value, shown, ms]);
-  return shown;
-}
 
 const STATUS_LABEL = { ouvert: "Ouvert", achalandé: "Achalandé", pause: "En pause" } as const;
 

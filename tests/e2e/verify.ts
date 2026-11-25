@@ -44,7 +44,7 @@ async function runMode(b: Browser, mode: "dom" | "canvas") {
   const p = await b.newPage({ viewport: { width: 1400, height: 860 } });
   const errors: string[] = [];
   p.on("pageerror", (e) => errors.push(e.message));
-  await p.goto(`${BASE}/?mode=${mode}&n=1000`);
+  await p.goto(`${BASE}/mur?mode=${mode}&n=1000`);
   await wall(p);
   await p.waitForTimeout(1500);
   const st = await state(p);
@@ -127,7 +127,7 @@ async function main() {
   console.log("\n== Chrome sans l'API (--disable-blink-features=CanvasDrawElement)");
   const nf = await chromium.launch({ args: ["--disable-blink-features=CanvasDrawElement"] });
   const p = await nf.newPage();
-  await p.goto(`${BASE}/?mode=canvas`);
+  await p.goto(`${BASE}/mur?mode=canvas`);
   await wall(p);
   await p.waitForTimeout(800);
   const st = await state(p);
@@ -140,7 +140,7 @@ async function main() {
   const b2 = await chromium.launch();
   const ctx = await b2.newContext({ javaScriptEnabled: false });
   const q = await ctx.newPage();
-  await q.goto(`${BASE}/`);
+  await q.goto(`${BASE}/mur`);
   const txt = (await q.locator("aside.overview").textContent()) ?? "";
   check("sans JS : vue d'ensemble SSR (régions, critiques, alertes)", txt.includes("Région Aster") && txt.includes("Critiques") && txt.includes("Indicateurs critiques"));
   await b2.close();
