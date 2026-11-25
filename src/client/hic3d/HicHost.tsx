@@ -73,18 +73,23 @@ export interface HicHostProps {
   layerOptions: Omit<PanelLayerOptions, "setGeometry" | "onRender">;
   onFallback(reason: string): void;
   onLatency?(key: string, ms: number): void;
+  /**
+   * Latence donnée -> pixel comptée seulement pour une surface à l'écran (la couche dessine aussi
+   * les surfaces hors du cadre, que personne ne voit) ; défaut : toutes.
+   */
+  latencyOnScreen?: boolean;
   /** appelé après chaque vérification `readPixels` réussie */
   onActive?(): void;
 }
 
-export function HicHost({ ml, map, metrics, surfaces, layerOptions, onFallback, onLatency, onActive }: HicHostProps) {
+export function HicHost({ ml, map, metrics, surfaces, layerOptions, onFallback, onLatency, latencyOnScreen, onActive }: HicHostProps) {
   const canvas = map.getCanvas() as AnyCanvas;
   const keysSig = surfaces.map((s) => s.key).join("\n");
   const keys = useMemo(() => (keysSig ? keysSig.split("\n") : []), [keysSig]);
   const [ready, setReady] = useState(false);
   const layerRef = useRef<PanelLayer | null>(null);
-  const cb = useRef({ onFallback, onLatency, onActive, layerOptions });
-  cb.current = { onFallback, onLatency, onActive, layerOptions };
+  const cb = useRef({ onFallback, onLatency, onActive, layerOptions, latencyOnScreen });
+  cb.current = { onFallback, onLatency, onActive, layerOptions, latencyOnScreen };
   const specsRef = useRef(new Map<string, SurfaceSpec>());
   const versionsRef = useRef(new Map<string, number>());
   // ensemble sale persistant : une surface repoussée par le budget reste à capturer au paint suivant
@@ -119,6 +124,14 @@ export function HicHost({ ml, map, metrics, surfaces, layerOptions, onFallback, 
       fallback = reason;
       cb.current.onFallback(reason);
     };
+    // surface dont l'emprise projetée (px CSS) recoupe le canvas
+    const onScreen = (p: PanelGpu | undefined) => {
+      if (!p?.proj) return false;
+      const pts = [p.proj.project(0, 0), p.proj.project(p.w, 0), p.proj.project(0, p.h), p.proj.project(p.w, p.h)];
+      const xs = pts.map((q) => q[0]);
+      const ys = pts.map((q) => q[1]);
+      return Math.max(...xs) > 0 && Math.min(...xs) < canvas.clientWidth && Math.max(...ys) > 0 && Math.min(...ys) < canvas.clientHeight;
+    };
     const focusable = (key: string | null | undefined) => (key && specsRef.current.get(key)?.focusable ? key : null);
     const opts = cb.current.layerOptions;
     const layer = new PanelLayer(ml, {
@@ -133,6 +146,7 @@ export function HicHost({ ml, map, metrics, surfaces, layerOptions, onFallback, 
       onRender: (ms, lat) => {
         metrics.addWork(ms);
         for (const l of lat) {
+          if (cb.current.latencyOnScreen && !onScreen(layer.panels.get(l.key))) continue;
           metrics.latency(l.ms);
           cb.current.onLatency?.(l.key, l.ms);
         }

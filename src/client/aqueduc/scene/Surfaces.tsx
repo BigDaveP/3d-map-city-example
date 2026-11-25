@@ -264,5 +264,5 @@ export function SceneSurfaces({ ml, map, metrics, net }: { ml: ML; map: MlMap; m
     ],
     [sectors, incident, tagged, net, showCut, cut, shownAt, shownBy],
   );
-  return <HicHost ml={ml} map={map} metrics={metrics} surfaces={surfaces} layerOptions={options} onFallback={onFallback} onActive={onActive} />;
+  return <HicHost ml={ml} map={map} metrics={metrics} surfaces={surfaces} layerOptions={options} onFallback={onFallback} onActive={onActive} latencyOnScreen />;
 }
