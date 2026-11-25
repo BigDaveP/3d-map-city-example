@@ -57,6 +57,8 @@ html:has(.aq-fatal) .aq-ssr { padding-bottom: 96px; }
 .tr-crumb { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px 4px 8px; border: 1px solid var(--tr-line); border-radius: var(--r-pill); background: var(--tr-surface-2); color: var(--tr-ink); font-weight: 600; white-space: nowrap; }
 .tr-crumb .tr-icon { color: var(--env-aqueduc); }
 .tr-app[data-env="deneigement"] .tr-crumb .tr-icon { color: var(--env-deneigement); }
+a.tr-brand { color: inherit; text-decoration: none; border-radius: var(--r-md); }
+a.tr-brand:hover .tr-brand-name { color: var(--tr-accent); }
 .tr-about { display: inline-grid; place-items: center; flex: none; width: 34px; height: 34px; border: 1px solid var(--tr-line); border-radius: var(--r-md); color: var(--tr-ink-2); background: var(--tr-surface); }
 .tr-about:hover { color: var(--tr-ink); border-color: var(--tr-line-strong); }
 
@@ -82,6 +84,46 @@ html:has(.aq-fatal) .aq-ssr { padding-bottom: 96px; }
 .tr-ssr-nav { display: flex; flex-wrap: wrap; gap: 6px; }
 .tr-ssr-nav a { padding: 4px 10px; border: 1px solid var(--tr-line); border-radius: var(--r-md); color: var(--tr-ink); text-decoration: none; font-weight: 500; }
 .tr-ssr-nav a[aria-current="page"] { background: var(--tr-accent-soft); border-color: var(--tr-accent); color: var(--tr-accent); }
+
+/* ---------------------------------------------------------------- cloche des alertes (référence Shopify) */
+.tr-bell { position: relative; flex: none; }
+.tr-bell-btn { position: relative; display: inline-grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 1px solid var(--tr-line); border-radius: var(--r-md); background: var(--tr-surface); color: var(--tr-ink-2); cursor: pointer; }
+.tr-bell-btn:hover,
+.tr-bell-btn[aria-expanded="true"] { color: var(--tr-ink); border-color: var(--tr-line-strong); }
+.tr-bell-btn[aria-expanded="true"] { background: var(--tr-surface-2); }
+/* pastille : nombre d'alertes, couleur de la plus grave (texte blanc ≥ 4,5:1) */
+.tr-bell-count { position: absolute; top: -7px; right: -8px; min-width: 19px; height: 19px; padding: 0 5px; border: 2px solid var(--tr-chrome); border-radius: var(--r-pill); background: var(--sev-info-text); color: #fff; font: 700 10.5px/15px var(--tr-font); text-align: center; }
+.tr-bell-btn[data-sev="critique"] .tr-bell-count { background: var(--sev-critique-text); }
+.tr-bell-btn[data-sev="attention"] .tr-bell-count { background: var(--sev-attention-text); }
+.tr-bell-pop { position: absolute; right: 0; top: calc(100% + 8px); z-index: 40; display: flex; flex-direction: column; width: min(400px, calc(100vw - 20px)); max-height: min(540px, calc(100dvh - 90px)); overflow: hidden; background: var(--tr-surface); border: 1px solid var(--tr-line); border-radius: 14px; box-shadow: var(--shadow-pop); font-size: var(--tr-text-md); color: var(--tr-ink); text-align: left; }
+.tr-bell-pop:focus { outline: none; }
+.tr-bell-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 14px 8px; }
+.tr-bell-h h2 { margin: 0; font-size: 14px; font-weight: 650; letter-spacing: -0.005em; }
+.tr-sim { font-size: var(--tr-text-xs); font-weight: 600; color: var(--state-simulated); background: var(--state-simulated-soft); border-radius: var(--r-pill); padding: 2px 8px; white-space: nowrap; }
+.tr-bell-sum { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0 14px 10px; border-bottom: 1px solid var(--tr-line); }
+.tr-sev-chip { display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px 2px 7px; border-radius: var(--r-pill); font-size: 11.5px; font-weight: 600; }
+.tr-sev-chip[data-sev="critique"] { background: var(--sev-critique-soft); color: var(--sev-critique-text); }
+.tr-sev-chip[data-sev="attention"] { background: var(--sev-attention-soft); color: var(--sev-attention-text); }
+.tr-sev-chip[data-sev="info"] { background: var(--sev-info-soft); color: var(--sev-info-text); }
+.tr-sev-chip .tr-sev-i { color: currentColor; }
+.tr-sev-i { flex: none; }
+.tr-sev-i[data-sev="critique"] { color: var(--sev-critique); }
+.tr-sev-i[data-sev="attention"] { color: var(--sev-attention); }
+.tr-sev-i[data-sev="info"] { color: var(--sev-info); }
+.tr-bell-list { margin: 0; padding: 6px; overflow: auto; list-style: none; }
+a.tr-bell-item { display: grid; grid-template-columns: 18px 1fr; gap: 10px; padding: 9px 10px; border-radius: 10px; color: var(--tr-ink); text-decoration: none; }
+a.tr-bell-item .tr-sev-i { margin-top: 1px; }
+a.tr-bell-item:hover { background: var(--tr-surface-2); }
+a.tr-bell-item:focus-visible { background: var(--tr-accent-soft); outline: 2px solid var(--tr-focus); outline-offset: -2px; }
+.tr-bell-t { display: grid; gap: 2px; min-width: 0; }
+.tr-bell-t b { font-size: 13px; font-weight: 600; line-height: 1.3; }
+.tr-bell-d { font-size: 12px; line-height: 1.4; color: var(--tr-ink-2); }
+.tr-bell-m { display: inline-flex; align-items: center; gap: 5px; margin-top: 2px; font-size: 11.5px; color: var(--tr-ink-2); }
+.tr-bell-go { color: var(--tr-accent); font-weight: 600; }
+.tr-bell-empty { margin: 0; padding: 18px 14px; color: var(--tr-ink-2); font-size: 12.5px; }
+.tr-bell-f { margin: 0; padding: 10px 14px; border-top: 1px solid var(--tr-line); font-size: 12.5px; }
+.tr-bell-f a { color: var(--tr-accent); font-weight: 600; text-decoration: none; }
+.tr-bell-f a:hover { text-decoration: underline; }
 
 /* ---------------------------------------------------------------- bandeau « sans l'API » */
 /* dans le flux, entre la barre et la carte : ne recouvre ni les commandes ni l'attribution */
@@ -202,8 +244,11 @@ html:has(.aq-fatal) .aq-ssr { padding-bottom: 96px; }
   .aq-app { --aq-gap: 10px; --tr-switcher-h: 44px; }
   .tr-brand-name { font-size: 13px; }
   .tr-crumb { display: none; }
-  /* seconde ligne : la recherche et « À propos » */
+  /* seconde ligne : la recherche, la cloche et « À propos » ; le menu des alertes prend la largeur */
+  .tr-bell,
   .tr-about { order: 11; }
+  .tr-bell { position: static; }
+  .tr-bell-pop { left: 10px; right: 10px; top: calc(100% + 6px); width: auto; }
   .aq-search { flex: 1 1 0; }
   .tr-envpanel { width: auto; min-width: 150px; max-width: calc(100% - 2 * var(--aq-gap) - var(--tr-switcher-h) - 8px); }
   /* sélecteur en haut à droite (Plans, komoot), vignette seule ; masqué pendant le récit, qui prend le haut */

@@ -1,8 +1,9 @@
 "use client";
 /**
- * Barre d'application commune : nom de l'outil et mention « Démo », environnement courant, recherche
- * (secteurs, zones, conduites, capteurs, ressources, rues des tuiles chargées), bascule Classique /
- * HTML-in-Canvas et lien « À propos ». Les indicateurs de performance n'y sont pas.
+ * Barre d'application commune : nom de l'outil et mention « Démo » (lien vers l'accueil),
+ * environnement courant, recherche (secteurs, zones, conduites, capteurs, ressources, rues des tuiles
+ * chargées), bascule Classique / HTML-in-Canvas, cloche des alertes et lien « À propos ». Les
+ * indicateurs de performance n'y sont pas.
  *
  * La recherche est une liste déroulante accessible (combobox ARIA) : flèches, Entrée, Échap. Un
  * résultat d'un autre environnement y mène (navigation côté client) et le met en avant (`focus`).
@@ -12,10 +13,12 @@ import { useRouter } from "next/navigation";
 import { useId, useMemo, useState, type FormEvent, type KeyboardEvent } from "react";
 import type { Map as MlMap } from "maplibre-gl";
 import { ENVS, type EnvId } from "@/lib/territoire/envs";
+import { hourLabel } from "@/lib/territoire/home";
 import { fold, staticHits, type SearchHit } from "@/lib/territoire/search";
 import { loadedModules } from "../modules";
 import { setFocus, territoireStore, type Mode } from "../store";
-import { useTerritoire } from "../useTerritoire";
+import { useLiveAlerts, useTerritoire } from "../useTerritoire";
+import { AlertBell } from "./AlertBell";
 import { BrandMark, EnvIcon } from "./EnvIcon";
 
 interface Hit {
@@ -159,6 +162,13 @@ function Search({ map, env }: { map: MlMap | null; env: EnvId | null }) {
   );
 }
 
+/** Cloche des vues 3D : alertes à l'heure simulée, avec les décisions du visiteur ; liens gardant `?mode`. */
+function LiveBell({ env }: { env: EnvId | null }) {
+  const alerts = useLiveAlerts();
+  const items = alerts.map((a) => ({ ...a, time: hourLabel(a.at), href: `/carte/${a.env}${location.search}` }));
+  return <AlertBell alerts={items} current={env} />;
+}
+
 export function AppBar({ map, env }: { map: MlMap | null; env: EnvId | null }) {
   const mode = useTerritoire((s) => s.mode);
   const api = useTerritoire((s) => s.api);
@@ -167,7 +177,7 @@ export function AppBar({ map, env }: { map: MlMap | null; env: EnvId | null }) {
   const setMode = (m: Mode) => territoireStore.setState(m === "hic" ? { mode: m, fallback: "" } : { mode: m });
   return (
     <header className="aq-bar">
-      <span className="tr-brand">
+      <Link href="/" className="tr-brand" title="Vue d'ensemble de la ville">
         <BrandMark />
         <span className="tr-brand-name">
           Territoire <span className="tr-brand-city">· Trois-Rivières</span>
@@ -175,7 +185,8 @@ export function AppBar({ map, env }: { map: MlMap | null; env: EnvId | null }) {
         <span className="tr-badge" title="Démo non officielle : données ouvertes réelles et données simulées.">
           Démo
         </span>
-      </span>
+        <span className="aq-sr"> : vue d&apos;ensemble</span>
+      </Link>
       {env && (
         <span className="tr-crumb">
           <EnvIcon env={env} size={16} />
@@ -199,7 +210,8 @@ export function AppBar({ map, env }: { map: MlMap | null; env: EnvId | null }) {
           HTML-in-Canvas
         </button>
       </div>
-      <Link href="/a-propos" prefetch={false} className="tr-about" aria-label="À propos de la démo" title="À propos">
+      <LiveBell env={env} />
+      <Link href="/a-propos" className="tr-about" aria-label="À propos de la démo" title="À propos">
         <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
           <circle cx="10" cy="10" r="7.5" />
           <path d="M10 9v4.5M10 6.4v.1" strokeLinecap="round" />

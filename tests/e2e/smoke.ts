@@ -6,7 +6,8 @@
  *   SHOT_SCENARIO_HIC / SHOT_SCENARIO_CLASSIC=chemin.png : étape 2 du scénario (isolation, coupe) ;
  *   SHOT_UNDERGROUND=chemin.png : vue souterraine (HTML-in-Canvas) sur le tronçon 13C1949 ;
  *   SHOT_NOAPI / SHOT_BAR_1440 / SHOT_BAR_1024=chemin.png : bandeau sans l'API, barre à 1440 et 1024 px ;
- *   SHOT_SWITCHER=chemin.png : sélecteur d'environnement ouvert (HTML-in-Canvas).
+ *   SHOT_SWITCHER=chemin.png : sélecteur d'environnement ouvert (HTML-in-Canvas) ;
+ *   SHOT_HOME / SHOT_BELL / SHOT_ABOUT=chemin.png : accueil à 14:05, cloche ouverte, « À propos ».
  * Chaque page de l'application a son horloge épinglée à 12:00 de la journée de référence
  * (`pin`) : les vérifications ne dépendent pas de l'heure du lancement.
  * Sortie : une ligne OK/ÉCHEC par point de contrôle ; code de sortie 1 si un échec.
@@ -111,11 +112,12 @@ async function ssrWithoutJs(b: Browser) {
   await ctx.close();
 }
 
-/** Routes : `/` mène à l'aqueduc (en attendant l'accueil), un environnement inconnu répond 404, un environnement du lot 2 renvoie à `/`. */
+/** Routes : `/` est l'accueil (?mode transmis aux liens des vues 3D), un environnement inconnu répond 404, un environnement du lot 2 renvoie à `/`. */
 async function routes() {
-  console.log("\n== routes de /carte");
+  console.log("\n== routes");
   const root = await fetch(`${BASE}/?mode=hic`, { redirect: "manual" });
-  check("/ → redirection temporaire vers /carte/aqueduc (mode gardé)", root.status === 307 && root.headers.get("location") === "/carte/aqueduc?mode=hic", `${root.status} ${root.headers.get("location")}`);
+  const html = await root.text();
+  check("/ → 200 (accueil), ?mode=hic transmis aux liens des vues 3D", root.status === 200 && html.includes('href="/carte/aqueduc?mode=hic"') && html.includes('href="/carte/deneigement?mode=hic"'), String(root.status));
   const unknown = await fetch(`${BASE}/carte/inconnu`, { redirect: "manual" });
   check("/carte/inconnu → 404", unknown.status === 404, String(unknown.status));
   const soon = await fetch(`${BASE}/carte/collecte`, { redirect: "manual" });
@@ -996,20 +998,190 @@ async function fallbackNote(b: Browser) {
   await ctx.close();
 }
 
+/** Heure de la journée de référence (`SCENARIO_DAY`) placée sur l'horloge commune, ×1. */
+async function setClock(p: Page, at: number) {
+  await p.waitForFunction(() => (window as any).__territoire?.store, null, { timeout: 45_000 });
+  await p.evaluate((t) => (window as any).__territoire.store.setState({ clock: { t0: t, speed: 1, startedAt: Date.now() } }), at);
+}
+
+/** Accueil sans JavaScript : avertissement, alertes (ou « Aucune alerte »), environnements, météo, pied. */
+async function homeWithoutJs(b: Browser) {
+  console.log("\n== / (accueil) sans JavaScript");
+  const ctx = await b.newContext({ javaScriptEnabled: false, viewport: { width: 1280, height: 800 } });
+  const p = await ctx.newPage();
+  const res = await p.goto(`${BASE}/`);
+  const text = await p.locator("body").innerText();
+  check("statut 200, titre « Vue d'ensemble »", res?.status() === 200 && (await p.locator("h1").innerText()).startsWith("Vue d'ensemble · "), `${res?.status()} ${await p.locator("h1").innerText()}`);
+  check("« Démo non officielle » et « Simulation »", text.includes("Démo non officielle") && text.includes("Simulation"));
+  const alerts = await p.locator(".tr-alert").count();
+  check("au moins une alerte, ou « Aucune alerte »", alerts > 0 || text.includes("Aucune alerte"), `${alerts} alerte(s)`);
+  const cards = await p.locator(".tr-envcard").evaluateAll((els) => els.map((e) => ({ env: e.getAttribute("data-env"), href: e.querySelector("a")?.getAttribute("href") ?? null })));
+  check(
+    "5 environnements dans l'ordre ; seuls Aqueduc et Déneigement mènent à leur vue",
+    JSON.stringify(cards) === JSON.stringify([
+      { env: "aqueduc", href: "/carte/aqueduc" },
+      { env: "deneigement", href: "/carte/deneigement" },
+      { env: "collecte", href: null },
+      { env: "zonage", href: null },
+      { env: "evaluation", href: null },
+    ]),
+    JSON.stringify(cards),
+  );
+  check("« À venir » : 3 prochains événements", (await p.locator(".tr-next-list li").count()) === 3);
+  check("météo (ou « Météo indisponible ») avec son attribution", /Météo : Environnement et Changement climatique Canada/.test(text) && (/°C/.test(text) || text.includes("Météo indisponible")));
+  check("pied : « Démo non officielle · données ouvertes CC-BY 4.0 · À propos »", (await p.locator(".tr-home-foot").innerText()).includes("Démo non officielle · données ouvertes CC-BY 4.0 · À propos") && (await p.locator('.tr-home-foot a[href="/a-propos"]').count()) === 1);
+  await ctx.close();
+}
+
+/**
+ * Accueil avec JavaScript : l'îlot suit l'horloge commune (placée à 14:05) ; cloche au clavier ;
+ * « Ouvrir » sur le bris mène à /carte/aqueduc, sans rechargement, avec l'incident sélectionné.
+ */
+async function homeJs(b: Browser) {
+  console.log("\n== / (accueil) avec JavaScript : horloge à 14:05, cloche, « Ouvrir » le bris");
+  const ctx = await b.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
+  const p = await ctx.newPage();
+  const errors = collectErrors(p);
+  await p.goto(`${BASE}/?mode=classic`);
+  await setClock(p, atHour(SCENARIO_DAY, "14:05"));
+  await p.evaluate(() => ((window as any).__noReload = true));
+  const brisRow = p.locator(".tr-alert", { hasText: "Bris de conduite 13C1949" });
+  const shown = await brisRow.waitFor({ timeout: 5_000 }).then(() => true).catch(() => false);
+  const stamp = await p.locator(".tr-home-stamp").innerText();
+  check("îlot recalculé à l'heure simulée : « mardi 24 nov., 14 h 05 », bris critique en tête", shown && stamp === "mardi 24 nov., 14 h 05" && (await p.locator(".tr-alert").first().getAttribute("data-sev")) === "critique", stamp);
+  check("carte de l'aqueduc : « 1 bris non isolé »", (await p.locator('.tr-envcard[data-env="aqueduc"] .tr-status').innerText()).includes("1 bris non isolé"));
+  if (process.env.SHOT_HOME) {
+    await p.screenshot({ path: process.env.SHOT_HOME, fullPage: true });
+    console.log(`capture : ${process.env.SHOT_HOME}`);
+  }
+
+  // cloche : nom accessible, clavier, Échap et retour du focus
+  const bell = p.locator(".tr-bell-btn");
+  const label = (await bell.getAttribute("aria-label")) ?? "";
+  check("cloche : nombre d'alertes et gravité dans le nom accessible", /^Alertes : \d+ actives? \(.*1 critique/.test(label) && (await bell.getAttribute("aria-expanded")) === "false", label);
+  await bell.focus();
+  await p.keyboard.press("Enter");
+  const pop = p.getByRole("dialog", { name: "Alertes" });
+  await pop.waitFor({ timeout: 5_000 }).catch(() => {});
+  const first = await p.evaluate(() => document.activeElement?.classList.contains("tr-bell-item") && document.activeElement.textContent);
+  check("ouverture : menu « Alertes » (dialog), aria-expanded, focus sur la première alerte", (await pop.count()) === 1 && (await bell.getAttribute("aria-expanded")) === "true" && typeof first === "string" && first.includes("Bris de conduite"), String(first));
+  if (process.env.SHOT_BELL) {
+    await p.screenshot({ path: process.env.SHOT_BELL });
+    console.log(`capture : ${process.env.SHOT_BELL}`);
+  }
+  const n = await pop.locator(".tr-bell-item").count();
+  await p.keyboard.press("ArrowUp");
+  const last = await p.evaluate(() => [...document.querySelectorAll(".tr-bell-item")].indexOf(document.activeElement as Element));
+  check("flèche haut depuis la première : dernière alerte", last === n - 1, `${last} / ${n}`);
+  await p.keyboard.press("Escape");
+  check("Échap : menu refermé, focus rendu à la cloche", (await pop.count()) === 0 && (await p.evaluate(() => !!document.activeElement?.classList.contains("tr-bell-btn"))));
+
+  // « Ouvrir » le bris : même horloge (pas de rechargement), incident sélectionné, focus consommé
+  await brisRow.getByRole("link", { name: /Ouvrir/ }).click();
+  const moved = await p.waitForURL("**/carte/aqueduc?mode=classic", { timeout: 10_000 }).then(() => true).catch(() => false);
+  await p.waitForFunction(() => (window as any).__aqueduc?.store.getState().selection, null, { timeout: 45_000 }).catch(() => {});
+  const st = await p.evaluate(() => {
+    const w = window as any;
+    return { sel: w.__aqueduc?.store.getState().selection, incident: !!w.__aqueduc?.store.getState().incident, focus: w.__territoire?.store.getState().focus, noReload: w.__noReload === true, mode: w.__territoire?.store.getState().mode };
+  });
+  const insp = await p.locator("[data-testid=inspector]").innerText({ timeout: 10_000 }).catch(() => "");
+  check(
+    "→ /carte/aqueduc?mode=classic sans rechargement, incident 13C1949 sélectionné (fiche ouverte), focus consommé",
+    moved && st.noReload && st.mode === "classic" && st.sel?.kind === "incident" && st.sel?.id === "13C1949" && st.incident && st.focus === null && insp.includes("13C1949"),
+    `${p.url()} ${JSON.stringify(st)}`,
+  );
+  const clock = await p.evaluate(() => (window as any).__territoire.store.getState().clock.t0);
+  check("horloge commune gardée (14:05)", localTime(clock) === "14:05", localTime(clock));
+  check("aucune erreur console (hydratation comprise)", errors.length === 0, errors.join(" | "));
+  await ctx.close();
+}
+
+/**
+ * Cloche dans une vue 3D : une alerte d'un autre environnement y mène et met l'objet en avant ;
+ * un focus du déneigement (recherche) ne reste pas après l'arrivée.
+ */
+async function bellInScene(b: Browser) {
+  console.log("\n== cloche dans une vue 3D, focus de l'environnement visé seulement");
+  const ctx = await b.newContext({ viewport: { width: 1440, height: 860 }, deviceScaleFactor: 1 });
+  const p = await ctx.newPage();
+  const errors = collectErrors(p);
+  await p.goto(`${BASE}/carte/deneigement?mode=classic`);
+  await p.locator(".tr-envpanel h2", { hasText: "Déneigement" }).waitFor({ timeout: 45_000 }).catch(() => {});
+  await setClock(p, atHour(SCENARIO_DAY, "14:05"));
+  await p.waitForTimeout(1200);
+  await p.locator(".tr-bell-btn").click();
+  const item = p.locator(".tr-bell-item", { hasText: "Bris de conduite 13C1949" });
+  const listed = await item.waitFor({ timeout: 5_000 }).then(() => true).catch(() => false);
+  check("depuis le déneigement : la cloche liste le bris de l'aqueduc", listed);
+  await item.click();
+  await p.waitForURL("**/carte/aqueduc?mode=classic", { timeout: 10_000 }).catch(() => {});
+  await p.waitForFunction(() => (window as any).__aqueduc?.store.getState().selection, null, { timeout: 20_000 }).catch(() => {});
+  const st = await p.evaluate(() => ({ sel: (window as any).__aqueduc?.store.getState().selection, focus: (window as any).__territoire.store.getState().focus }));
+  check("→ /carte/aqueduc, incident sélectionné, focus consommé", new URL(p.url()).pathname === AQ && st.sel?.kind === "incident" && st.sel?.id === "13C1949" && st.focus === null, JSON.stringify(st));
+  // même environnement : la cloche sélectionne sans naviguer
+  await p.evaluate(() => (window as any).__aqueduc.store.setState({ selection: null }));
+  await p.locator(".tr-bell-btn").click();
+  await p.locator(".tr-bell-item", { hasText: "Bris de conduite" }).click();
+  await p.waitForTimeout(300);
+  const same = await p.evaluate(() => ({ sel: (window as any).__aqueduc?.store.getState().selection, focus: (window as any).__territoire.store.getState().focus }));
+  check("dans l'aqueduc : l'alerte sélectionne l'incident sans changer d'URL", new URL(p.url()).pathname === AQ && same.sel?.kind === "incident" && same.focus === null, JSON.stringify(same));
+  // recherche d'une zone du déneigement : le focus est consommé à l'arrivée (rien ne traîne)
+  await p.locator(".aq-search input").fill("Zone A");
+  await p.keyboard.press("ArrowDown");
+  await p.keyboard.press("Enter");
+  await p.waitForURL("**/carte/deneigement**", { timeout: 10_000 }).catch(() => {});
+  await p.locator(".tr-envpanel h2", { hasText: "Déneigement" }).waitFor({ timeout: 10_000 }).catch(() => {});
+  await p.waitForTimeout(300);
+  const f = await p.evaluate(() => (window as any).__territoire.store.getState().focus);
+  check("recherche « Zone A » : arrivée au déneigement, focus effacé", new URL(p.url()).pathname === "/carte/deneigement" && f === null, JSON.stringify(f));
+  check("aucune erreur console", errors.length === 0, errors.join(" | "));
+  await ctx.close();
+}
+
+/** « À propos » : phrase « non officielle », quatre lignes de licence, sources, lien vers le banc. */
+async function aboutPage(b: Browser) {
+  console.log("\n== /a-propos");
+  const ctx = await b.newContext({ javaScriptEnabled: false, viewport: { width: 1280, height: 800 } });
+  const p = await ctx.newPage();
+  const res = await p.goto(`${BASE}/a-propos`);
+  const text = await p.locator("body").innerText();
+  check("statut 200", res?.status() === 200, String(res?.status()));
+  check("phrase « non officielle » mot pour mot", text.includes("Démo non officielle. Ni la Ville de Trois-Rivières ni aucune autre municipalité n'a produit, vérifié ou approuvé cette démo."));
+  const lines = [
+    "Conduites : Ville de Trois-Rivières, Données Québec, CC-BY 4.0",
+    "Zones de stationnement de nuit : Ville de Trois-Rivières, Données Québec, CC-BY 4.0",
+    "Météo : Environnement et Changement climatique Canada (Licence du gouvernement ouvert – Canada)",
+    "Fond de carte : OpenFreeMap / OpenMapTiles / OpenStreetMap",
+  ];
+  check("les quatre lignes de licence", lines.every((l) => text.includes(l)), lines.filter((l) => !text.includes(l)).join(" | "));
+  check("tableau des sources : 4 jeux, éditeur, licence et lien", (await p.locator(".tr-table").first().locator("tbody tr").count()) === 4 && (await p.locator('a[href^="https://www.donneesquebec.ca/"]').count()) === 2);
+  check("réel et simulé pour les 5 environnements ; constantes 10 h 00 et 15 h 00", (await p.locator("tr[data-env]").count()) === 5 && text.includes("10 h 00") && text.includes("15 h 00"));
+  check("lien vers le banc (/bench) et retour à l'accueil", (await p.locator('main a[href="/bench"]').count()) === 1 && (await p.locator('a[href="/"]').count()) >= 1);
+  if (process.env.SHOT_ABOUT) {
+    await p.screenshot({ path: process.env.SHOT_ABOUT, fullPage: true });
+    console.log(`capture : ${process.env.SHOT_ABOUT}`);
+  }
+  await ctx.close();
+}
+
 async function benchPage() {
   console.log("\n== /bench");
   const r = await fetch(`${BASE}/bench`);
   check("/bench → 200", r.status === 200, String(r.status));
   const html = await r.text();
-  check("/bench : section « Réseau d'eau » (ancre #aqueduc) et lien de retour vers la démo", html.includes('id="aqueduc"') && /<nav[^>]*>.*?<a[^>]*href="\/"/s.test(html));
+  check("/bench : section « Réseau d'eau » (ancre #aqueduc) et lien de retour vers l'accueil (/)", html.includes('id="aqueduc"') && /<nav[^>]*>.*?<a[^>]*href="\/"/s.test(html));
   const csv = await fetch(`${BASE}/bench/aqueduc.csv`);
   check("/bench/aqueduc.csv → 200", csv.status === 200, String(csv.status));
 }
 
 const b = await chromium.launch();
 try {
+  await homeWithoutJs(b);
+  await homeJs(b);
+  await aboutPage(b);
   await ssrWithoutJs(b);
   await routes();
+  await bellInScene(b);
   await envSwitch(b);
   await narrow(b, false);
   await narrow(b, true);

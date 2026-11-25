@@ -26,24 +26,23 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   return { title: `${ENVS[env].title} · Territoire · Trois-Rivières`, description: ENVS[env].blurb };
 }
 
-/** Barre du rendu serveur : le nom de l'outil, les environnements et « À propos », en liens ordinaires. */
+/** Barre du rendu serveur : le nom de l'outil, les environnements, l'accueil et « À propos », en liens ordinaires. */
 function SsrBar({ env }: { env: EnvId }) {
   return (
     <header className="aq-bar aq-ssr-bar">
-      <span className="tr-brand">
+      <Link href="/" className="tr-brand">
         <BrandMark />
         <span className="tr-brand-name">Territoire · Trois-Rivières</span>
         <span className="tr-badge">Démo</span>
-      </span>
+      </Link>
       <nav className="tr-ssr-nav" aria-label="Environnements">
         {LOT1_ENVS.map((id) => (
           <Link key={id} href={`/carte/${id}`} aria-current={id === env ? "page" : undefined}>
             {ENVS[id].title}
           </Link>
         ))}
-        <Link href="/a-propos" prefetch={false}>
-          À propos
-        </Link>
+        <Link href="/">Vue d&apos;ensemble</Link>
+        <Link href="/a-propos">À propos</Link>
       </nav>
       <span className="aq-sim">Simulation</span>
     </header>

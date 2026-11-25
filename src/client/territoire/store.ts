@@ -98,3 +98,24 @@ export function undoLast(kind: EnvAction["kind"], now = Date.now()): EnvAction |
 export function setFocus(focus: Focus) {
   territoireStore.setState({ focus });
 }
+
+let forecastLoad: Promise<void> | null = null;
+
+/**
+ * Prévision d'Environnement Canada (`/api/territoire/meteo`), chargée une fois par page si personne
+ * ne l'a encore fournie (l'accueil la donne déjà, rendue par le serveur). Échec : null, la démo
+ * continue avec la neige simulée.
+ */
+export function loadForecast(): Promise<void> {
+  if (territoireStore.getState().forecast !== "chargement") return Promise.resolve();
+  forecastLoad ??= fetch("/api/territoire/meteo")
+    .then((r) => (r.ok ? (r.json() as Promise<{ forecast: Forecast | null }>) : { forecast: null }))
+    .then(
+      (body) => body.forecast ?? null,
+      () => null,
+    )
+    .then((forecast) => {
+      if (territoireStore.getState().forecast === "chargement") territoireStore.setState({ forecast });
+    });
+  return forecastLoad;
+}
