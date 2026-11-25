@@ -737,6 +737,8 @@ async function withoutApi() {
       for (let i = 0; i < 4; i++) await p.keyboard.press("Tab");
       check("Tab reste dans le dialogue", await p.evaluate(() => !!document.querySelector("dialog.aq-noapi-video")?.contains(document.activeElement)));
       await p.keyboard.press("Escape");
+      // le dialogue se ferme aussitôt ; la vidéo est retirée au rendu React qui suit (jusqu'à ~150 ms)
+      await p.locator("video[controls]").waitFor({ state: "detached", timeout: 2_000 }).catch(() => {});
       check("Échap referme la vidéo", (await p.locator("video[controls]").count()) === 0);
       check("le focus revient au bouton d'ouverture", await p.evaluate(() => document.activeElement?.textContent === "Voir la version HTML-in-Canvas en vidéo"));
     }
