@@ -16,8 +16,8 @@ import { homeSnapshot, type HomeSnapshot, type Mode } from "@/lib/territoire/hom
 import type { Forecast } from "@/lib/territoire/meteo";
 import { AlertBell } from "../shell/AlertBell";
 import { BrandMark } from "../shell/EnvIcon";
-import { territoireStore } from "../store";
-import { useHydrated, useSimNow, useTerritoire } from "../useTerritoire";
+import { offerForecast, territoireStore } from "../store";
+import { useForecastRefresh, useHydrated, useSimNow, useTerritoire } from "../useTerritoire";
 import { AlertsPanel } from "./AlertsPanel";
 import { EnvCard } from "./EnvCard";
 
@@ -53,10 +53,11 @@ export function Home({ snapshot, forecast, mode, weather }: { snapshot: HomeSnap
   const stored = useTerritoire((s) => s.forecast);
   const speed = useTerritoire((s) => s.clock.speed);
 
-  // la prévision lue par le serveur sert aussi aux vues 3D (pas de second appel)
-  useEffect(() => {
-    if (territoireStore.getState().forecast === "chargement") territoireStore.setState({ forecast });
-  }, [forecast]);
+  // la prévision lue par le serveur sert aussi aux vues 3D (pas de second appel) ; plus récente que
+  // celle du store (visite précédente), elle la remplace. Déclaré avant le rafraîchissement : il voit
+  // donc la prévision du serveur et ne redemande rien avant 10 minutes.
+  useEffect(() => offerForecast(forecast), [forecast]);
+  useForecastRefresh();
 
   // pilotage des vérifications : l'horloge commune est réglable dès l'accueil (pas de carte ici)
   useEffect(() => {
@@ -74,6 +75,7 @@ export function Home({ snapshot, forecast, mode, weather }: { snapshot: HomeSnap
     };
   }, []);
 
+  // avant l'effet ci-dessus (premier rendu après une navigation), le store peut encore se charger
   const snap = hydrated ? homeSnapshot(t, actions, stored === "chargement" ? forecast : stored, mode) : snapshot;
   return (
     <div className="tr-home">

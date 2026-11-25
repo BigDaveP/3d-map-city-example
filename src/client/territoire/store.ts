@@ -33,6 +33,8 @@ export interface TerritoireState {
   env: EnvId | null;
   /** prévision d'Environnement Canada ; null si indisponible */
   forecast: Forecast | null | "chargement";
+  /** instant (horloge réelle) où `forecast` a été obtenue ; 0 tant qu'elle se charge */
+  forecastAt: number;
   focus: Focus;
 }
 
@@ -47,6 +49,7 @@ const initial = (): TerritoireState => {
     actions: [],
     env: null,
     forecast: "chargement",
+    forecastAt: 0,
     focus: null,
   };
 };
@@ -109,23 +112,64 @@ export function setFocus(focus: Focus) {
   territoireStore.setState({ focus });
 }
 
-let forecastLoad: Promise<void> | null = null;
+/** La prévision lue est rafraîchie au-delà de 10 minutes (le serveur la garde 30 minutes). */
+export const FORECAST_TTL_MS = 10 * 60_000;
+/** Délai avant un nouvel essai après un échec (« Météo indisponible »). */
+export const FORECAST_RETRY_MS = 30_000;
+
+/** Prévision connue, ou null (indisponible ou pas encore chargée). */
+export const forecastOf = (s: Pick<TerritoireState, "forecast">): Forecast | null => (s.forecast === "chargement" ? null : s.forecast);
+
+/** Range une prévision obtenue à l'instant `at` (horloge réelle). */
+export function setForecast(forecast: Forecast | null, at = Date.now()) {
+  territoireStore.setState({ forecast, forecastAt: at });
+}
+
+const issued = (f: Forecast) => Date.parse(f.issuedAt) || 0;
 
 /**
- * Prévision d'Environnement Canada (`/api/territoire/meteo`), chargée une fois par page si personne
- * ne l'a encore fournie (l'accueil la donne déjà, rendue par le serveur). Échec : null, la démo
- * continue avec la neige simulée.
+ * Prévision rendue par le serveur (accueil) : elle remplace celle du store si elle est plus récente
+ * (publiée plus tard), ou si le store n'a rien de mieux (chargement, indisponible). Une prévision
+ * réelle déjà là n'est pas remplacée par l'échec du serveur.
  */
-export function loadForecast(): Promise<void> {
-  if (territoireStore.getState().forecast !== "chargement") return Promise.resolve();
-  forecastLoad ??= fetch("/api/territoire/meteo")
+export function offerForecast(forecast: Forecast | null, at = Date.now()) {
+  const cur = territoireStore.getState().forecast;
+  if (cur === "chargement" || (forecast !== null && (cur === null || issued(forecast) > issued(cur)))) setForecast(forecast, at);
+}
+
+let forecastLoad: Promise<void> | null = null;
+let forecastTriedAt = -Infinity;
+
+/** Faut-il (re)demander la prévision à l'instant `now` ? */
+export function forecastDue(now = Date.now()): boolean {
+  const { forecast, forecastAt } = territoireStore.getState();
+  if (forecast === "chargement") return true;
+  if (now - forecastTriedAt < FORECAST_RETRY_MS) return false;
+  return forecast === null ? now - forecastAt >= FORECAST_RETRY_MS : now - forecastAt >= FORECAST_TTL_MS;
+}
+
+/**
+ * Prévision d'Environnement Canada (`/api/territoire/meteo`), demandée quand elle manque, quand le
+ * dernier essai a échoué (après `FORECAST_RETRY_MS`) ou quand elle a plus de `FORECAST_TTL_MS` ;
+ * `force` (bouton « Réessayer ») ignore ces délais. Une seule requête à la fois. Échec : null si on
+ * n'avait rien (« Météo indisponible », la démo continue avec la neige simulée), sinon la prévision
+ * précédente reste, réessayée plus tard.
+ */
+export function loadForecast({ force = false, now = Date.now() }: { force?: boolean; now?: number } = {}): Promise<void> {
+  if (forecastLoad) return forecastLoad;
+  if (!force && !forecastDue(now)) return Promise.resolve();
+  forecastTriedAt = now;
+  forecastLoad = fetch("/api/territoire/meteo", { cache: "no-store" })
     .then((r) => (r.ok ? (r.json() as Promise<{ forecast: Forecast | null }>) : { forecast: null }))
     .then(
       (body) => body.forecast ?? null,
       () => null,
     )
     .then((forecast) => {
-      if (territoireStore.getState().forecast === "chargement") territoireStore.setState({ forecast });
+      if (forecast !== null || forecastOf(territoireStore.getState()) === null) setForecast(forecast, now);
+    })
+    .finally(() => {
+      forecastLoad = null;
     });
   return forecastLoad;
 }

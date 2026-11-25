@@ -5,7 +5,8 @@ import { actionsUpTo, atHour, dayStartOf } from "../src/lib/territoire/day";
 import { aqueducStore, currentIncident, isolatedAt } from "../src/client/aqueduc/store";
 import { closeValves, exploreFreely, startScenario } from "../src/client/aqueduc/scenarioController";
 import { attachScenario, syncIncident } from "../src/client/aqueduc/scenarioSync";
-import { act, backToNow, seek, setFocus, setSpeed, simNow, territoireStore, undoLast } from "../src/client/territoire/store";
+import { act, backToNow, FORECAST_RETRY_MS, FORECAST_TTL_MS, forecastOf, loadForecast, offerForecast, seek, setFocus, setSpeed, simNow, territoireStore, undoLast } from "../src/client/territoire/store";
+import type { Forecast } from "../src/lib/territoire/meteo";
 
 /** 3 décembre 2026, minuit heure de l'Est : une autre journée que celle des tests de l'aqueduc. */
 const DAY = Date.UTC(2026, 11, 3, 5, 0);
@@ -153,4 +154,89 @@ test("scénario guidé sur la journée simulée : détection à 14:01, isolation
   // la décision du visiteur reste dans la ville
   assert.equal(territoireStore.getState().actions.length, 1);
   detach();
+});
+
+const fc = (issuedAt: string): Forecast => ({ source: "eccc", issuedAt, current: { tempC: -3, condition: "Neige" }, periods: [], hourly: [], warnings: [] });
+
+/** `fetch` simulé : réponses données dans l'ordre (statut 500 → `null`), appels comptés. */
+function stubFetch(replies: (Forecast | null | "500")[]) {
+  const calls: string[] = [];
+  const real = globalThis.fetch;
+  globalThis.fetch = (async (url: string) => {
+    calls.push(String(url));
+    const r = replies.shift();
+    if (r === "500" || r === undefined) return new Response("erreur", { status: 500 });
+    return Response.json({ forecast: r });
+  }) as typeof fetch;
+  return { calls, restore: () => void (globalThis.fetch = real) };
+}
+
+test("loadForecast : 500 → null, nouvel essai après 30 s seulement ; la reprise de l'API corrige", async () => {
+  territoireStore.setState({ forecast: "chargement", forecastAt: 0 });
+  const f = stubFetch(["500", fc("2026-12-03T12:00:00Z")]);
+  try {
+    const T = 1_000_000_000_000;
+    await loadForecast({ now: T });
+    assert.equal(territoireStore.getState().forecast, null);
+    assert.equal(f.calls.length, 1);
+    await loadForecast({ now: T + FORECAST_RETRY_MS - 1 });
+    assert.equal(f.calls.length, 1, "pas de nouvel essai avant 30 s");
+    await loadForecast({ now: T + FORECAST_RETRY_MS });
+    assert.equal(f.calls.length, 2);
+    assert.equal(forecastOf(territoireStore.getState())?.issuedAt, "2026-12-03T12:00:00Z");
+  } finally {
+    f.restore();
+  }
+});
+
+test("loadForecast : fraîche, rien ; plus de 10 min, rafraîchie ; un échec garde la prévision réelle ; « Réessayer » force", async () => {
+  const T = 1_100_000_000_000;
+  territoireStore.setState({ forecast: fc("2026-12-03T12:00:00Z"), forecastAt: T });
+  const f = stubFetch(["500", fc("2026-12-03T13:00:00Z"), fc("2026-12-03T14:00:00Z")]);
+  try {
+    await loadForecast({ now: T + FORECAST_TTL_MS - 1 });
+    assert.equal(f.calls.length, 0);
+    await loadForecast({ now: T + FORECAST_TTL_MS });
+    assert.equal(f.calls.length, 1);
+    assert.equal(forecastOf(territoireStore.getState())?.issuedAt, "2026-12-03T12:00:00Z", "l'échec ne remplace pas la prévision réelle");
+    await loadForecast({ now: T + FORECAST_TTL_MS + FORECAST_RETRY_MS });
+    assert.equal(forecastOf(territoireStore.getState())?.issuedAt, "2026-12-03T13:00:00Z");
+    assert.equal(territoireStore.getState().forecastAt, T + FORECAST_TTL_MS + FORECAST_RETRY_MS);
+    // « Réessayer » : sans attendre
+    await loadForecast({ force: true, now: T + FORECAST_TTL_MS + FORECAST_RETRY_MS + 1 });
+    assert.equal(f.calls.length, 3);
+    assert.equal(forecastOf(territoireStore.getState())?.issuedAt, "2026-12-03T14:00:00Z");
+  } finally {
+    f.restore();
+  }
+});
+
+test("loadForecast : une seule requête à la fois", async () => {
+  territoireStore.setState({ forecast: "chargement", forecastAt: 0 });
+  const f = stubFetch([fc("2026-12-03T12:00:00Z")]);
+  try {
+    const a = loadForecast({ now: 1 });
+    const b = loadForecast({ force: true, now: 2 });
+    assert.equal(a, b);
+    await a;
+    assert.equal(f.calls.length, 1);
+  } finally {
+    f.restore();
+  }
+});
+
+test("offerForecast (accueil) : la prévision du serveur remplace une plus ancienne, jamais une réelle par un échec", () => {
+  territoireStore.setState({ forecast: "chargement", forecastAt: 0 });
+  offerForecast(null, 5);
+  assert.equal(territoireStore.getState().forecast, null);
+  offerForecast(fc("2026-12-03T12:00:00Z"), 6);
+  assert.equal(forecastOf(territoireStore.getState())?.issuedAt, "2026-12-03T12:00:00Z");
+  offerForecast(fc("2026-12-03T13:00:00Z"), 7);
+  assert.equal(forecastOf(territoireStore.getState())?.issuedAt, "2026-12-03T13:00:00Z");
+  assert.equal(territoireStore.getState().forecastAt, 7);
+  // plus ancienne ou indisponible : la prévision du store reste
+  offerForecast(fc("2026-12-03T11:00:00Z"), 8);
+  offerForecast(null, 9);
+  assert.equal(forecastOf(territoireStore.getState())?.issuedAt, "2026-12-03T13:00:00Z");
+  assert.equal(territoireStore.getState().forecastAt, 7);
 });

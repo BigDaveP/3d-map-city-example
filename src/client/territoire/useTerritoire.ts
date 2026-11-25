@@ -5,7 +5,7 @@ import { useStore } from "zustand";
 import { allAlerts, type Alert } from "@/lib/territoire/alerts";
 import { dayStartOf } from "@/lib/territoire/day";
 import { snowSource } from "@/lib/territoire/neige";
-import { loadForecast, simNow, territoireStore, type TerritoireState } from "./store";
+import { FORECAST_RETRY_MS, forecastOf, loadForecast, simNow, territoireStore, type TerritoireState } from "./store";
 
 export function useTerritoire<T>(sel: (s: TerritoireState) => T): T {
   return useStore(territoireStore, sel);
@@ -50,11 +50,28 @@ export function useHydrated(): boolean {
   );
 }
 
-/** Alertes de la ville à l'heure simulée, avec les actions du visiteur ; charge la météo au besoin. */
+/**
+ * Effet de bord explicite : garde la prévision du store à jour tant que le composant est monté
+ * (chargée au besoin, rafraîchie après 10 min, réessayée 30 s après un échec ; voir `loadForecast`).
+ * Appelé une fois par page : par la scène de `/carte` et par l'accueil.
+ */
+export function useForecastRefresh(): void {
+  useEffect(() => {
+    void loadForecast();
+    const id = setInterval(() => void loadForecast(), FORECAST_RETRY_MS);
+    return () => clearInterval(id);
+  }, []);
+}
+
+/** Prévision connue (null : indisponible ou en cours de chargement). Sans effet de bord. */
+export function useForecast() {
+  return useTerritoire(forecastOf);
+}
+
+/** Alertes de la ville à l'heure simulée, avec les actions du visiteur. Sans effet de bord. */
 export function useLiveAlerts(): Alert[] {
   const t = useSimNow();
   const actions = useTerritoire((s) => s.actions);
-  const forecast = useTerritoire((s) => s.forecast);
-  useEffect(() => void loadForecast(), []);
-  return allAlerts(t, actions, snowSource(forecast === "chargement" ? null : forecast));
+  const forecast = useForecast();
+  return allAlerts(t, actions, snowSource(forecast));
 }

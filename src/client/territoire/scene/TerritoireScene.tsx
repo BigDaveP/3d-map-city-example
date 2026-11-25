@@ -22,7 +22,7 @@ import { EnvSwitcher } from "../shell/EnvSwitcher";
 import { NoApiBanner } from "../shell/NoApiBanner";
 import { Timeline } from "../shell/Timeline";
 import { setFocus, territoireStore, type Mode } from "../store";
-import { useTerritoire } from "../useTerritoire";
+import { useForecastRefresh, useTerritoire } from "../useTerritoire";
 import { restyleBasemap, STYLE_URL, WORKER_URL } from "./basemap";
 
 /** Durée du vol entre deux environnements. */
@@ -66,6 +66,8 @@ export default function TerritoireScene() {
   // module en cours de chargement (pas pendant le vol : la carte bouge déjà)
   const [pending, setPending] = useState(false);
   const mode = useTerritoire((s) => s.mode);
+  // prévision du store tenue à jour pour toute la scène (cloche, panneau du déneigement)
+  useForecastRefresh();
   // environnement d'arrivée : cadrage de départ de la carte, monté sans vol
   const startEnv = useRef(env);
   const flown = useRef(false);
