@@ -10,7 +10,7 @@ export default function BenchPage() {
     <main className="bench viz-root">
       <p className="sim-banner" role="note">⚠️ Données simulées — mesures prises sur la machine décrite ci-dessous.</p>
       <nav className="bench-nav" aria-label="Navigation">
-        <Link href="/">← Vue d&apos;ensemble</Link>
+        <Link href="/">Vue d&apos;ensemble</Link>
         <Link href="/carte/aqueduc">Aqueduc en 3D</Link>
         <Link href="/a-propos">À propos</Link>
       </nav>

@@ -690,7 +690,7 @@ async function toIsolation(p: Page) {
   const text = (await story.count()) ? await story.innerText() : "";
   check("récit à gauche, étapes et mention « simulé »", /Détection/.test(text) && /Rapport/.test(text) && /simul/i.test(text), text.slice(0, 80).replace(/\n/g, " "));
   check("couches et recherche masquées pendant le scénario", (await p.locator(".aq-layers").count()) === 0 && !(await p.locator(".aq-search").isVisible()));
-  await p.getByRole("button", { name: "Étape suivante →" }).click();
+  await p.getByRole("button", { name: "Étape suivante", exact: true }).click();
   // caméra de l'étape (1,5 s), puis tuiles et captures
   await p.waitForTimeout(1800);
   await p.evaluate(() => new Promise((r) => {
@@ -790,7 +790,7 @@ async function scenarioHic(b: Browser) {
   check("coupe : vannes fermées, tronçon à 0 bar", /fermée/.test(cutText) && !/à fermer/.test(cutText));
 
   // rapport : export vidéo de la séquence (10 s)
-  for (let i = 0; i < 3; i++) await p.getByRole("button", { name: "Étape suivante →" }).click();
+  for (let i = 0; i < 3; i++) await p.getByRole("button", { name: "Étape suivante", exact: true }).click();
   const report = await p.locator(".aq-story-fig").innerText().catch(() => "");
   check("rapport : chronologie et adresses touchées", /basse pression/.test(report) && /sans eau pendant/.test(report), report);
   const t = Date.now();
@@ -1223,9 +1223,26 @@ async function bellText(p: Page) {
 /**
  * Déneigement (HTML-in-Canvas ou classique), horloge épinglée : décision en deux gestes à 08:00
  * (A et B programmées, C non, alerte « décider » retirée de la cloche), interdiction en vigueur et
- * feux de A allumés (et clignotants) à 23:30, fiche de la zone A au clic sur son marquage ; à 16:00
- * sur une page neuve, « Décider pour ce soir » est désactivé, « Trop tard ».
+ * feux de A allumés (et clignotants) à 23:30, fiche de la zone A au clic sur son marquage ; à 00:30,
+ * une décision change la nuit en cours tout de suite (R11) ; à 16:00 sur une page neuve, la décision
+ * reste possible, avec une mise en garde (R11 : jamais bloquée). La légende (mention de simulation,
+ * attribution des zones) est visible sans défiler à 1440 × 860.
  */
+/** Mention de simulation et attribution des zones de la légende : entières dans la partie visible du panneau. */
+async function legendVisible(p: Page) {
+  return p.evaluate(() => {
+    const panel = document.querySelector<HTMLElement>(".dn-panel");
+    const items = [document.querySelector<HTMLElement>(".dn-sim-note"), document.querySelector<HTMLElement>(".dn-legend .dn-credit")];
+    if (!panel || items.some((e) => !e)) return { ok: false, detail: "absent" };
+    const r = panel.getBoundingClientRect();
+    const inside = items.map((e) => {
+      const q = e!.getBoundingClientRect();
+      return q.height > 0 && q.top >= r.top && q.bottom <= r.bottom + 0.5;
+    });
+    return { ok: inside.every(Boolean) && panel.scrollTop === 0, detail: `panneau ${Math.round(r.top)}–${Math.round(r.bottom)} · ${items.map((e) => { const q = e!.getBoundingClientRect(); return `${Math.round(q.top)}–${Math.round(q.bottom)}`; }).join(" ")}` };
+  });
+}
+
 async function deneigement(b: Browser, mode: "hic" | "classic") {
   const DN = `/carte/deneigement?mode=${mode}`;
   console.log(`\n== ${DN} : décision de l'interdiction, feux, fiche de zone`);
@@ -1263,6 +1280,8 @@ async function deneigement(b: Browser, mode: "hic" | "classic") {
   const panel = await p.locator(".dn-panel").innerText();
   check("panneau : météo (source, neige des prochaines 36 h, crédit), « Décidée à 10 h 00 par la direction (simulé) »", /Neige · prochaines 36 h/i.test(panel) && /(Environnement Canada|Simulation)/.test(panel) && /Météo : Environnement et Changement climatique Canada/.test(panel) && panel.includes("Décidée à 10 h 00 par la direction (simulé)"), panel.slice(0, 200).replace(/\n/g, " | "));
   check("légende : « Simulation : feux inspirés du système de la Ville de Québec » et attribution des zones", panel.includes("Simulation : feux inspirés du système de la Ville de Québec") && panel.includes("Zones de stationnement de nuit : Ville de Trois-Rivières, Données Québec, CC-BY 4.0"));
+  const leg1030 = await legendVisible(p);
+  check("10:30, 1440 × 860 : mention de simulation et attribution des zones visibles sans défiler", leg1030.ok, leg1030.detail);
   if (mode === "hic" && process.env.SHOT_DN_1030) {
     await p.waitForTimeout(1500);
     await p.screenshot({ path: process.env.SHOT_DN_1030 });
@@ -1275,13 +1294,22 @@ async function deneigement(b: Browser, mode: "hic" | "classic") {
   const before = await bellText(p);
   check("08:00 : la cloche demande de décider l'interdiction", /décider l'interdiction/.test(before), before.slice(0, 120).replace(/\n/g, " | "));
   const box = (z: string) => p.locator(".dn-zone-opt", { hasText: `Zone ${z}` }).locator("input");
-  check("08:00 : aucune zone cochée, bouton actif", !(await box("A").isChecked()) && !(await box("B").isChecked()) && !(await box("C").isChecked()) && (await p.getByRole("button", { name: "Décider pour ce soir" }).isEnabled()));
+  // rien de coché : le bouton dit ce qu'il fait (« Aucune interdiction ce soir ») et une ligne l'explique
+  const emptyBtn = p.locator(".dn-decide-btn");
+  const emptyNote = (await p.locator(".dn-caution").innerText().catch(() => "")) || "";
+  check(
+    "08:00 : aucune zone cochée ; bouton actif « Aucune interdiction ce soir », effet expliqué (aria-describedby)",
+    !(await box("A").isChecked()) && !(await box("B").isChecked()) && !(await box("C").isChecked()) && (await emptyBtn.innerText()) === "Aucune interdiction ce soir" && (await emptyBtn.isEnabled()) && /pas d'interdiction ce soir/.test(emptyNote) && (await emptyBtn.getAttribute("aria-describedby")) === (await p.locator(".dn-caution").getAttribute("id")),
+    `${await emptyBtn.innerText()} · ${emptyNote}`,
+  );
   await box("A").check();
   await box("B").check();
+  const dirty = await p.locator(".dn-decided").innerText();
+  check("A et B cochées, non enregistrées : « Modifications non enregistrées », bouton « Décider pour ce soir », aucune action encore", dirty.includes("Modifications non enregistrées") && (await p.evaluate(() => (window as any).__territoire.store.getState().actions.length)) === 0, dirty);
   await p.getByRole("button", { name: "Décider pour ce soir" }).click();
   await p.waitForTimeout(300);
   check("A et B programmées, C sans interdiction (__territoire.snow.plans)", (await snowPlans(p)) === "A:programmee B:programmee C:aucune", await snowPlans(p));
-  check("panneau : « Décidée par vous à 8 h 00 »", (await p.locator(".dn-decided").innerText()).includes("Décidée par vous à 8 h 00"), await p.locator(".dn-decided").innerText());
+  check("panneau : « Décidée par vous à 8 h 00 », plus de modification non enregistrée", (await p.locator(".dn-decided").innerText()).includes("Décidée par vous à 8 h 00") && !(await p.locator(".dn-decided").innerText()).includes("non enregistrées"), await p.locator(".dn-decided").innerText());
   const actions = await p.evaluate(() => (window as any).__territoire.store.getState().actions.map((a: any) => `${a.kind}:${(a.zones ?? []).join("")}`));
   check("une seule action « ban » A+B enregistrée", JSON.stringify(actions) === JSON.stringify(["ban:AB"]), JSON.stringify(actions));
   const after = await bellText(p);
@@ -1302,6 +1330,9 @@ async function deneigement(b: Browser, mode: "hic" | "classic") {
     await p.waitForTimeout(260);
   }
   check("feux allumés clignotants (circle-opacity alternée)", phases.size === 2, `${phases.size} phase(s)`);
+  const leg2330 = await legendVisible(p);
+  const night2330 = await p.locator(".dn-decide").innerText();
+  check("23:30 : légende visible sans défiler ; « En vigueur jusqu'à 6 h », jamais « Trop tard »", leg2330.ok && night2330.includes("En vigueur jusqu'à 6 h") && !/trop tard/i.test(night2330), `${leg2330.detail} · ${night2330.replace(/\n/g, " | ")}`);
   const night = await p.evaluate((hic) => {
     const sel = hic ? '.maplibregl-canvas > [data-panel="zone:A"]' : ".dn-flat .dn-mark";
     const el = [...document.querySelectorAll<HTMLElement>(sel)].find((e) => e.querySelector(".dn-mark-name")?.textContent === "Zone A");
@@ -1375,10 +1406,20 @@ async function deneigement(b: Browser, mode: "hic" | "classic") {
     `${await snowPlans(p)} · C ${JSON.stringify(c030)} · ${decided}`,
   );
   check("R10, 00:30 : la zone C n'a pas de case cochée", !(await box("C").isChecked()) && (await box("A").isChecked()));
+  // R11 : à 00:30, une décision change la nuit en cours tout de suite (C ajoutée, feux allumés)
+  await box("C").check();
+  await p.getByRole("button", { name: "Appliquer à la nuit en cours" }).click();
+  await p.waitForTimeout(1200);
+  const c030b = await lightStates(p, "C");
+  check(
+    "R11, 00:30 : C ajoutée → A, B et C en vigueur tout de suite, feux de C allumés, « Décidée par vous à 0 h 30 »",
+    (await snowPlans(p)) === "A:en-vigueur B:en-vigueur C:en-vigueur" && (c030b.allume ?? 0) > 0 && Object.keys(c030b).length === 1 && (await p.locator(".dn-decided").innerText()).includes("Décidée par vous à 0 h 30"),
+    `${await snowPlans(p)} · C ${JSON.stringify(c030b)} · ${await p.locator(".dn-decided").innerText()}`,
+  );
   check("aucune erreur console", errors.length === 0, errors.join(" | "));
   await ctx.close();
 
-  // 16:00 sur une page neuve : trop tard pour décider
+  // 16:00 sur une page neuve : décision tardive, toujours possible (R11)
   const ctx2 = await b.newContext({ viewport: { width: 1440, height: 860 }, deviceScaleFactor: 1 });
   const p2 = await ctx2.newPage();
   const errors2 = collectErrors(p2);
@@ -1389,8 +1430,20 @@ async function deneigement(b: Browser, mode: "hic" | "classic") {
   const btn = p2.getByRole("button", { name: "Décider pour ce soir" });
   const reasonId = (await btn.getAttribute("aria-describedby")) ?? "";
   const reason = reasonId ? await p2.locator(`[id="${reasonId}"]`).innerText().catch(() => "") : "";
-  check("16:00 : « Décider pour ce soir » désactivé, raison « Trop tard pour ce soir (limite 15 h) » (aria-describedby)", (await btn.isDisabled()) && reason === "Trop tard pour ce soir (limite 15 h)", reason);
-  check("16:00 : décision par défaut gardée (A, B, C programmées par la direction)", (await snowPlans(p2)) === "A:programmee B:programmee C:programmee");
+  check("16:00 : décision par défaut gardée (A, B, C programmées par la direction), cases cochées en conséquence", (await snowPlans(p2)) === "A:programmee B:programmee C:programmee" && (await p2.locator(".dn-zone-opt input:checked").count()) === 3);
+  check(
+    "R11, 16:00 : « Décider pour ce soir » actif, mise en garde « Décision tardive : les résidents auront moins de temps pour déplacer leur véhicule. » (aria-describedby)",
+    (await btn.isEnabled()) && reason === "Décision tardive : les résidents auront moins de temps pour déplacer leur véhicule.",
+    reason,
+  );
+  const box2 = (z: string) => p2.locator(".dn-zone-opt", { hasText: `Zone ${z}` }).locator("input");
+  await box2("A").uncheck();
+  await box2("C").uncheck();
+  await btn.click();
+  await p2.waitForTimeout(300);
+  check("R11, 16:00 : la décision (B seule) est acceptée et programme l'interdiction du soir", (await snowPlans(p2)) === "A:aucune B:programmee C:aucune" && (await p2.locator(".dn-decided").innerText()).includes("Décidée par vous à 16 h 00"), `${await snowPlans(p2)} · ${await p2.locator(".dn-decided").innerText()}`);
+  const page16 = (await p2.locator("body").innerText()) + (await bellText(p2));
+  check("16:00 : aucun « Trop tard » dans la page ni dans la cloche", !/trop tard/i.test(page16));
   check("aucune erreur console (16:00)", errors2.length === 0, errors2.join(" | "));
   await ctx2.close();
 }
@@ -1416,7 +1469,7 @@ async function meteoDown(b: Browser) {
   const off = await p.locator(".dn-weather", { hasText: "Météo indisponible" }).waitFor({ timeout: 10_000 }).then(() => true).catch(() => false);
   const w = await p.locator(".dn-weather").innerText().catch(() => "");
   check("500 : « Météo indisponible », source « Simulation », 12 cm simulés, crédit météo", off && /Simulation/.test(w) && /12\s*cm/.test(w) && /Météo : Environnement et Changement climatique Canada/.test(w), w.replace(/\n/g, " | "));
-  check("500 : le reste du panneau fonctionne (décision possible, plans calculés)", (await p.getByRole("button", { name: "Décider pour ce soir" }).isEnabled()) && (await snowPlans(p)) === "A:aucune B:aucune C:aucune");
+  check("500 : le reste du panneau fonctionne (décision possible, plans calculés)", (await p.locator(".dn-decide-btn").isEnabled()) && (await snowPlans(p)) === "A:aucune B:aucune C:aucune");
   // l'API revient : la fiche réelle versionnée, avec 8 cm de neige pour la nuit
   const fixture = parseCityPage(JSON.parse(await readFile(new URL("../fixtures/eccc-citypage-snow.json", import.meta.url), "utf8")))!;
   fixture.periods = fixture.periods.map((x, i) => (i === 1 ? { ...x, snowCm: 8 } : { ...x, snowCm: null }));

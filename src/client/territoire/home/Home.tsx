@@ -15,7 +15,7 @@ import { ENVS } from "@/lib/territoire/envs";
 import { homeSnapshot, type HomeSnapshot, type Mode } from "@/lib/territoire/home";
 import type { Forecast } from "@/lib/territoire/meteo";
 import { AlertBell } from "../shell/AlertBell";
-import { BrandMark } from "../shell/EnvIcon";
+import { BrandMark, UiIcon } from "../shell/EnvIcon";
 import { offerForecast, territoireStore } from "../store";
 import { useForecastRefresh, useHydrated, useSimNow, useTerritoire } from "../useTerritoire";
 import { AlertsPanel } from "./AlertsPanel";
@@ -31,6 +31,7 @@ function NextEvents({ next }: { next: HomeSnapshot["next"] }) {
       <ol className="tr-next-list">
         {next.map((e) => (
           <li key={e.at} data-env={e.env}>
+            <span className="tr-diamond" data-env={e.env} data-future aria-hidden="true" />
             <span className="tr-next-time">
               {e.time}
               {e.tomorrow && <small>demain</small>}
@@ -91,26 +92,22 @@ export function Home({ snapshot, forecast, mode, weather }: { snapshot: HomeSnap
         </span>
         <span className="aq-spacer" />
         <AlertBell alerts={snap.alerts} current={null} />
-        <Link href="/a-propos" className="tr-about" aria-label="À propos de la démo" title="À propos">
-          <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
-            <circle cx="10" cy="10" r="7.5" />
-            <path d="M10 9v4.5M10 6.4v.1" strokeLinecap="round" />
-          </svg>
+        <Link href="/a-propos" className="tr-about tr-iconbtn" aria-label="À propos de la démo" title="À propos">
+          <UiIcon name="info" size={18} />
         </Link>
       </header>
       <main className="tr-home-main">
         <div className="tr-home-head">
           <div>
-            <p className="tr-eyebrow">Gestion du territoire · Trois-Rivières</p>
             <h1>
               Vue d&apos;ensemble · <span className="tr-home-stamp">{snap.stamp}</span>
             </h1>
             <p className="tr-home-lede">
-              Heure simulée de la journée scénarisée{hydrated && speed === 60 ? ", accélérée ×60" : ""}. Alertes et états suivent l&apos;horloge
-              commune et vos décisions dans les vues 3D.
+              Gestion du territoire de Trois-Rivières à l&apos;heure simulée{hydrated && speed === 60 ? " (accélérée ×60)" : ""}. Les alertes et
+              l&apos;état des services suivent l&apos;horloge commune et vos décisions dans les vues 3D.
             </p>
           </div>
-          <span className="tr-home-badge">Simulation · Démo non officielle</span>
+          <span className="tr-sim tr-home-badge">Simulation · Démo non officielle</span>
         </div>
         <div className="tr-home-top">
           <div className="tr-home-main-col">
@@ -122,8 +119,8 @@ export function Home({ snapshot, forecast, mode, weather }: { snapshot: HomeSnap
         <section className="tr-home-envs" aria-labelledby="tr-envs-h">
           <h2 id="tr-envs-h">Environnements</h2>
           <ul className="tr-envcards">
-            {snap.envs.map((e) => (
-              <EnvCard key={e.id} env={e} />
+            {snap.envs.map((e, i) => (
+              <EnvCard key={e.id} env={e} eager={i < 2} />
             ))}
           </ul>
         </section>

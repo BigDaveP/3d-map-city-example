@@ -64,7 +64,7 @@ test("état de l'aqueduc : rien avant 14 h, bris non isolé, isolé par le visit
 test("état du déneigement : nuit en vigueur, prévision, décision, interdiction programmée puis en vigueur", () => {
   assert.match(deneigementStatus(at("03:00"), [], sim).text, /^Interdiction en vigueur · 3 zones · déneigement à \d+ % \(simulé\)$/);
   assert.equal(deneigementStatus(at("06:30"), [], sim).text, "Aucune interdiction · prévision à 7 h 30 (simulé)");
-  assert.deepEqual(deneigementStatus(at("08:00"), [], sim), { tone: "attention", text: "Neige prévue · décision attendue avant 15 h 00 (simulé)" });
+  assert.deepEqual(deneigementStatus(at("08:00"), [], sim), { tone: "attention", text: "Neige prévue · décision conseillée avant 15 h 00 (simulé)" });
   assert.equal(deneigementStatus(at("10:30"), [], sim).text, "Interdiction ce soir dès 23 h · 3 zones (direction, simulé)");
   const ban: EnvAction = { at: at("08:30"), kind: "ban", zones: ["A", "B"] };
   assert.equal(deneigementStatus(at("09:00"), [ban], sim).text, "Interdiction ce soir dès 23 h · 2 zones (votre décision)");
@@ -82,7 +82,7 @@ test("instantané de l'accueil à 14:05 sans action : bris critique en tête, r�
   assert.equal(snap.alerts[0].time, "14 h 01");
   assert.deepEqual(snap.summary, { critique: 1, attention: 0, info: 0 });
   assert.deepEqual(snap.next.map((e) => [e.time, e.label]), [
-    ["15 h 00", "Limite de décision pour ce soir"],
+    ["15 h 00", "Heure conseillée pour décider l'interdiction"],
     ["19 h 00", "Début de la neige"],
     ["23 h 00", "Interdiction en vigueur"],
   ]);
@@ -102,12 +102,12 @@ test("ouvrir une alerte : le focus n'est posé que pour l'environnement de l'ale
 });
 
 /** Rendu statique d'un composant dans un processus sans la condition react-server (react-dom/server y est refusé). */
-function renderWeather(forecastJson: string): string {
+function renderWeather(forecastJson: string, now = Date.parse("2026-11-25T17:30:00Z")): string {
   const code = `
     import { createElement } from "react";
     import { renderToStaticMarkup } from "react-dom/server";
     import { WeatherSummary } from "./src/client/territoire/home/Weather.tsx";
-    process.stdout.write(renderToStaticMarkup(createElement(WeatherSummary, { forecast: ${forecastJson} })));
+    process.stdout.write(renderToStaticMarkup(createElement(WeatherSummary, { forecast: ${forecastJson}, now: ${now} })));
   `;
   return execFileSync(process.execPath, ["--import", "tsx", "--input-type=module", "-e", code], { encoding: "utf8" });
 }
@@ -126,7 +126,20 @@ test("météo de l'accueil : conditions actuelles, ce soir et neige des prochain
   assert.match(html, /Ensoleillé/);
   assert.match(html, /Ce soir et cette nuit/);
   assert.match(html, /prochaines 36 h/);
-  assert.match(html, /BULLETIN MÉTÉOROLOGIQUE SPÉCIAL/);
+  // avertissement d'ECCC en casse de phrase
+  assert.match(html, /Bulletin météorologique spécial/);
+});
+
+test("météo de l'accueil : icône de 48 px des conditions actuelles, icônes de 16 px des prochaines heures", () => {
+  const f = parseCityPage(JSON.parse(readFileSync("tests/fixtures/eccc-citypage-qc-130.json", "utf8")));
+  // 12 h 30 à Trois-Rivières : soleil (code 00), puis la nuit tombe (lune, code 30, coucher à 16 h 09)
+  const html = renderWeather(JSON.stringify(f));
+  assert.match(html, /<svg class="tr-wx-i" data-condition="soleil" width="48" height="48"/);
+  const hours = [...html.matchAll(/<li><span class="tr-weather-h">([^<]+)<\/span><svg class="tr-wx-i" data-condition="([a-z-]+)" width="16"[^>]*aria-label="([^"]+)"/g)].map((m) => `${m[1]} ${m[2]} ${m[3]}`);
+  assert.deepEqual(hours, ["13 h soleil Ensoleillé", "15 h soleil Ensoleillé", "17 h lune Dégagé", "19 h lune Dégagé", "21 h lune Dégagé", "23 h lune Dégagé"]);
+  // le soir : lune pour les conditions actuelles, même si la fiche dit encore « Ensoleillé » (00)
+  const evening = renderWeather(JSON.stringify(f), Date.parse("2026-11-25T22:30:00Z"));
+  assert.match(evening, /data-condition="lune" width="48"/);
 });
 
 test("À propos : phrase « non officielle » mot pour mot, quatre attributions, sources avec licence et lien", () => {

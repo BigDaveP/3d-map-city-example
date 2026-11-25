@@ -93,7 +93,7 @@ const EVENTS: { time: keyof typeof DAY_TIMES; label: string; env: EnvId }[] = [
   { time: "forecastAt", label: "Prévision de neige pour ce soir (7 h 30)", env: "deneigement" },
   { time: "defaultDecisionAt", label: "Décision par défaut de l'interdiction (10 h)", env: "deneigement" },
   { time: "breakAt", label: "Bris de conduite au centre-ville (14 h)", env: "aqueduc" },
-  { time: "decisionDeadline", label: "Limite de décision pour ce soir (15 h)", env: "deneigement" },
+  { time: "decisionDeadline", label: "Heure conseillée pour décider l'interdiction (15 h)", env: "deneigement" },
   { time: "snowStart", label: "Début de la neige (19 h)", env: "deneigement" },
   { time: "banStart", label: "Interdiction en vigueur (23 h)", env: "deneigement" },
 ];

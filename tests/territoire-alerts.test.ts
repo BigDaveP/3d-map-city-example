@@ -36,15 +36,19 @@ test("déneigement : rien après une décision du visiteur", () => {
   assert.deepEqual(deneigementAlerts(at("09:00"), [ban], sim), []);
 });
 
-test("déneigement sans décision par défaut : critique dès 12:00, trop tard dès 15:00", () => {
+test("déneigement sans décision par défaut : critique dès 12:00, décision tardive dès 15:00 (sans rien bloquer)", () => {
   const noDefault = (h: string) => deneigementAlertsWith(at(h), [], sim, false);
   assert.equal(noDefault("11:59")[0].severity, "attention");
   assert.equal(noDefault("12:00")[0].severity, "critique");
   const late = noDefault("15:00");
   assert.equal(late.length, 1);
-  assert.equal(late[0].title, "Trop tard pour ce soir");
+  assert.equal(late[0].id, "neige-tardive");
+  assert.match(late[0].detail, /Décision tardive : les résidents auront moins de temps pour déplacer leur véhicule/);
+  assert.doesNotMatch(late[0].title + late[0].detail, /trop tard/i);
   assert.equal(late[0].severity, "critique");
   assert.deepEqual(deneigementAlertsWith(at("14:00"), [{ at: at("13:00"), kind: "ban", zones: ["B"] }], sim, false), []);
+  // R11 : une décision prise à 16:00 compte et retire l'alerte
+  assert.deepEqual(deneigementAlertsWith(at("16:30"), [{ at: at("16:00"), kind: "ban", zones: ["B"] }], sim, false).map((a) => a.id), []);
 });
 
 test("déneigement : interdiction en vigueur dans 3 zones la nuit", () => {
@@ -101,7 +105,7 @@ test("summarize compte par gravité", () => {
   assert.deepEqual(summarize([]), { critique: 0, attention: 0, info: 0 });
 });
 
-test("déneigement : une interdiction posée la nuit ne retire pas l'alerte de décision du matin (R5)", () => {
+test("déneigement : une interdiction posée la nuit (opération de la veille) ne retire pas l'alerte de décision du matin", () => {
   const night: EnvAction = { at: at("02:00"), kind: "ban", zones: ["A"] };
   assert.equal(deneigementAlerts(at("08:00"), [night], sim)[0]?.id, "neige-decision");
 });

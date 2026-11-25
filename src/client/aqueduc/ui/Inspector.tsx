@@ -13,6 +13,7 @@ import { useImpactTotals } from "../scene/SectorMark";
 import { useSimDay, useTerritoire } from "../../territoire/useTerritoire";
 import { addNotice, select, type Notice } from "../store";
 import { useAq } from "../useAq";
+import { UiIcon } from "../../territoire/shell/EnvIcon";
 
 const TONE = ["good", "warn", "bad"] as const;
 const DAY_FMT = new Intl.DateTimeFormat("fr-CA", { day: "numeric", month: "long", timeZone: "UTC" });
@@ -40,7 +41,7 @@ function SegmentCard({ net, id, incident }: { net: NetIndex; id: string; inciden
   return (
     <>
       <header className="aq-insp-h">
-        {incident && <span className="aq-badge">BRIS PROBABLE</span>}
+        {incident && <span className="aq-badge">Bris probable</span>}
         <span className="aq-insp-id aq-num">{p.id}</span>
         <span className="aq-insp-sub">
           {PIPE_CLASS[p.c]} · {net.sectorById.get(p.s)?.name}
@@ -264,7 +265,7 @@ export function Inspector({ net }: { net: NetIndex }) {
   return (
     <aside className="aq-inspector aq-panel" aria-label="Fiche de l'élément sélectionné" data-testid="inspector">
       <button type="button" className="aq-close" aria-label="Fermer la fiche" onClick={() => select(null)}>
-        ×
+        <UiIcon name="close" />
       </button>
       {sel.kind === "segment" && <SegmentCard net={net} id={sel.id} incident={isIncident} />}
       {sel.kind === "sensor" && <SensorCard net={net} id={sel.id} />}

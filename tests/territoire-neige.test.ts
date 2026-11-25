@@ -4,12 +4,13 @@ import { SCENARIO_DAY } from "../src/lib/aqueduc/scenario";
 import { atHour, type EnvAction } from "../src/lib/territoire/day";
 import { FLEET } from "../src/lib/territoire/fleet";
 import type { Forecast } from "../src/lib/territoire/meteo";
-import { banDeadlinePassed, banWindow, isDayBan, snowPlan, snowSource, FLEET as FLEET2, type SnowSource } from "../src/lib/territoire/neige";
+import { banDecision, banTiming, isBan, operationDayOf, snowPlan, snowSource, FLEET as FLEET2, type SnowSource } from "../src/lib/territoire/neige";
 
 const d = SCENARIO_DAY;
 const sim: SnowSource = { kind: "simulation", cm: 12 };
 const at = (h: string) => atHour(d, h);
 const banA: EnvAction = { at: at("08:00"), kind: "ban", zones: ["A"] };
+const next = (h: string) => atHour(atHour(d, "12:00") + 24 * 3_600_000, h);
 const zone = (t: number, actions: EnvAction[], z: "A" | "B" | "C") => snowPlan(t, actions, sim).find((p) => p.zone === z)!;
 
 const forecast = (snowCm: number | null, warnings: Forecast["warnings"] = []): Forecast => ({
@@ -47,9 +48,14 @@ test("00:00 à 06:00 : plan par défaut de la veille, en vigueur", () => {
   assert.deepEqual(plan[0].resources, FLEET.filter((_, i) => i % 3 === 0).map((r) => r.id));
 });
 
-test("les bans du visiteur ne comptent pas entre 00:00 et 06:00", () => {
-  const plan = snowPlan(at("03:00"), [{ at: at("01:00"), kind: "ban", zones: ["A"] }], sim);
-  assert.ok(plan.every((p) => p.ban === "en-vigueur" && p.decidedBy === "direction"));
+test("R11 : un ban du visiteur à 01:00 change la nuit en cours tout de suite", () => {
+  const ban: EnvAction = { at: at("01:00"), kind: "ban", zones: ["A"] };
+  // avant la décision : la décision par défaut de la veille, trois zones
+  assert.ok(snowPlan(at("00:59"), [ban], sim).every((p) => p.ban === "en-vigueur" && p.decidedBy === "direction"));
+  const plan = snowPlan(at("01:00"), [ban], sim);
+  assert.deepEqual(plan.map((p) => `${p.zone}:${p.ban}:${p.lights}`), ["A:en-vigueur:allume", "B:aucune:eteint", "C:aucune:eteint"]);
+  assert.equal(plan[0].decidedBy, "visiteur");
+  assert.equal(plan[0].decidedAt, at("01:00"));
 });
 
 test("06:00 à 10:00 : aucune interdiction", () => {
@@ -97,12 +103,6 @@ test("le dernier ban avant 15:00 l'emporte et remplace la décision par défaut"
   assert.deepEqual(afterDefault.map((p) => p.ban), ["aucune", "programmee", "programmee"]);
 });
 
-test("un ban après 15:00 est ignoré", () => {
-  const tooLate: EnvAction = { at: at("15:30"), kind: "ban", zones: ["A"] };
-  const plan = snowPlan(at("16:00"), [tooLate], sim);
-  assert.ok(plan.every((p) => p.decidedBy === "direction" && p.ban === "programmee"));
-});
-
 test("ressources : répartition par défaut puis assign", () => {
   const plan = snowPlan(at("12:00"), [], sim);
   assert.equal(plan[0].resources.length, 8);
@@ -130,34 +130,71 @@ test("progression : 4 ressources, 0,25 à 02:15 (depuis 23:00 de la veille)", ()
   assert.equal(p.progress, 0.25);
 });
 
-test("banDeadlinePassed : 15:00", () => {
-  assert.equal(banDeadlinePassed(at("14:59")), false);
-  assert.equal(banDeadlinePassed(at("15:00")), false);
-  assert.equal(banDeadlinePassed(at("15:01")), true);
+test("banTiming : avant la prévision, de jour, tardive après 15:00, de nuit dès 23:00 (jamais refusée, R11)", () => {
+  assert.equal(banTiming(at("02:00")), "nuit");
+  assert.equal(banTiming(at("06:00")), "avant-prevision");
+  assert.equal(banTiming(at("07:29")), "avant-prevision");
+  assert.equal(banTiming(at("07:30")), "jour");
+  assert.equal(banTiming(at("15:00")), "jour");
+  assert.equal(banTiming(at("15:01")), "tardive");
+  assert.equal(banTiming(at("22:59")), "tardive");
+  assert.equal(banTiming(at("23:00")), "nuit");
 });
 
-test("banWindow : avant la prévision de 07:30, ouverte de 07:30 à 15:00, trop tard ensuite", () => {
-  assert.equal(banWindow(at("02:00")), "avant");
-  assert.equal(banWindow(at("07:29")), "avant");
-  assert.equal(banWindow(at("07:30")), "ouverte");
-  assert.equal(banWindow(at("15:00")), "ouverte");
-  assert.equal(banWindow(at("15:01")), "trop-tard");
+test("operationDayOf : de 06:00 à 06:00 le lendemain", () => {
+  assert.equal(operationDayOf(at("06:00")), d);
+  assert.equal(operationDayOf(at("23:59")), d);
+  assert.equal(operationDayOf(next("05:59")), d);
+  assert.equal(operationDayOf(next("06:00")), operationDayOf(next("12:00")));
+  assert.notEqual(operationDayOf(next("06:00")), d);
+  assert.ok(isBan(banA) && !isBan({ at: at("08:00"), kind: "isolate" }));
 });
 
-test("une interdiction posée la nuit (R5) ne vaut pas pour le soir ; une réaffectation de nuit, si", () => {
+test("R11 : une décision à 16:00 est acceptée et programme l'interdiction du soir", () => {
+  const late: EnvAction = { at: at("16:00"), kind: "ban", zones: ["B"] };
+  // avant : la décision par défaut ; après : celle du visiteur, B seule
+  assert.ok(snowPlan(at("15:59"), [late], sim).every((p) => p.decidedBy === "direction"));
+  const plan = snowPlan(at("16:00"), [late], sim);
+  assert.deepEqual(plan.map((p) => `${p.zone}:${p.ban}`), ["A:aucune", "B:programmee", "C:aucune"]);
+  assert.deepEqual(snowPlan(at("23:30"), [late], sim).map((p) => `${p.zone}:${p.lights}`), ["A:eteint", "B:allume", "C:eteint"]);
+});
+
+test("R11 : une décision à 00:30 change la nuit en cours ; le déneigement d'une zone ajoutée part de la décision", () => {
+  const day: EnvAction = { at: at("08:00"), kind: "ban", zones: ["A", "B"] };
+  const night: EnvAction = { at: next("00:30"), kind: "ban", zones: ["A", "C"] };
+  assert.deepEqual(snowPlan(next("00:29"), [day, night], sim).map((p) => p.ban), ["en-vigueur", "en-vigueur", "aucune"]);
+  const plan = snowPlan(next("00:30"), [day, night], sim);
+  assert.deepEqual(plan.map((p) => `${p.zone}:${p.ban}:${p.lights}`), ["A:en-vigueur:allume", "B:aucune:eteint", "C:en-vigueur:allume"]);
+  assert.equal(plan[0].decidedAt, next("00:30"));
+  // A est interdite depuis 23:00 (décision de 08:00 reconduite) ; C, depuis 00:30
+  const later = snowPlan(next("01:30"), [day, night], sim);
+  const rate = (n: number) => 3_600_000 / ((6.5 * 8 * 3_600_000) / n);
+  assert.ok(Math.abs(later[0].progress - 2.5 * rate(later[0].resources.length)) < 1e-9, String(later[0].progress));
+  assert.ok(Math.abs(later[2].progress - 1 * rate(later[2].resources.length)) < 1e-9, String(later[2].progress));
+  // la décision de nuit ne vaut pas pour la soirée suivante : nouvelle opération dès 06:00
+  assert.ok(snowPlan(next("11:00"), [day, night], sim).every((p) => p.decidedBy === "direction"));
+});
+
+test("banDecision : celle du visiteur (même sans zone), sinon celle de la direction après 10:00, sinon null", () => {
+  assert.equal(banDecision(at("09:00"), []), null);
+  assert.deepEqual(banDecision(at("10:30"), []), { by: "direction", at: at("10:00"), zones: ["A", "B", "C"] });
+  const none: EnvAction = { at: at("11:00"), kind: "ban", zones: [] };
+  assert.deepEqual(banDecision(at("12:00"), [none]), { by: "visiteur", at: at("11:00"), zones: [] });
+  // la nuit : la décision « aucune zone » de la veille est toujours celle du visiteur
+  assert.deepEqual(banDecision(next("00:30"), [none]), { by: "visiteur", at: at("11:00"), zones: [] });
+  assert.ok(snowPlan(next("00:30"), [none], sim).every((p) => p.ban === "aucune"));
+});
+
+test("une interdiction posée la nuit vaut pour la nuit en cours, pas pour le soir suivant ; une réaffectation de nuit, si", () => {
   const night: EnvAction = { at: at("02:00"), kind: "ban", zones: ["A"] };
   const move: EnvAction = { at: at("02:00"), kind: "assign", resource: "CH-01", zone: "B" };
-  assert.equal(isDayBan(night), false);
-  assert.equal(isDayBan({ at: at("06:30"), kind: "ban", zones: ["A"] }), false);
-  assert.equal(isDayBan(banA), true);
-  // 08:00 : rien de décidé (la décision de nuit ne compte pas) ; 11:00 : décision par défaut
+  // 08:00 : rien de décidé pour ce soir ; 11:00 : décision par défaut
   assert.ok(snowPlan(at("08:00"), [night], sim).every((p) => p.ban === "aucune"));
   assert.ok(snowPlan(at("11:00"), [night], sim).every((p) => p.decidedBy === "direction" && p.ban === "programmee"));
   assert.ok(zone(at("08:00"), [night, move], "B").resources.includes("CH-01"));
 });
 
 // R10 : de 00:00 à 06:00, c'est l'opération de la veille (jour D → nuit du jour D+1)
-const next = (h: string) => atHour(atHour(d, "12:00") + 24 * 3_600_000, h);
 
 test("R10 : un ban A+B à 08:00 le jour D → A et B en vigueur, C sans interdiction à 00:30 le jour D+1, par le visiteur", () => {
   const ban: EnvAction = { at: at("08:00"), kind: "ban", zones: ["A", "B"] };

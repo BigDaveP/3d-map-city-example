@@ -16,7 +16,7 @@ import type { Severity } from "@/lib/territoire/alerts";
 import { ENVS, type EnvId } from "@/lib/territoire/envs";
 import { alertFocus, severityCount, type HomeAlert } from "@/lib/territoire/home";
 import { setFocus } from "../store";
-import { EnvIcon } from "./EnvIcon";
+import { EnvIcon, UiIcon } from "./EnvIcon";
 
 const ORDER: Severity[] = ["critique", "attention", "info"];
 
@@ -27,7 +27,7 @@ export function SevIcon({ severity, size = 16 }: { severity: Severity; size?: nu
     : severity === "attention" ? "M10 2.5a7.5 7.5 0 1 1 0 15 7.5 7.5 0 0 1 0-15Z M10 6.5v4.5 M10 13.6v.1"
     : "M10 2.5a7.5 7.5 0 1 1 0 15 7.5 7.5 0 0 1 0-15Z M10 9v4.5 M10 6.4v.1";
   return (
-    <svg className="tr-sev-i" data-sev={severity} width={size} height={size} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg className="tr-sev-i" data-sev={severity} width={size} height={size} viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d={d} />
     </svg>
   );
@@ -101,7 +101,7 @@ export function AlertBell({ alerts, current }: { alerts: readonly HomeAlert[]; c
       <button
         ref={opener}
         type="button"
-        className="tr-bell-btn"
+        className="tr-bell-btn tr-iconbtn"
         data-sev={top ?? undefined}
         aria-haspopup="dialog"
         aria-expanded={open}
@@ -110,9 +110,7 @@ export function AlertBell({ alerts, current }: { alerts: readonly HomeAlert[]; c
         title="Alertes"
         onClick={() => setOpen(!open)}
       >
-        <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M5 8.5a5 5 0 0 1 10 0c0 4 1.5 5.5 1.5 5.5h-13S5 12.5 5 8.5ZM8.3 16.5a1.8 1.8 0 0 0 3.4 0" />
-        </svg>
+        <UiIcon name="bell" size={18} />
         {alerts.length > 0 && (
           <span className="tr-bell-count" aria-hidden="true">
             {alerts.length}
@@ -129,7 +127,7 @@ export function AlertBell({ alerts, current }: { alerts: readonly HomeAlert[]; c
             <p className="tr-bell-sum">
               {summary.map(([s, n]) => (
                 <span key={s} className="tr-sev-chip" data-sev={s}>
-                  <SevIcon severity={s} size={13} />
+                  <SevIcon severity={s} size={16} />
                   {severityCount(s, n)}
                 </span>
               ))}
@@ -158,7 +156,7 @@ export function AlertBell({ alerts, current }: { alerts: readonly HomeAlert[]; c
                       <b>{a.title}</b>
                       <span className="tr-bell-d">{a.detail}</span>
                       <span className="tr-bell-m">
-                        <EnvIcon env={a.env} size={13} />
+                        <EnvIcon env={a.env} size={16} />
                         {ENVS[a.env].title} · {a.time}
                         {a.env !== current && <span className="tr-bell-go"> · Ouvrir</span>}
                       </span>

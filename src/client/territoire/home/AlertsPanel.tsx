@@ -10,7 +10,7 @@ import type { Severity } from "@/lib/territoire/alerts";
 import { ENVS } from "@/lib/territoire/envs";
 import { alertFocus, type HomeAlert } from "@/lib/territoire/home";
 import { SevIcon } from "../shell/AlertBell";
-import { EnvIcon } from "../shell/EnvIcon";
+import { EnvIcon, UiIcon } from "../shell/EnvIcon";
 import { setFocus } from "../store";
 
 const ORDER: Severity[] = ["critique", "attention", "info"];
@@ -30,24 +30,24 @@ export function AlertsPanel({ alerts, summary }: { alerts: readonly HomeAlert[];
       <ul className="tr-sevsum" aria-label="Alertes par gravité">
         {ORDER.map((s) => (
           <li key={s} data-sev={s} data-zero={summary[s] === 0 || undefined}>
-            <SevIcon severity={s} size={15} />
             <b>{summary[s]}</b>
-            <span>{NAME[s][summary[s] > 1 ? 1 : 0]}</span>
+            <span className="tr-sevsum-l">
+              <SevIcon severity={s} size={16} />
+              {NAME[s][summary[s] > 1 ? 1 : 0]}
+            </span>
           </li>
         ))}
       </ul>
       {alerts.length === 0 ? (
         <p className="tr-alerts-empty">
-          <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M10 2.5a7.5 7.5 0 1 1 0 15 7.5 7.5 0 0 1 0-15ZM6.8 10.2l2.2 2.2 4.2-4.6" />
-          </svg>
-          Aucune alerte active à cette heure de la journée simulée.
+          <UiIcon name="check" />
+          Aucune alerte active à cette heure de la journée simulée
         </p>
       ) : (
         <ul className="tr-alert-list">
           {alerts.map((a) => (
             <li key={a.id} className="tr-alert" data-sev={a.severity}>
-              <SevIcon severity={a.severity} size={18} />
+              <SevIcon severity={a.severity} size={16} />
               <div className="tr-alert-b">
                 <p className="tr-alert-t">
                   <span className="aq-sr">{NAME[a.severity][0]} : </span>
@@ -55,13 +55,13 @@ export function AlertsPanel({ alerts, summary }: { alerts: readonly HomeAlert[];
                 </p>
                 <p className="tr-alert-d">{a.detail}</p>
                 <p className="tr-alert-m">
-                  <EnvIcon env={a.env} size={13} />
+                  <EnvIcon env={a.env} size={16} />
                   {ENVS[a.env].title} · depuis {a.time}
                 </p>
               </div>
               <Link className="tr-open" href={a.href} onNavigate={() => setFocus(alertFocus(a))}>
                 Ouvrir<span className="aq-sr"> : {a.title}</span>
-                <span aria-hidden="true"> →</span>
+                <UiIcon name="chevron-right" />
               </Link>
             </li>
           ))}

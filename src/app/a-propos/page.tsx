@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import "@/client/territoire/home/home.css";
-import { BrandMark, EnvIcon } from "@/client/territoire/shell/EnvIcon";
+import { BrandMark, EnvIcon, UiIcon } from "@/client/territoire/shell/EnvIcon";
 import { ATTRIBUTIONS, DEMO_CONSTANTS, NON_OFFICIAL, REALITY, SOURCES, TRY_IT } from "@/lib/territoire/about";
 import { ENVS, type EnvId } from "@/lib/territoire/envs";
 
@@ -29,15 +29,16 @@ export default function AboutPage() {
         </Link>
         <span className="aq-spacer" />
         <Link href="/" className="tr-back">
-          ← Vue d&apos;ensemble
+          <UiIcon name="arrow-left" />
+          Vue d&apos;ensemble
         </Link>
       </header>
       <main className="tr-home-main tr-prose">
-        <p className="tr-eyebrow">À propos</p>
-        <h1>Une démo de gestion du territoire, en 3D</h1>
+        <h1>À propos de la démo</h1>
         <p className="tr-home-lede">
-          Un outil de gestionnaire municipal imaginé pour montrer ce que permet HTML-in-Canvas : une ville, plusieurs services sur la même carte
-          3D, des alertes et une journée simulée. Données ouvertes réelles, complétées par des simulations clairement marquées.
+          Un outil de gestion du territoire imaginé pour Trois-Rivières, pour montrer ce que permet HTML-in-Canvas : les services de la ville
+          sur la même carte 3D, des alertes et une journée simulée. Données ouvertes réelles, complétées par des simulations clairement
+          marquées.
         </p>
         <p className="tr-callout" role="note">
           <strong>{NON_OFFICIAL}</strong>
@@ -137,8 +138,10 @@ export default function AboutPage() {
             ))}
           </dl>
           <p className="tr-muted">
-            Avec la décision par défaut de 10 h, les alertes « critique à midi » et « trop tard à 15 h » du déneigement ne paraissent que si
-            personne n&apos;a décidé ; elles restent dans le modèle.
+            Avec la décision par défaut de 10 h, les alertes « critique à midi » et « décision tardive à 15 h » du déneigement ne paraissent
+            que si personne n&apos;a décidé ; elles restent dans le modèle. La décision d&apos;interdiction n&apos;est jamais refusée : après
+            15 h, la démo prévient que les résidents auront moins de temps pour déplacer leur véhicule, et la nuit, une décision change tout
+            de suite les feux de la nuit en cours.
           </p>
         </section>
 
@@ -159,6 +162,33 @@ export default function AboutPage() {
               <li key={t}>{t}</li>
             ))}
           </ul>
+        </section>
+
+        <section aria-labelledby="credits">
+          <h2 id="credits">Interface et crédits</h2>
+          <p>
+            L&apos;interface a été revue avec la méthode{" "}
+            <a href="https://github.com/heydamir/unslop" rel="noreferrer">
+              unslop
+            </a>{" "}
+            de Damir Sokolovsky (licence{" "}
+            <a href="https://creativecommons.org/licenses/by/4.0/deed.fr" rel="noreferrer">
+              CC BY 4.0
+            </a>
+            ). Les vignettes de l&apos;accueil sont de vraies captures de la scène 3D, produites par un script.
+          </p>
+          <p>
+            Les icônes de la météo reprennent des tracés de{" "}
+            <a href="https://lucide.dev" rel="noreferrer">
+              Lucide
+            </a>{" "}
+            (licence{" "}
+            <a href="https://github.com/lucide-icons/lucide/blob/main/LICENSE" rel="noreferrer">
+              ISC
+            </a>
+            , © Lucide Contributors, et © Cole Bemis pour les parties issues de Feather). Elles suivent les codes d&apos;icônes publiés par
+            Environnement et Changement climatique Canada.
+          </p>
         </section>
       </main>
       <footer className="tr-home-foot">

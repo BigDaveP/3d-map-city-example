@@ -2,8 +2,9 @@
  * Libellés du déneigement communs aux marquages, au panneau et à la fiche (module pur, testé sous
  * Node).
  */
+import type { EnvAction, ZoneId } from "@/lib/territoire/day";
 import { hourLabel } from "@/lib/territoire/home";
-import type { ZonePlan } from "@/lib/territoire/neige";
+import { banDecision, banTiming, operationDayOf, ZONES, type ZonePlan } from "@/lib/territoire/neige";
 
 /** État de l'interdiction en une ligne ; null sans interdiction (le marquage n'affiche alors rien). */
 export function banLine(p: ZonePlan): string | null {
@@ -33,4 +34,61 @@ export function markFigure(p: ZonePlan, lights: number): { value: string; label:
 export function lightsLabel(n: number, state: ZonePlan["lights"]): string {
   const word = { eteint: ["éteint", "éteints"], programme: ["programmé", "programmés"], allume: ["allumé", "allumés"] }[state];
   return plural(n, `feu ${word[0]}`, `feux ${word[1]}`);
+}
+
+/** Choix en cours du visiteur, lié à la décision sur laquelle il a commencé (`base`). */
+export interface Picked {
+  base: string;
+  zones: ZoneId[];
+}
+
+export interface DecisionView {
+  /** clé de la décision en vigueur : un choix commencé sur une autre décision est oublié */
+  base: string;
+  /** zones cochées : le choix en cours, sinon la décision en vigueur */
+  checked: ZoneId[];
+  /** le choix diffère de la décision en vigueur (non enregistré) */
+  dirty: boolean;
+  /** libellé du bouton, toujours actif (R11) */
+  button: string;
+  /** ce que fait le bouton quand aucune zone n'est cochée, sinon null */
+  empty: string | null;
+  /** mise en garde selon l'heure, jamais bloquante (R11), sinon null */
+  caution: string | null;
+  /** décision en vigueur en une ligne */
+  status: string;
+}
+
+const sameZones = (a: readonly ZoneId[], b: readonly ZoneId[]) => a.length === b.length && a.every((z) => b.includes(z));
+
+/**
+ * Bloc « Interdiction de stationner » du panneau, à l'heure t : les cases suivent la décision en
+ * vigueur (visiteur ou direction) tant que le visiteur ne les change pas ; un choix non enregistré
+ * est signalé, et oublié si la décision en vigueur change entre-temps (10:00, autre journée). Le
+ * bouton n'est jamais désactivé (R11) : sans zone cochée, il dit « Aucune interdiction ce soir » et
+ * une ligne explique l'effet ; après 15:00 et la nuit, une mise en garde, sans rien refuser.
+ */
+export function decisionView(t: number, actions: readonly EnvAction[], picked: Picked | null): DecisionView {
+  const decision = banDecision(t, actions);
+  const inForce = decision?.zones ?? [];
+  const base = decision ? `${decision.by}@${decision.at}:${inForce.join("")}` : `aucune@${operationDayOf(t)}`;
+  const checked = picked && picked.base === base ? ZONES.filter((z) => picked.zones.includes(z)) : [...inForce];
+  const timing = banTiming(t);
+  const night = timing === "nuit";
+  const status = decision
+    ? `${decisionLine({ decidedBy: decision.by, decidedAt: decision.at })}${inForce.length === 0 ? " : aucune zone" : ""}`
+    : "Aucune décision pour ce soir";
+  return {
+    base,
+    checked,
+    dirty: !sameZones(checked, inForce),
+    button: checked.length > 0 ? (night ? "Appliquer à la nuit en cours" : "Décider pour ce soir") : night ? "Lever l'interdiction cette nuit" : "Aucune interdiction ce soir",
+    empty: checked.length > 0 ? null : night ? "Aucune zone cochée : les feux s'éteignent tout de suite." : "Aucune zone cochée : pas d'interdiction ce soir, les feux restent éteints.",
+    caution:
+      timing === "tardive" ? "Décision tardive : les résidents auront moins de temps pour déplacer leur véhicule."
+      : night ? `${inForce.length > 0 ? "En vigueur jusqu'à 6 h. " : ""}De nuit, une décision change les feux tout de suite.`
+      : timing === "avant-prevision" ? "La prévision du jour arrive à 7 h 30."
+      : null,
+    status,
+  };
 }

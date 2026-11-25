@@ -90,7 +90,7 @@ export const DEMO_CONSTANTS: { label: string; value: string }[] = [
   { label: "Prévision de neige et alerte « décider l'interdiction »", value: DAY_TIMES.forecastAt },
   { label: "Décision par défaut de la direction (simulé), si le visiteur n'a pas décidé", value: DAY_TIMES.defaultDecisionAt },
   { label: "Bris de conduite au centre-ville (scénario de l'aqueduc)", value: DAY_TIMES.breakAt },
-  { label: "Limite de décision de l'interdiction pour le soir même", value: DAY_TIMES.decisionDeadline },
+  { label: "Heure conseillée pour décider l'interdiction du soir ; plus tard, la décision reste possible", value: DAY_TIMES.decisionDeadline },
   { label: "Début de la neige simulée", value: DAY_TIMES.snowStart },
   { label: "Interdiction en vigueur, feux allumés, équipes sur le terrain", value: DAY_TIMES.banStart },
   { label: "Seuil de neige réelle qui déclenche l'alerte (prochaines 36 h)", value: `${SNOW_THRESHOLD_CM} cm` },

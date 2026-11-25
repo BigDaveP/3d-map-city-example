@@ -57,24 +57,59 @@ export interface ZonePlan {
 /** Une opération de déneigement d'une zone dure 6,5 h pour 8 ressources ; elle s'allonge avec moins de ressources. */
 const CREW_HOURS = 6.5 * 8;
 
-/** Les `ban` du visiteur après 15:00 sont ignorés par le modèle (l'interface les refuse avant). */
-export function banDeadlinePassed(t: number): boolean {
-  return t > atHour(dayStartOf(t), DAY_TIMES.decisionDeadline);
+/** Décision d'interdiction du visiteur (toujours acceptée, R11). */
+export type BanAction = Extract<EnvAction, { kind: "ban" }>;
+
+export const isBan = (a: EnvAction): a is BanAction => a.kind === "ban";
+
+/**
+ * Journée d'opération de l'instant t : minuit du jour dont la soirée et la nuit sont en jeu. Une
+ * opération va de 06:00 (levée de la nuit précédente) à 06:00 le lendemain ; entre 00:00 et 06:00,
+ * c'est donc l'opération de la veille (R10).
+ */
+export function operationDayOf(t: number): number {
+  const day = dayStartOf(t);
+  return t < atHour(day, DAY_TIMES.banEnd) ? dayStartOf(day - HOUR) : day;
 }
 
 /**
- * Fenêtre de décision de l'interdiction à l'instant t : « avant » jusqu'à la prévision du jour
- * (07:30 ; la nuit, ce sont les équipes qui travaillent, et aucune décision ne se prend), « ouverte »
- * de 07:30 à 15:00, « trop-tard » ensuite (les citoyens n'ont plus le temps de s'informer).
+ * Moment d'une décision prise à l'instant t (R11 : jamais refusée, seulement expliquée) :
+ * « avant-prevision » de 06:00 à 07:30 (la prévision du jour n'est pas encore là), « jour » jusqu'à
+ * 15:00, « tardive » de 15:00 à 23:00 (les résidents ont moins de temps pour déplacer leur véhicule),
+ * « nuit » de 23:00 à 06:00 (la décision change la nuit en cours, tout de suite).
  */
-export function banWindow(t: number): "avant" | "ouverte" | "trop-tard" {
-  if (t < atHour(dayStartOf(t), DAY_TIMES.forecastAt)) return "avant";
-  return banDeadlinePassed(t) ? "trop-tard" : "ouverte";
+export function banTiming(t: number): "avant-prevision" | "jour" | "tardive" | "nuit" {
+  const op = operationDayOf(t);
+  if (t >= atHour(op, DAY_TIMES.banStart)) return "nuit";
+  if (t < atHour(op, DAY_TIMES.forecastAt)) return "avant-prevision";
+  return t > atHour(op, DAY_TIMES.decisionDeadline) ? "tardive" : "jour";
 }
 
-/** Décision d'interdiction du visiteur que le modèle retient : prise de jour, entre 07:30 et 15:00 (R5). */
-export function isDayBan(a: EnvAction): a is Extract<EnvAction, { kind: "ban" }> {
-  return a.kind === "ban" && banWindow(a.at) === "ouverte";
+/** Décision d'interdiction : qui, quand, quelles zones (vide : aucune interdiction). */
+export interface BanDecision {
+  by: "visiteur" | "direction";
+  at: number;
+  zones: ZoneId[];
+}
+
+/**
+ * Décisions successives de l'opération de t, jusqu'à t : la décision par défaut de la direction à
+ * 10:00 (seulement si le visiteur n'a rien décidé avant), puis chaque décision du visiteur, à toute
+ * heure de l'opération (de 06:00 à 06:00, R10 et R11).
+ */
+function decisions(t: number, actions: readonly EnvAction[]): BanDecision[] {
+  const op = operationDayOf(t);
+  const bans = actions.filter((a): a is BanAction => isBan(a) && a.at <= t && operationDayOf(a.at) === op);
+  const defaultAt = atHour(op, DAY_TIMES.defaultDecisionAt);
+  const out: BanDecision[] = [];
+  if (t >= defaultAt && !(bans.length > 0 && bans[0].at < defaultAt)) out.push({ by: "direction", at: defaultAt, zones: [...ZONES] });
+  for (const b of bans) out.push({ by: "visiteur", at: b.at, zones: ZONES.filter((z) => b.zones.includes(z)) });
+  return out.sort((a, b) => a.at - b.at);
+}
+
+/** Décision en vigueur pour l'opération de t (dernière décision du visiteur, sinon celle de la direction), ou null. */
+export function banDecision(t: number, actions: readonly EnvAction[]): BanDecision | null {
+  return decisions(t, actions).at(-1) ?? null;
 }
 
 /** Ressources par zone : répartition circulaire dans l'ordre de FLEET, puis les `assign` du visiteur. */
@@ -90,73 +125,38 @@ function assignment(actions: readonly EnvAction[]): Record<ZoneId, string[]> {
 }
 
 /**
- * Plan par zone à l'instant t (actions de la journée de t seulement).
- * Entre 00:00 et 06:00, c'est l'opération de la veille (R10) : la dernière interdiction décidée par
- * le visiteur la veille, sinon la décision par défaut de la direction (10:00) ; les ressources de la
- * veille, plus les `assign` faits depuis minuit (R5). À partir de 06:00, seules les actions du jour
- * comptent. Seules les décisions de jour (07:30 à 15:00, `isDayBan`) valent : une interdiction
- * posée la nuit ne vaut pas pour le soir qui suit.
+ * Plan par zone à l'instant t, pour l'opération en cours (de 06:00 à 06:00, `operationDayOf`).
+ * Avant 23:00, la décision en vigueur programme l'interdiction du soir ; de 23:00 à 06:00, elle est
+ * en vigueur, et une décision prise pendant la nuit la change tout de suite (R11) : les feux suivent,
+ * et le déneigement d'une zone ajoutée commence à l'heure de la décision. Ressources : celles du jour ;
+ * entre 00:00 et 06:00, celles de la veille, plus les `assign` faits depuis minuit (R5, R10).
  */
 export function snowPlan(t: number, actions: readonly EnvAction[], _source: SnowSource): ZonePlan[] {
   const day = dayStartOf(t);
+  const op = operationDayOf(t);
   const today = actionsUpTo(actions, t);
-  const resources = assignment(today);
-  const progressFrom = (banStart: number, n: number) => {
-    if (t < banStart) return 0;
-    return Math.min(1, (t - banStart) / ((CREW_HOURS / Math.max(1, n)) * HOUR));
-  };
+  const resources = op === day ? assignment(today) : assignment([...actionsUpTo(actions, day - 1), ...today]);
+  const banStart = atHour(op, DAY_TIMES.banStart);
+  const inForce = t >= banStart;
+  const all = decisions(t, actions);
+  const current = all.at(-1);
 
-  if (t < atHour(day, DAY_TIMES.banEnd)) {
-    // nuit : l'opération de la veille (R10). Décision du visiteur de la veille, sinon celle de la
-    // direction à 10:00 ; ressources de la veille, puis les réaffectations faites depuis minuit (R5)
-    const prev = dayStartOf(day - HOUR);
-    const yesterday = actionsUpTo(actions, day - 1);
-    const night = assignment([...yesterday, ...today]);
-    const ban = yesterday.filter(isDayBan).at(-1);
-    const decision = ban
-      ? { by: "visiteur" as const, at: ban.at, zones: new Set<ZoneId>(ban.zones) }
-      : { by: "direction" as const, at: atHour(prev, DAY_TIMES.defaultDecisionAt), zones: new Set<ZoneId>(ZONES) };
-    const banStart = atHour(prev, DAY_TIMES.banStart);
-    return ZONES.map((zone): ZonePlan =>
-      decision.zones.has(zone)
-        ? {
-            zone,
-            ban: "en-vigueur",
-            decidedBy: decision.by,
-            decidedAt: decision.at,
-            resources: night[zone],
-            progress: progressFrom(banStart, night[zone].length),
-            lights: "allume",
-          }
-        : { zone, ban: "aucune", decidedBy: null, decidedAt: null, resources: night[zone], progress: 0, lights: "eteint" },
-    );
-  }
-
-  const none = (zone: ZoneId): ZonePlan => ({ zone, ban: "aucune", decidedBy: null, decidedAt: null, resources: resources[zone], progress: 0, lights: "eteint" });
-  if (t < atHour(day, DAY_TIMES.forecastAt)) return ZONES.map(none);
-
-  const bans = today.filter(isDayBan);
-  const visitor = bans.length > 0 ? bans[bans.length - 1] : null;
-  const defaultAt = atHour(day, DAY_TIMES.defaultDecisionAt);
-  const decision =
-    visitor !== null
-      ? { by: "visiteur" as const, at: visitor.at, zones: new Set<ZoneId>(visitor.zones) }
-      : t >= defaultAt
-        ? { by: "direction" as const, at: defaultAt, zones: new Set<ZoneId>(ZONES) }
-        : null;
-  if (decision === null) return ZONES.map(none);
-
-  const banStart = atHour(day, DAY_TIMES.banStart);
-  return ZONES.map((zone) => {
-    if (!decision.zones.has(zone)) return none(zone);
-    const inForce = t >= banStart;
+  return ZONES.map((zone): ZonePlan => {
+    if (!current || !current.zones.includes(zone)) {
+      return { zone, ban: "aucune", decidedBy: null, decidedAt: null, resources: resources[zone], progress: 0, lights: "eteint" };
+    }
+    // interdite sans interruption depuis `since` : le déneigement part de 23:00 ou de ce moment
+    let since = current.at;
+    for (let i = all.length - 1; i >= 0 && all[i].zones.includes(zone); i--) since = all[i].at;
+    const start = Math.max(banStart, since);
+    const n = resources[zone].length;
     return {
       zone,
       ban: inForce ? "en-vigueur" : "programmee",
-      decidedBy: decision.by,
-      decidedAt: decision.at,
+      decidedBy: current.by,
+      decidedAt: current.at,
       resources: resources[zone],
-      progress: progressFrom(banStart, resources[zone].length),
+      progress: inForce ? Math.min(1, (t - start) / ((CREW_HOURS / Math.max(1, n)) * HOUR)) : 0,
       lights: inForce ? "allume" : "programme",
     };
   });

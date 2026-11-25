@@ -87,9 +87,9 @@ export function deneigementStatus(t: number, actions: readonly EnvAction[], sour
     const progress = Math.round((inForce.reduce((s, p) => s + p.progress, 0) / inForce.length) * 100);
     return { tone: "info", text: `Interdiction en vigueur · ${plural(inForce.length, "zone", "zones")} · déneigement à ${progress} % (simulé)` };
   }
-  const alert = deneigementAlerts(t, actions, source).find((a) => a.id === "neige-decision" || a.id === "neige-tard");
-  if (alert?.id === "neige-tard") return { tone: "critique", text: "Trop tard pour décider l'interdiction ce soir (simulé)" };
-  if (alert) return { tone: alert.severity, text: `Neige prévue · décision attendue avant ${hourLabel(atHour(dayStartOf(t), DAY_TIMES.decisionDeadline))} (simulé)` };
+  const alert = deneigementAlerts(t, actions, source).find((a) => a.id === "neige-decision" || a.id === "neige-tardive");
+  if (alert?.id === "neige-tardive") return { tone: "critique", text: "Neige prévue · interdiction toujours à décider, décision tardive (simulé)" };
+  if (alert) return { tone: alert.severity, text: `Neige prévue · décision conseillée avant ${hourLabel(atHour(dayStartOf(t), DAY_TIMES.decisionDeadline))} (simulé)` };
   const scheduled = plans.filter((p) => p.ban === "programmee");
   if (scheduled.length > 0) {
     const by = scheduled[0].decidedBy === "visiteur" ? "votre décision" : "direction, simulé";

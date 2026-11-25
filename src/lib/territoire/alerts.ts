@@ -2,7 +2,7 @@
 import { scenarioSteps } from "../aqueduc/scenario";
 import { actionsUpTo, atHour, dayStartOf, DAY_TIMES, type EnvAction } from "./day";
 import type { EnvFocus, EnvId } from "./envs";
-import { isDayBan, snowPlan, type SnowSource } from "./neige";
+import { banDecision, snowPlan, type SnowSource } from "./neige";
 
 export type Severity = "critique" | "attention" | "info";
 export interface Alert {
@@ -24,8 +24,9 @@ function snowDetail(s: SnowSource): string {
 
 /**
  * Alertes du déneigement ; `defaultDecision` dit si la direction décide à 10:00 quand le visiteur ne le
- * fait pas. Avec elle (cas de la démo), les alertes « critique » de 12:00 et « trop tard » de 15:00 ne
- * se déclenchent jamais : elles restent dans le modèle pour le cas sans décision par défaut.
+ * fait pas. Avec elle (cas de la démo), les alertes « critique » de 12:00 et « décision tardive » de
+ * 15:00 ne se déclenchent jamais : elles restent dans le modèle pour le cas sans décision par défaut.
+ * La décision reste possible à toute heure (R11) : après 15:00, l'alerte prévient, elle ne ferme rien.
  */
 export function deneigementAlertsWith(t: number, actions: readonly EnvAction[], source: SnowSource, defaultDecision: boolean): Alert[] {
   const day = dayStartOf(t);
@@ -41,12 +42,19 @@ export function deneigementAlertsWith(t: number, actions: readonly EnvAction[], 
   if (t < time("forecastAt")) return out;
 
   const deadline = time("decisionDeadline");
-  const visitorBan = actionsUpTo(actions, t).some(isDayBan);
+  const visitorBan = banDecision(t, actions)?.by === "visiteur";
   const decided = visitorBan || (defaultDecision && t >= time("defaultDecisionAt"));
 
   if (!decided) {
     if (t >= deadline) {
-      out.push({ id: "neige-tard", env: "deneigement", severity: "critique", title: "Trop tard pour ce soir", detail: `Aucune interdiction décidée avant 15 h. ${snowDetail(source)}.`, at: deadline });
+      out.push({
+        id: "neige-tardive",
+        env: "deneigement",
+        severity: "critique",
+        title: "Neige prévue ce soir — interdiction toujours à décider",
+        detail: `${snowDetail(source)}. Décision tardive : les résidents auront moins de temps pour déplacer leur véhicule.`,
+        at: deadline,
+      });
     } else {
       const critical = t >= time("decisionCritical");
       out.push({
@@ -54,7 +62,7 @@ export function deneigementAlertsWith(t: number, actions: readonly EnvAction[], 
         env: "deneigement",
         severity: critical ? "critique" : "attention",
         title: "Neige prévue ce soir — décider l'interdiction de stationner",
-        detail: `${snowDetail(source)}. Décision attendue avant 15 h.`,
+        detail: `${snowDetail(source)}. Décision conseillée avant 15 h.`,
         at: critical ? time("decisionCritical") : time("forecastAt"),
       });
     }

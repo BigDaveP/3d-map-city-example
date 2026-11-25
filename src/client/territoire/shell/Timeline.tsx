@@ -111,7 +111,7 @@ export function Timeline({ track }: { track: TimelineTrack | null }) {
             <div className="aq-tl-hours" aria-hidden="true">
               {HOURS.map((h) => (
                 <span key={h} style={{ left: pct(atHour(day, h)) }}>
-                  {h.slice(0, 2)} h
+                  {Number(h.slice(0, 2))} h
                 </span>
               ))}
               <span style={{ left: "100%" }}>24 h</span>
@@ -143,6 +143,8 @@ export function Timeline({ track }: { track: TimelineTrack | null }) {
             <div
               className="aq-tl-cursor"
               style={{ left: pct(cursor) }}
+              // étiquette à gauche du curseur près de minuit (la frise la rognerait)
+              data-align={(cursor - day) / len > 0.92 ? "end" : undefined}
               role="slider"
               tabIndex={0}
               aria-label="Heure simulée"

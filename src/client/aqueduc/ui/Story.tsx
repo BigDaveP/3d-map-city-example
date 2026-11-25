@@ -154,7 +154,7 @@ export function Story({ map, net }: { map: MlMap; net: NetIndex }) {
       </ol>
       <div className="aq-btns aq-story-nav">
         <button type="button" className="aq-btn" disabled={k === 0 || video.busy} onClick={() => prevStep()}>
-          ← Précédent
+          Précédent
         </button>
         {last ? (
           <button type="button" className="aq-btn" disabled={video.busy} onClick={() => startScenario()}>
@@ -162,7 +162,7 @@ export function Story({ map, net }: { map: MlMap; net: NetIndex }) {
           </button>
         ) : (
           <button type="button" className="aq-btn aq-pri" disabled={video.busy} onClick={() => nextStep()}>
-            Étape suivante →
+            Étape suivante
           </button>
         )}
         <button type="button" className="aq-btn aq-story-exit" disabled={video.busy} onClick={() => exploreFreely()}>

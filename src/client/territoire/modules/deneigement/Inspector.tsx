@@ -10,6 +10,7 @@ import type { ZoneId } from "@/lib/territoire/day";
 import { DEPOTS, type Resource } from "@/lib/territoire/fleet";
 import { ZONES, type DeneigementData, type ZonePlan } from "@/lib/territoire/neige";
 import { RESOURCE_KIND } from "@/lib/territoire/search";
+import { UiIcon } from "../../shell/EnvIcon";
 import { act } from "../../store";
 import { banLine, decisionLine, lightsLabel } from "./labels";
 import { selectSnow, useSnowPlans, useSnowSelection } from "./state";
@@ -159,7 +160,7 @@ export function SnowInspector({ data, zones }: { data: DeneigementData; zones: r
   return (
     <aside className="aq-inspector aq-panel dn-inspector" aria-label="Fiche de l'élément sélectionné" data-testid="inspector">
       <button type="button" className="aq-close" aria-label="Fermer la fiche" onClick={() => selectSnow(null)}>
-        ×
+        <UiIcon name="close" />
       </button>
       {body}
     </aside>

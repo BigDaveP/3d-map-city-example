@@ -31,7 +31,7 @@ export function EnvPanel({ env, subtitle, operations, collapsedHint, className, 
     <section className={`tr-envpanel aq-panel${className ? ` ${className}` : ""}`} aria-label={`${title} : couches et opérations`} data-env={env}>
       <header className="tr-envpanel-h">
         <span className="tr-envpanel-icon">
-          <EnvIcon env={env} />
+          <EnvIcon env={env} size={18} />
         </span>
         <span className="tr-envpanel-t">
           <h2>{title}</h2>

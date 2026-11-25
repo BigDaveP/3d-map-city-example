@@ -22,14 +22,14 @@ export function WeatherCard() {
     <section className="dn-weather" aria-labelledby="dn-weather-h" aria-busy={loading}>
       <div className="dn-weather-h">
         <h3 id="dn-weather-h">Neige · prochaines 36 h</h3>
+        <p className="dn-weather-cm">
+          <span className="aq-num">{cm(source.cm)}</span> cm
+        </p>
         <span className="dn-src" data-src={source.kind}>
           {source.kind === "eccc" ? "Environnement Canada" : "Simulation"}
         </span>
       </div>
-      <p className="dn-weather-cm">
-        <span className="aq-num">{cm(source.cm)}</span> cm
-        {loading && <span className="dn-weather-note"> · prévision en cours de chargement…</span>}
-      </p>
+      {loading && <p className="dn-weather-note">Prévision en cours de chargement…</p>}
       {f === null && !loading && (
         <div className="dn-weather-off" role="status">
           <p>
@@ -42,7 +42,7 @@ export function WeatherCard() {
       )}
       {f && source.kind === "simulation" && (
         <p className="dn-weather-note">
-          Simulation : la prévision réelle n&apos;annonce pas de neige ({cm(snowTonightCm(f))} cm, seuil {SNOW_THRESHOLD_CM} cm).
+          Prévision réelle : {cm(snowTonightCm(f))} cm, sous le seuil de {SNOW_THRESHOLD_CM} cm
         </p>
       )}
       {warning && (

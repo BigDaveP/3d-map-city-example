@@ -8,15 +8,16 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { ENVS, type EnvId } from "@/lib/territoire/envs";
-import { EnvIcon } from "./EnvIcon";
+import { THUMBS } from "@/lib/territoire/thumbs";
+import { UiIcon } from "./EnvIcon";
 
 const IDS = Object.keys(ENVS) as EnvId[];
 
-/** Vignette (image de la vue de l'environnement à venir ; en attendant, un aplat dessiné en CSS). */
+/** Vignette : capture de la vue de l'environnement (désaturée pour ceux du lot 2), décorative ici. */
 function Thumb({ env }: { env: EnvId }) {
   return (
     <span className="tr-thumb" data-env={env} aria-hidden="true">
-      <EnvIcon env={env} size={20} />
+      <img src={THUMBS[env].src} alt="" width={THUMBS[env].width} height={THUMBS[env].height} loading="lazy" decoding="async" />
     </span>
   );
 }
@@ -79,7 +80,9 @@ export function EnvSwitcher({ current }: { current: EnvId | null }) {
           <span className="tr-switcher-k">Environnement</span>
           <b>{cur?.title ?? "Choisir"}</b>
         </span>
-        <span className="tr-switcher-swap" aria-hidden="true" />
+        <span className="tr-switcher-swap">
+          <UiIcon name="updown" />
+        </span>
       </button>
       {open && (
         <div id={popId} className="tr-switcher-pop" role="dialog" aria-label="Changer d'environnement" onKeyDown={key}>

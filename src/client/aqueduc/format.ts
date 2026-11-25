@@ -52,12 +52,15 @@ export function sensorValue(kind: SensorKind, v: number): string {
   return `${num(v, 0)} %`;
 }
 
-const hm = new Intl.DateTimeFormat("fr-CA", { timeZone: TIME_ZONE, hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+const hm = new Intl.DateTimeFormat("en-CA", { timeZone: TIME_ZONE, hour: "numeric", minute: "2-digit", hourCycle: "h23" });
 const dayFmt = new Intl.DateTimeFormat("fr-CA", { timeZone: TIME_ZONE, weekday: "short", day: "numeric", month: "short" });
 
-/** « 07:42 » à l'heure de l'Est. */
+/** « 7 h 42 » à l'heure de l'Est : le même format que l'accueil et les alertes. */
 export function clockTime(t: number): string {
-  return hm.format(t).replace(" h ", ":");
+  const parts = hm.formatToParts(t);
+  const h = parts.find((p) => p.type === "hour")?.value ?? "0";
+  const m = parts.find((p) => p.type === "minute")?.value ?? "00";
+  return `${Number(h)} h ${m}`;
 }
 
 /** « mar. 24 nov. » à l'heure de l'Est. */

@@ -19,7 +19,7 @@ import { loadedModules } from "../modules";
 import { setFocus, territoireStore, type Mode } from "../store";
 import { useLiveAlerts, useTerritoire } from "../useTerritoire";
 import { AlertBell } from "./AlertBell";
-import { BrandMark, EnvIcon } from "./EnvIcon";
+import { BrandMark, EnvIcon, UiIcon } from "./EnvIcon";
 
 interface Hit {
   key: string;
@@ -112,10 +112,9 @@ function Search({ map, env }: { map: MlMap | null; env: EnvId | null }) {
       <label className="aq-sr" htmlFor={`${id}-in`}>
         Rechercher un secteur, une zone, une conduite, un capteur, une ressource ou une rue
       </label>
-      <svg className="tr-search-i" width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-        <circle cx="8.5" cy="8.5" r="5.5" />
-        <path d="m13 13 4 4" strokeLinecap="round" />
-      </svg>
+      <span className="tr-search-i">
+        <UiIcon name="search" />
+      </span>
       <input
         id={`${id}-in`}
         type="search"
@@ -126,7 +125,7 @@ function Search({ map, env }: { map: MlMap | null; env: EnvId | null }) {
         aria-activedescendant={expanded && active >= 0 ? `${id}-o${active}` : undefined}
         aria-describedby={`${id}-hint`}
         value={q}
-        placeholder="Secteur, zone, conduite, capteur…"
+        placeholder="Rechercher"
         onChange={(e) => (setQ(e.target.value), setMsg(""), setOpen(true), setActive(-1))}
         onFocus={() => setOpen(true)}
         onBlur={() => setOpen(false)}
@@ -211,11 +210,8 @@ export function AppBar({ map, env }: { map: MlMap | null; env: EnvId | null }) {
         </button>
       </div>
       <LiveBell env={env} />
-      <Link href="/a-propos" className="tr-about" aria-label="À propos de la démo" title="À propos">
-        <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
-          <circle cx="10" cy="10" r="7.5" />
-          <path d="M10 9v4.5M10 6.4v.1" strokeLinecap="round" />
-        </svg>
+      <Link href="/a-propos" className="tr-about tr-iconbtn" aria-label="À propos de la démo" title="À propos">
+        <UiIcon name="info" size={18} />
       </Link>
     </header>
   );

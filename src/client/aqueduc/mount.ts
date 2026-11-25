@@ -22,9 +22,9 @@ import { setTagWorkSink } from "./tagWork";
 export const START_VIEW = { center: CITY.center, zoom: 15.4, pitch: 58, bearing: -25 };
 
 /** Marges de la caméra pendant le scénario : récit à gauche, frise en bas, fiche à droite si ouverte. */
-const GAP = 14;
+const GAP = 12;
 const STORY_W = 300;
-const TIMELINE_H = 118;
+const TIMELINE_H = 116;
 const INSPECTOR_W = 320;
 
 /**

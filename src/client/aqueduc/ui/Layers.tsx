@@ -110,7 +110,7 @@ export function Layers() {
           <button type="button" className="aq-btn aq-pri aq-launch" onClick={() => startScenario()}>
             Lancer le scénario de bris
           </button>
-          <p className="tr-envpanel-help">Bris de 14 h au centre-ville, en 5 étapes (simulation).</p>
+          <p className="tr-envpanel-help">Bris de 14 h au centre-ville, en 5 étapes (simulation)</p>
         </>
       }
     >

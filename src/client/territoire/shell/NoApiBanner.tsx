@@ -8,6 +8,7 @@
 import { useEffect, useRef, useState } from "react";
 import { CITY, SIM_CREDIT } from "@/lib/aqueduc/city";
 import { useTerritoire } from "../useTerritoire";
+import { UiIcon } from "./EnvIcon";
 
 export const VIDEO_URL = "/aqueduc/scenario-hic.webm";
 const DISMISS_KEY = "aq-noapi-dismissed";
@@ -116,7 +117,7 @@ export function NoApiBanner() {
           aria-label="Fermer le bandeau"
           onClick={dismiss}
         >
-          ×
+          <UiIcon name="close" />
         </button>
       </div>
       {how && !lost && (
