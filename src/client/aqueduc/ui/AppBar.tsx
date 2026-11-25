@@ -132,7 +132,10 @@ export function AppBar({ map, net, metrics, tubes }: { map: MlMap | null; net: N
       <span className="aq-spacer" />
       {!scenario && (
         <button type="button" className="aq-btn aq-pri aq-launch" disabled={!net} onClick={() => startScenario()}>
-          Lancer le scénario de bris
+          <span className="aq-launch-long">Lancer le scénario de bris</span>
+          <span className="aq-launch-short" aria-hidden="true">
+            Scénario de bris
+          </span>
         </button>
       )}
       <Clock />

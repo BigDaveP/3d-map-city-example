@@ -18,6 +18,8 @@
   --aq-numf: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
   --aq-shadow: 0 6px 20px rgba(20, 33, 51, 0.12);
   --aq-gap: 14px;
+  /* hauteur réservée à l'attribution (une ligne), au-dessus de la frise : fiche et récit s'arrêtent au-dessus */
+  --aq-attrib: 30px;
   /* menu des démos (thème sombre par défaut) : jetons clairs */
   --panel: #ffffff;
   --line: #e1e6ed;
@@ -100,6 +102,19 @@ html[data-aq="app"] .aq-ssr { display: none; }
 .aq-bar .demo-nav dialog::backdrop { background: rgba(20, 33, 51, 0.35); }
 .aq-bar .demo-nav dialog form button { color: #fff; }
 
+/* ---------------------------------------------------------------- bandeau « sans l'API » */
+/* dans le flux, entre la barre et la carte : ne recouvre ni les commandes ni l'attribution */
+.aq-noapi { position: relative; z-index: 15; flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 4px var(--aq-gap); padding: 5px 44px 5px var(--aq-gap); background: #fdf3e1; border-bottom: 1px solid #ecd9b4; font-size: 12.5px; }
+.aq-noapi-text { margin: 0; flex: 1 1 320px; color: #5c3d00; }
+.aq-noapi-btns { display: flex; flex-wrap: wrap; gap: 6px; }
+.aq-noapi .aq-btn { padding: 3px 9px; }
+.aq-noapi-x { top: 50%; right: 8px; margin-top: -15px; }
+.aq-noapi-how { flex: 1 1 100%; margin: 0; color: var(--aq-ink); }
+.aq-noapi-how code { font-family: var(--aq-numf); font-size: 12px; background: #fff; border: 1px solid #ecd9b4; border-radius: 4px; padding: 0 4px; overflow-wrap: anywhere; }
+.aq-noapi-video { position: fixed; inset: 0; z-index: 80; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(20, 33, 51, 0.6); }
+.aq-noapi-frame { display: grid; justify-items: end; gap: 8px; max-width: min(960px, 100%); }
+.aq-noapi-frame video { width: 100%; max-height: calc(100dvh - 90px); border-radius: 10px; background: #000; }
+
 /* ---------------------------------------------------------------- couches */
 .aq-layers { left: var(--aq-gap); top: var(--aq-gap); width: 216px; font-size: 12.5px; }
 .aq-layers-h { display: flex; width: 100%; align-items: center; justify-content: space-between; padding: 10px 12px; border: 0; background: none; border-radius: 12px; font: 600 10.5px var(--aq-ui); letter-spacing: 0.08em; text-transform: uppercase; color: var(--aq-ink-2); cursor: pointer; }
@@ -151,7 +166,7 @@ html[data-aq="app"] .aq-ssr { display: none; }
 .aq-tl-cursor span { position: absolute; top: 34%; left: 6px; padding: 0 3px; font-size: 11.5px; font-weight: 700; color: var(--aq-ink); background: rgba(255, 255, 255, 0.9); border-radius: 3px; }
 
 /* ---------------------------------------------------------------- fiche */
-.aq-inspector { right: var(--aq-gap); top: var(--aq-gap); max-height: calc(100% - 118px - 3 * var(--aq-gap)); width: 320px; overflow: auto; padding: 16px; font-size: 12.5px; }
+.aq-inspector { right: var(--aq-gap); top: var(--aq-gap); max-height: calc(100% - 118px - 3 * var(--aq-gap) - var(--aq-attrib)); width: 320px; overflow: auto; padding: 16px; font-size: 12.5px; }
 .aq-close { position: absolute; top: 8px; right: 8px; width: 30px; height: 30px; border: 0; border-radius: 8px; background: none; color: var(--aq-ink-2); font-size: 20px; line-height: 1; cursor: pointer; }
 .aq-close:hover { background: var(--aq-bg); }
 .aq-insp-h { display: flex; flex-direction: column; gap: 4px; padding-right: 30px; margin-bottom: 10px; }
@@ -174,8 +189,9 @@ html[data-aq="app"] .aq-ssr { display: none; }
 
 /* ---------------------------------------------------------------- récit du scénario (maquette C) */
 .aq-launch { flex: none; }
+.aq-launch-short { display: none; }
 .aq-tl-scenario { font-size: 11px; font-weight: 600; color: var(--aq-accent); }
-.aq-story { left: var(--aq-gap); top: var(--aq-gap); bottom: calc(118px + 2 * var(--aq-gap)); width: 300px; z-index: 5; display: flex; flex-direction: column; gap: 10px; padding: 16px; overflow: auto; font-size: 12.5px; }
+.aq-story { left: var(--aq-gap); top: var(--aq-gap); bottom: calc(118px + 2 * var(--aq-gap) + var(--aq-attrib)); width: 300px; z-index: 5; display: flex; flex-direction: column; gap: 10px; padding: 16px; overflow: auto; font-size: 12.5px; }
 .aq-story .aq-h3 { margin: 0; }
 .aq-story h2 { margin: 0; font-size: 18px; line-height: 1.25; letter-spacing: -0.005em; }
 .aq-story h2:focus { outline: none; }
@@ -280,14 +296,23 @@ html[data-aq="app"] .aq-ssr { display: none; }
 .aq-attrib { margin: 28px 0 0; font-size: 12px; color: var(--aq-ink-2); }
 
 /* ---------------------------------------------------------------- écrans étroits */
-@media (max-width: 1100px) {
-  .aq-city { display: none; }
+/* la barre tient sur une ligne dès 1280 px : le nom de la ville, le jour de l'horloge puis
+   l'intitulé long du scénario s'effacent avant que la recherche ne soit rognée */
+@media (max-width: 1560px) {
+  .aq-city,
+  .aq-clock-day { display: none; }
 }
-@media (max-width: 860px) {
-  .aq-bar { flex-wrap: wrap; gap: 8px; padding: 6px 10px; }
+@media (max-width: 1360px) {
+  .aq-bar { gap: 10px; }
+  .aq-launch-long { display: none; }
+  .aq-launch-short { display: inline; }
+}
+/* en dessous, la barre passe sur deux lignes : la recherche prend toute la seconde */
+@media (max-width: 1220px) {
+  .aq-bar { flex-wrap: wrap; gap: 6px; padding: 6px 10px; }
   .aq-search { order: 10; flex: 1 1 100%; }
   .aq-spacer { display: none; }
-  .aq-clock-day { display: none; }
+  .aq-app { --aq-attrib: 52px; }
 }
 @media (max-width: 720px) {
   .aq-app { --aq-gap: 10px; }
@@ -297,10 +322,10 @@ html[data-aq="app"] .aq-ssr { display: none; }
   .aq-tl-l { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 4px 10px; padding: 8px 12px; border-right: 0; border-bottom: 1px solid var(--aq-line); }
   .aq-tl-title { flex: 1 1 100%; }
   .aq-tl-btns { margin: 0 0 0 auto; }
-  .aq-inspector { left: var(--aq-gap); width: auto; top: auto; bottom: 168px; max-height: calc(100% - 230px); }
+  .aq-inspector { left: var(--aq-gap); width: auto; top: auto; bottom: 244px; max-height: calc(100% - 306px); }
   /* récit en haut, fiche en bas : les deux tiennent sans se recouvrir */
   .aq-story { right: var(--aq-gap); width: auto; bottom: auto; max-height: 42%; padding: 12px; }
-  .aq-stage:has(.aq-story) .aq-inspector { max-height: calc(58% - 190px); }
+  .aq-stage:has(.aq-story) .aq-inspector { max-height: calc(58% - 266px); min-height: 90px; }
   .aq-story-steps li:not([data-state="now"]) { display: none; }
   .aq-stage .maplibregl-ctrl-attrib.maplibregl-compact { margin-bottom: 4px; }
   .aq-stage .maplibregl-ctrl-bottom-right { bottom: 166px; }

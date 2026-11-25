@@ -30,6 +30,7 @@ import { aqueducStore, select, type AqState, type Mode, type Selection } from ".
 import { AppBar } from "./ui/AppBar";
 import { Inspector } from "./ui/Inspector";
 import { Layers } from "./ui/Layers";
+import { NoApiBanner } from "./ui/NoApiBanner";
 import { Story } from "./ui/Story";
 import { Timeline } from "./ui/Timeline";
 import { useAq } from "./useAq";
@@ -251,6 +252,7 @@ export default function AqueducApp({ initialMode }: { initialMode?: Mode }) {
   return (
     <div className="aq-app" data-mode={mode}>
       <AppBar map={ctx?.map ?? null} net={ctx?.net ?? null} metrics={ctx?.metrics ?? null} tubes={tubes?.stats ?? null} />
+      <NoApiBanner />
       <main className="aq-stage">
         <div className="aq-map" ref={container} role="region" aria-label="Carte 3D du réseau d'aqueduc de Trois-Rivières" />
         {!ctx && !error && (

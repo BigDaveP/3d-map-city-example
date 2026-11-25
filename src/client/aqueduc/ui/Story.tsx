@@ -8,7 +8,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Map as MlMap } from "maplibre-gl";
 import { SCENARIO_STEPS, type StepId } from "@/lib/aqueduc/scenario";
-import { download, recordMap } from "../../carte/video";
+import { canRecord, download, recordMap } from "../../carte/video";
 import { clockTime, num } from "../format";
 import type { NetIndex } from "../net";
 import { exploreFreely, goToStep, nextStep, prevStep, replayForVideo, startScenario } from "../scenarioController";
@@ -63,8 +63,12 @@ function StepFigure({ net, step }: { net: NetIndex; step: StepId }) {
 function useVideoExport(map: MlMap) {
   const [state, setState] = useState<{ busy: boolean; msg: string }>({ busy: false, msg: "" });
   const url = useRef("");
+  const [supported, setSupported] = useState(true);
+  // le navigateur est interrogé après le montage (rien à lire côté serveur)
+  useEffect(() => setSupported(canRecord()), []);
   useEffect(() => () => void (url.current && URL.revokeObjectURL(url.current)), []);
   const run = async () => {
+    if (!canRecord()) return setState({ busy: false, msg: "Votre navigateur ne sait pas enregistrer la carte." });
     setState({ busy: true, msg: "Enregistrement de la séquence (10 s)…" });
     const stop = replayForVideo();
     try {
@@ -80,19 +84,21 @@ function useVideoExport(map: MlMap) {
       goToStep("rapport");
     }
   };
-  return { ...state, run };
+  return { ...state, supported, run };
 }
 
 function ExportVideo({ video }: { video: ReturnType<typeof useVideoExport> }) {
   const mode = useAq((s) => s.mode);
   return (
     <div className="aq-story-export">
-      <button type="button" className="aq-btn aq-pri" disabled={video.busy} onClick={video.run}>
+      <button type="button" className="aq-btn aq-pri" disabled={video.busy || !video.supported} onClick={video.run}>
         {video.busy ? "Enregistrement…" : "Exporter la vidéo"}
       </button>
       <p className="aq-note" role="status">
         {video.msg ||
-          (mode === "hic"
+          (!video.supported
+            ? "Export indisponible : ce navigateur ne prend pas en charge l'enregistrement de la carte (MediaRecorder et canvas.captureStream)."
+            : mode === "hic"
             ? "10 s : les étapes rejouées, avec les inscriptions de la scène."
             : "10 s : en mode classique, la vidéo ne contient que la carte (les étiquettes DOM n'y sont pas).")}
       </p>
@@ -154,7 +160,7 @@ export function Story({ map, net }: { map: MlMap; net: NetIndex }) {
             Étape suivante →
           </button>
         )}
-        <button type="button" className="aq-btn aq-story-exit" onClick={() => exploreFreely()}>
+        <button type="button" className="aq-btn aq-story-exit" disabled={video.busy} onClick={() => exploreFreely()}>
           Explorer librement
         </button>
       </div>

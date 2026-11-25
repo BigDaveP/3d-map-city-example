@@ -4,7 +4,8 @@
  *   SHOT=chemin.png pour enregistrer une capture de la page d'accueil (mode classique, 1440 × 860) ;
  *   SHOT_HIC=chemin.png pour la même vue en mode HTML-in-Canvas ;
  *   SHOT_SCENARIO_HIC / SHOT_SCENARIO_CLASSIC=chemin.png : étape 2 du scénario (isolation, coupe) ;
- *   SHOT_UNDERGROUND=chemin.png : vue souterraine (HTML-in-Canvas) sur le tronçon 13C1949.
+ *   SHOT_UNDERGROUND=chemin.png : vue souterraine (HTML-in-Canvas) sur le tronçon 13C1949 ;
+ *   SHOT_NOAPI / SHOT_BAR_1440 / SHOT_BAR_1024=chemin.png : bandeau sans l'API, barre à 1440 et 1024 px.
  * Sortie : une ligne OK/ÉCHEC par point de contrôle ; code de sortie 1 si un échec.
  * Les tuiles viennent d'OpenFreeMap : chargements courts, une seule vue par page.
  */
@@ -22,8 +23,46 @@ function check(name: string, ok: boolean, detail = "") {
 function collectErrors(p: Page) {
   const errors: string[] = [];
   p.on("pageerror", (e) => errors.push(`exception : ${e.message}`));
-  p.on("console", (m) => m.type() === "error" && errors.push(`console : ${m.text()}`));
+  // le sondage HEAD de la vidéo (absente tant qu'elle n'est pas publiée) laisse un 404 attendu dans la console
+  p.on("console", (m) => m.type() === "error" && !m.location().url.endsWith("/aqueduc/scenario-hic.webm") && errors.push(`console : ${m.text()}`));
   return errors;
+}
+
+/** Rectangles qui se recouvrent (px CSS). */
+const overlaps = (a: { left: number; right: number; top: number; bottom: number }, b: { left: number; right: number; top: number; bottom: number }) =>
+  a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+
+/** R19-3 : l'attribution est entière, lisible, non recouverte par la fiche, le récit ni la frise. */
+async function attributionClear(p: Page, label: string) {
+  const r = await p.evaluate(() => {
+    const a = document.querySelector<HTMLElement>(".maplibregl-ctrl-attrib");
+    if (!a) return null;
+    const box = a.getBoundingClientRect();
+    const others = [...document.querySelectorAll<HTMLElement>(".aq-inspector, .aq-story, .aq-timeline, .aq-layers, .aq-noapi")].map((e) => ({ cls: e.className.split(" ")[0], r: e.getBoundingClientRect() }));
+    // sur chaque lien de l'attribution, l'élément du dessus doit être l'attribution elle-même
+    const covered = [...a.querySelectorAll("a")].filter((l) => {
+      const q = l.getBoundingClientRect();
+      const top = document.elementFromPoint(q.left + q.width / 2, q.top + q.height / 2);
+      return !top || !a.contains(top);
+    }).length;
+    return { text: a.textContent ?? "", box: { left: box.left, right: box.right, top: box.top, bottom: box.bottom }, others: others.map((o) => ({ cls: o.cls, r: { left: o.r.left, right: o.r.right, top: o.r.top, bottom: o.r.bottom } })), covered, vw: innerWidth, vh: innerHeight };
+  });
+  if (!r) return check(`${label} : attribution présente`, false);
+  const hit = r.others.filter((o) => overlaps(o.r, r.box)).map((o) => o.cls);
+  check(`${label} : attribution complète (CC-BY 4.0, OpenFreeMap)`, /CC-BY 4\.0/.test(r.text) && /OpenFreeMap/.test(r.text), r.text.slice(0, 80));
+  check(`${label} : attribution dans la fenêtre et non recouverte`, r.box.left >= 0 && r.box.right <= r.vw && r.box.bottom <= r.vh && hit.length === 0 && r.covered === 0, `recouvre ${hit.join(", ") || "rien"}, ${r.covered} lien(s) masqué(s)`);
+}
+
+/** R19-4 : tout ce que la barre contient tient dans la fenêtre, la recherche garde une largeur utile. */
+async function barFits(p: Page, label: string, minSearch: number) {
+  const r = await p.evaluate(() => {
+    const bar = document.querySelector<HTMLElement>(".aq-app .aq-bar")!;
+    const kids = [...bar.children].filter((e) => (e as HTMLElement).offsetParent !== null || getComputedStyle(e).position === "fixed").map((e) => ({ cls: (e as HTMLElement).className.toString().split(" ")[0], r: e.getBoundingClientRect() }));
+    const search = document.querySelector<HTMLElement>(".aq-search input");
+    return { vw: innerWidth, sw: document.documentElement.scrollWidth, barScroll: bar.scrollWidth, barClient: bar.clientWidth, out: kids.filter((k) => k.r.right > innerWidth + 0.5 || k.r.left < -0.5).map((k) => k.cls), search: search && search.offsetParent ? search.getBoundingClientRect().width : 0, h: bar.getBoundingClientRect().height };
+  });
+  check(`${label} : barre sans débordement`, r.out.length === 0 && r.barScroll <= r.barClient && r.sw === r.vw, `hors fenêtre : ${r.out.join(", ") || "rien"}, scrollWidth ${r.sw}/${r.vw}, barre ${r.barScroll}/${r.barClient}`);
+  check(`${label} : recherche utilisable (≥ ${minSearch} px)`, r.search >= minSearch, `${Math.round(r.search)} px, barre ${Math.round(r.h)} px de haut`);
 }
 
 async function ssrWithoutJs(b: Browser) {
@@ -53,7 +92,13 @@ async function narrow(b: Browser, js: boolean) {
   }
   const w = await p.evaluate(() => document.documentElement.scrollWidth);
   check("aucun défilement horizontal (scrollWidth = 390)", w === 390, `scrollWidth ${w}`);
-  if (js) check("aucune erreur console", errors.length === 0, errors.join(" | "));
+  if (js) {
+    // fiche ouverte sur un téléphone : l'attribution (dépliée au départ) reste lisible
+    await p.evaluate(() => (window as any).__aqueduc.store.setState({ selection: { kind: "segment", id: "13C1949" } }));
+    await p.waitForTimeout(600);
+    await attributionClear(p, "390 px, fiche ouverte");
+    check("aucune erreur console", errors.length === 0, errors.join(" | "));
+  }
   await ctx.close();
 }
 
@@ -143,6 +188,7 @@ async function classic(b: Browser) {
     await insp.waitFor({ timeout: 5_000 }).catch(() => {});
     const text = (await insp.count()) ? await insp.innerText() : "";
     for (const s of ["13C1949", "300 mm", "Fonte grise", "1920"]) check(`fiche : « ${s} »`, text.includes(s));
+    await attributionClear(p, "fiche ouverte (classique)");
     await p.keyboard.press("Escape");
     check("Échap ferme la fiche", (await insp.count()) === 0);
   }
@@ -450,6 +496,7 @@ async function scenarioHic(b: Browser) {
   check("deux vannes, vrais boutons « V-xx · à fermer »", r.valves.length === 2 && r.valves.every((t) => /^V-\d+ · à fermer$/.test(t ?? "")), r.valves.join(" | "));
   check("rien d'autre ne flotte : récit et frise seulement", r.panels.length === 2 && r.panels.some((c) => c.includes("aq-story")) && r.panels.some((c) => c.includes("aq-timeline")), r.panels.join(" | "));
   check("pas de repli en mode classique", !r.fallback, r.fallback);
+  await attributionClear(p, "récit (HTML-in-Canvas)");
   if (process.env.SHOT_SCENARIO_HIC) {
     await p.waitForTimeout(3000);
     await p.screenshot({ path: process.env.SHOT_SCENARIO_HIC });
@@ -526,6 +573,7 @@ async function scenarioClassic(b: Browser) {
   const valves = p.locator("[data-testid=inspector] .aq-cut-card button");
   check("fiche de l'incident ouverte d'office, coupe 2D et « Vannes à fermer »", /Vannes à fermer/.test(text) && (await p.locator(".aq-cut-card svg").count()) === 1, text.replace(/\n/g, " ").slice(0, 120));
   check("deux vannes, vrais boutons « V-xx · à fermer »", (await valves.count()) === 2 && (await valves.allInnerTexts()).every((t) => /^V-\d+ · à fermer$/.test(t)));
+  await attributionClear(p, "fiche de l'incident (classique)");
   if (process.env.SHOT_SCENARIO_CLASSIC) {
     await p.waitForTimeout(2500);
     await p.screenshot({ path: process.env.SHOT_SCENARIO_CLASSIC });
@@ -542,6 +590,123 @@ async function scenarioClassic(b: Browser) {
   check("fiche de l'incident refermée", (await insp.count()) === 0);
   check("aucune erreur console", errors.length === 0, errors.join(" | "));
   await ctx.close();
+}
+
+/** R19-4 : la barre d'application à plusieurs largeurs (le bouton du scénario est dans la barre). */
+async function appBar(b: Browser) {
+  console.log("\n== barre d'application, plusieurs largeurs");
+  for (const [w, minSearch] of [[1440, 240], [1280, 200], [1024, 140], [768, 140], [390, 200]] as const) {
+    const ctx = await b.newContext({ viewport: { width: w, height: 860 }, deviceScaleFactor: 1 });
+    const p = await ctx.newPage();
+    await p.goto(`${BASE}/?mode=classic`);
+    await p.waitForFunction(() => (window as any).__aqueduc, null, { timeout: 45_000 });
+    await p.waitForTimeout(600);
+    await barFits(p, `${w} px`, minSearch);
+    const launch = await p.locator(".aq-launch").isVisible();
+    check(`${w} px : bouton du scénario visible`, launch);
+    if (w === 1440 && process.env.SHOT_BAR_1440) await p.screenshot({ path: process.env.SHOT_BAR_1440, clip: { x: 0, y: 0, width: w, height: 120 } });
+    if (w === 1024 && process.env.SHOT_BAR_1024) await p.screenshot({ path: process.env.SHOT_BAR_1024, clip: { x: 0, y: 0, width: w, height: 120 } });
+    await ctx.close();
+  }
+}
+
+/**
+ * Visiteur sans l'API (Chromium lancé sans CanvasDrawElement) : mode classique, bandeau, vidéo
+ * seulement si le fichier répond 200 (faux fichier par `page.route`, il n'existe qu'après la tâche 12),
+ * explication « Comment l'activer », fermeture retenue pour la session.
+ */
+async function withoutApi() {
+  console.log("\n== / sans l'API HTML-in-Canvas");
+  const nb = await chromium.launch({ args: ["--disable-blink-features=CanvasDrawElement"] });
+  try {
+    const open = async (route: boolean, path = "/", width = 1440) => {
+      const ctx = await nb.newContext({ viewport: { width, height: 860 }, deviceScaleFactor: 1 });
+      if (route) await ctx.route("**/aqueduc/scenario-hic.webm", (r) => r.fulfill({ status: 200, contentType: "video/webm", body: Buffer.alloc(32) }));
+      const p = await ctx.newPage();
+      const errors = collectErrors(p);
+      await p.goto(`${BASE}${path}`);
+      await p.waitForFunction(() => (window as any).__aqueduc, null, { timeout: 45_000 });
+      return { ctx, p, errors };
+    };
+    const banner = (p: Page) => p.locator("[data-testid=noapi]");
+
+    // 1) sans fichier vidéo : bandeau, pas de bouton vidéo
+    let { ctx, p, errors } = await open(false);
+    const st = await p.evaluate(() => {
+      const s = (window as any).__aqueduc.store.getState();
+      return { mode: s.mode, api: s.api, hic: (window as any).__hicMap?.layer ?? null };
+    });
+    check("sans l'API : mode classique, API absente", st.mode === "classic" && st.api === "absente" && st.hic === null, `${st.mode} / ${st.api}`);
+    await banner(p).waitFor({ timeout: 5_000 }).catch(() => {});
+    const text = (await banner(p).count()) ? await banner(p).innerText() : "";
+    check("bandeau « Votre navigateur n'active pas HTML-in-Canvas : vous voyez la version classique. »", text.includes("Votre navigateur n'active pas HTML-in-Canvas : vous voyez la version classique."), text.slice(0, 90));
+    await p.waitForTimeout(800);
+    check("sans fichier vidéo : pas de bouton vidéo (Review Focus 1)", (await p.getByRole("button", { name: "Voir la version HTML-in-Canvas en vidéo" }).count()) === 0);
+    // « Comment l'activer » : le drapeau, puis relancer Chrome, et le jeton d'essai
+    await p.getByRole("button", { name: "Comment l'activer" }).click();
+    const how = await p.locator("#aq-noapi-how").innerText().catch(() => "");
+    check("« Comment l'activer » : chrome://flags/#canvas-draw-element, relancer Chrome, jeton d'essai", how.includes("chrome://flags/#canvas-draw-element") && /relancez Chrome/.test(how) && /jeton d'essai/.test(how), how);
+    // le bandeau ne recouvre ni les commandes ni l'attribution, et la carte reste complète
+    const geo = await p.evaluate(() => {
+      const b = document.querySelector("[data-testid=noapi]")!.getBoundingClientRect();
+      const st = document.querySelector(".aq-stage")!.getBoundingClientRect();
+      const bar = document.querySelector(".aq-app .aq-bar")!.getBoundingClientRect();
+      const hit = [".maplibregl-ctrl-attrib", ".aq-layers", ".aq-timeline"].filter((q) => {
+        const e = document.querySelector(q)?.getBoundingClientRect();
+        return e && e.top < b.bottom && e.bottom > b.top;
+      });
+      return { bannerH: b.height, below: b.top >= bar.bottom - 0.5 && b.bottom <= st.top + 0.5, hit, sw: document.documentElement.scrollWidth, vw: innerWidth };
+    });
+    check("bandeau compact, sous la barre, sans recouvrir les commandes de la carte", geo.below && geo.hit.length === 0 && geo.bannerH <= 80, `${Math.round(geo.bannerH)} px, recouvre ${geo.hit.join(", ") || "rien"}`);
+    await attributionClear(p, "bandeau ouvert");
+    if (process.env.SHOT_NOAPI) {
+      await p.waitForTimeout(2500);
+      await p.screenshot({ path: process.env.SHOT_NOAPI });
+      console.log(`capture : ${process.env.SHOT_NOAPI}`);
+    }
+    // fermeture mémorisée pour la session (même onglet : rechargement)
+    await p.getByRole("button", { name: "Fermer le bandeau" }).click();
+    check("bandeau fermé", (await banner(p).count()) === 0);
+    await p.reload();
+    await p.waitForFunction(() => (window as any).__aqueduc, null, { timeout: 45_000 });
+    await p.waitForTimeout(800);
+    check("fermeture retenue pour la session (après rechargement)", (await banner(p).count()) === 0);
+    check("aucune erreur console (sans l'API)", errors.length === 0, errors.join(" | "));
+    await ctx.close();
+
+    // 2) avec un fichier qui répond 200 : le bouton ouvre la vidéo
+    ({ ctx, p, errors } = await open(true));
+    const btn = p.getByRole("button", { name: "Voir la version HTML-in-Canvas en vidéo" });
+    await btn.waitFor({ timeout: 8_000 }).catch(() => {});
+    check("avec le fichier (200) : bouton vidéo présent", (await btn.count()) === 1);
+    if (await btn.count()) {
+      await btn.click();
+      const v = p.locator("video[controls]");
+      await v.waitFor({ timeout: 5_000 }).catch(() => {});
+      const src = (await v.count()) ? await v.getAttribute("src") : "";
+      check("le bouton ouvre un <video controls> sur scenario-hic.webm", /\/aqueduc\/scenario-hic\.webm$/.test(src ?? ""), String(src));
+      await p.keyboard.press("Escape");
+      check("Échap referme la vidéo", (await p.locator("video[controls]").count()) === 0);
+    }
+    await ctx.close();
+
+    // 3) ?mode=hic sans l'API : repli expliqué
+    ({ ctx, p, errors } = await open(false, "/?mode=hic"));
+    const fb = await p.evaluate(() => { const s = (window as any).__aqueduc.store.getState(); return { mode: s.mode, fallback: s.fallback }; });
+    check("/?mode=hic sans l'API : repli classique expliqué", fb.mode === "classic" && /API HTML-in-Canvas absente/.test(fb.fallback), fb.fallback);
+    check("bouton « HTML-in-Canvas » désactivé", await p.getByRole("button", { name: "HTML-in-Canvas", exact: true }).isDisabled());
+    await ctx.close();
+
+    // 4) mobile : aucun défilement horizontal avec le bandeau
+    ({ ctx, p, errors } = await open(false, "/", 390));
+    await banner(p).waitFor({ timeout: 5_000 }).catch(() => {});
+    await p.getByRole("button", { name: "Comment l'activer" }).click();
+    const sw = await p.evaluate(() => ({ sw: document.documentElement.scrollWidth, h: document.querySelector("[data-testid=noapi]")?.getBoundingClientRect().height ?? 0 }));
+    check("390 px avec le bandeau : aucun défilement horizontal", sw.sw === 390, `scrollWidth ${sw.sw}, bandeau ${Math.round(sw.h)} px`);
+    await ctx.close();
+  } finally {
+    await nb.close();
+  }
 }
 
 /** /carte en mode HTML-in-Canvas : 5 panneaux capturés, vérifiés par readPixels, sans repli. */
@@ -564,7 +729,7 @@ async function carteHic(b: Browser) {
     const w = window as any;
     const st = w.__carte.store.getState();
     const stats = w.__hicMap?.stats() ?? {};
-    return { mode: st.mode, fallback: st.fallback || stats.fallback || "", api: st.api, uploads: stats.uploads, verified: stats.verified, panels: w.__hicMap?.layer.panels.size };
+    return { mode: st.mode, fallback: st.fallback || stats.fallback || "", api: st.api, uploads: stats.uploads, verified: stats.verified, panels: w.__hicMap?.layer?.panels.size };
   });
   check("uploads ≥ 5 et verified ≥ 3", ok && r.uploads >= 5 && r.verified >= 3, `uploads ${r.uploads}, verified ${r.verified}`);
   check("5 panneaux dans la couche", r.panels === 5, String(r.panels));
@@ -592,6 +757,8 @@ try {
   await undergroundHic(b);
   await scenarioHic(b);
   await scenarioClassic(b);
+  await appBar(b);
+  await withoutApi();
   await carteHic(b);
   await otherPages();
 } finally {
