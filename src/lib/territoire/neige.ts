@@ -3,10 +3,30 @@
  * ressources et progression. Module pur, sans React ni navigateur.
  */
 import { actionsUpTo, atHour, dayStartOf, DAY_TIMES, type EnvAction, type ZoneId } from "./day";
-import { FLEET } from "./fleet";
+import { FLEET, type Resource } from "./fleet";
+import type { Polygon } from "./geo";
 import { snowTonightCm, snowWarning, SNOW_THRESHOLD_CM, type Forecast } from "./meteo";
 
 export { FLEET, type ResourceKind } from "./fleet";
+
+/** Zone de stationnement de nuit (réelle : Ville de Trois-Rivières, Données Québec). */
+export interface Zone {
+  id: ZoneId;
+  name: string;
+  polygon: Polygon;
+}
+/** Feu d'interdiction de stationnement (Simulation : emplacement le long des rues principales). */
+export interface Light {
+  id: string;
+  zone: ZoneId;
+  at: [number, number];
+}
+/** Réponse de `/api/territoire/deneigement`. */
+export interface DeneigementData {
+  zones: Zone[];
+  lights: Light[];
+  fleet: readonly Resource[];
+}
 
 const HOUR = 3_600_000;
 export const ZONES: readonly ZoneId[] = ["A", "B", "C"];
@@ -42,6 +62,21 @@ export function banDeadlinePassed(t: number): boolean {
   return t > atHour(dayStartOf(t), DAY_TIMES.decisionDeadline);
 }
 
+/**
+ * Fenêtre de décision de l'interdiction à l'instant t : « avant » jusqu'à la prévision du jour
+ * (07:30 ; la nuit, ce sont les équipes qui travaillent, et aucune décision ne se prend), « ouverte »
+ * de 07:30 à 15:00, « trop-tard » ensuite (les citoyens n'ont plus le temps de s'informer).
+ */
+export function banWindow(t: number): "avant" | "ouverte" | "trop-tard" {
+  if (t < atHour(dayStartOf(t), DAY_TIMES.forecastAt)) return "avant";
+  return banDeadlinePassed(t) ? "trop-tard" : "ouverte";
+}
+
+/** Décision d'interdiction du visiteur que le modèle retient : prise de jour, entre 07:30 et 15:00 (R5). */
+export function isDayBan(a: EnvAction): a is Extract<EnvAction, { kind: "ban" }> {
+  return a.kind === "ban" && banWindow(a.at) === "ouverte";
+}
+
 /** Ressources par zone : répartition circulaire dans l'ordre de FLEET, puis les `assign` du visiteur. */
 function assignment(actions: readonly EnvAction[]): Record<ZoneId, string[]> {
   const zoneOf = new Map<string, ZoneId | null>(FLEET.map((r, i) => [r.id, ZONES[i % ZONES.length]]));
@@ -57,7 +92,9 @@ function assignment(actions: readonly EnvAction[]): Record<ZoneId, string[]> {
 /**
  * Plan par zone à l'instant t (actions de la journée de t seulement).
  * Entre 00:00 et 06:00, c'est le plan par défaut de la veille : les `ban` du visiteur ne comptent pas
- * (ils repartent à minuit), mais les `assign` faits depuis minuit s'appliquent aux ressources.
+ * (ils repartent à minuit), mais les `assign` faits depuis minuit s'appliquent aux ressources. Seules
+ * les décisions de jour (07:30 à 15:00, `isDayBan`) comptent : une interdiction posée la nuit ne
+ * vaut pas pour le soir qui suit.
  */
 export function snowPlan(t: number, actions: readonly EnvAction[], _source: SnowSource): ZonePlan[] {
   const day = dayStartOf(t);
@@ -86,8 +123,7 @@ export function snowPlan(t: number, actions: readonly EnvAction[], _source: Snow
   const none = (zone: ZoneId): ZonePlan => ({ zone, ban: "aucune", decidedBy: null, decidedAt: null, resources: resources[zone], progress: 0, lights: "eteint" });
   if (t < atHour(day, DAY_TIMES.forecastAt)) return ZONES.map(none);
 
-  const deadline = atHour(day, DAY_TIMES.decisionDeadline);
-  const bans = today.filter((a): a is Extract<EnvAction, { kind: "ban" }> => a.kind === "ban" && a.at <= deadline);
+  const bans = today.filter(isDayBan);
   const visitor = bans.length > 0 ? bans[bans.length - 1] : null;
   const defaultAt = atHour(day, DAY_TIMES.defaultDecisionAt);
   const decision =

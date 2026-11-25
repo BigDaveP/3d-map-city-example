@@ -2,7 +2,7 @@
 import { scenarioSteps } from "../aqueduc/scenario";
 import { actionsUpTo, atHour, dayStartOf, DAY_TIMES, type EnvAction } from "./day";
 import type { EnvFocus, EnvId } from "./envs";
-import { snowPlan, type SnowSource } from "./neige";
+import { isDayBan, snowPlan, type SnowSource } from "./neige";
 
 export type Severity = "critique" | "attention" | "info";
 export interface Alert {
@@ -41,7 +41,7 @@ export function deneigementAlertsWith(t: number, actions: readonly EnvAction[], 
   if (t < time("forecastAt")) return out;
 
   const deadline = time("decisionDeadline");
-  const visitorBan = actionsUpTo(actions, t).some((a) => a.kind === "ban" && a.at <= deadline);
+  const visitorBan = actionsUpTo(actions, t).some(isDayBan);
   const decided = visitorBan || (defaultDecision && t >= time("defaultDecisionAt"));
 
   if (!decided) {

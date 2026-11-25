@@ -99,3 +99,8 @@ test("summarize compte par gravité", () => {
   assert.deepEqual(summarize([mk("critique"), mk("info"), mk("info"), mk("attention")]), { critique: 1, attention: 1, info: 2 });
   assert.deepEqual(summarize([]), { critique: 0, attention: 0, info: 0 });
 });
+
+test("déneigement : une interdiction posée la nuit ne retire pas l'alerte de décision du matin (R5)", () => {
+  const night: EnvAction = { at: at("02:00"), kind: "ban", zones: ["A"] };
+  assert.equal(deneigementAlerts(at("08:00"), [night], sim)[0]?.id, "neige-decision");
+});

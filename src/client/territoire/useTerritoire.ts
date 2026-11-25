@@ -11,15 +11,20 @@ export function useTerritoire<T>(sel: (s: TerritoireState) => T): T {
   return useStore(territoireStore, sel);
 }
 
-/** Heure simulée, rafraîchie toutes les `everyMs` ms (et à chaque changement d'horloge). */
+/**
+ * Heure simulée, rafraîchie toutes les `everyMs` ms, à chaque changement d'horloge et à chaque
+ * décision : une action est datée à l'heure simulée exacte, plus tard que la dernière lecture ;
+ * sans relecture, `actionsUpTo` l'ignorerait jusqu'au tic suivant.
+ */
 export function useSimNow(everyMs = 1000): number {
   const clock = useTerritoire((s) => s.clock);
+  const actions = useTerritoire((s) => s.actions);
   const [t, setT] = useState(() => simNow());
   useEffect(() => {
     setT(simNow());
     const id = setInterval(() => setT(simNow()), everyMs);
     return () => clearInterval(id);
-  }, [clock, everyMs]);
+  }, [clock, actions, everyMs]);
   return t;
 }
 

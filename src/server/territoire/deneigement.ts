@@ -2,25 +2,10 @@
 import "server-only";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import type { ZoneId } from "@/lib/territoire/day";
 import { FLEET } from "@/lib/territoire/fleet";
-import type { Polygon } from "@/lib/territoire/geo";
+import type { DeneigementData, Light, Zone } from "@/lib/territoire/neige";
 
-export interface Zone {
-  id: ZoneId;
-  name: string;
-  polygon: Polygon;
-}
-export interface Light {
-  id: string;
-  zone: ZoneId;
-  at: [number, number];
-}
-export interface DeneigementData {
-  zones: Zone[];
-  lights: Light[];
-  fleet: typeof FLEET;
-}
+export type { DeneigementData, Light, Zone } from "@/lib/territoire/neige";
 
 const g = globalThis as unknown as { __deneigementData?: DeneigementData };
 

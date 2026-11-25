@@ -8,7 +8,7 @@ import type { EnvModule } from "./types";
 
 export const MODULES: Partial<Record<EnvId, () => Promise<EnvModule>>> = {
   aqueduc: () => import("./aqueduc").then((m) => m.loadAqueduc()),
-  deneigement: () => import("./deneigement").then((m) => m.deneigement),
+  deneigement: () => import("./deneigement").then((m) => m.loadDeneigement()),
 };
 
 const loading = new Map<EnvId, Promise<EnvModule>>();

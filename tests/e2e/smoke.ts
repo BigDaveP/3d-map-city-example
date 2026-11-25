@@ -7,16 +7,19 @@
  *   SHOT_UNDERGROUND=chemin.png : vue souterraine (HTML-in-Canvas) sur le tronçon 13C1949 ;
  *   SHOT_NOAPI / SHOT_BAR_1440 / SHOT_BAR_1024=chemin.png : bandeau sans l'API, barre à 1440 et 1024 px ;
  *   SHOT_SWITCHER=chemin.png : sélecteur d'environnement ouvert (HTML-in-Canvas) ;
- *   SHOT_HOME / SHOT_BELL / SHOT_ABOUT=chemin.png : accueil à 14:05, cloche ouverte, « À propos ».
+ *   SHOT_HOME / SHOT_BELL / SHOT_ABOUT=chemin.png : accueil à 14:05, cloche ouverte, « À propos » ;
+ *   SHOT_DN_1030 / SHOT_DN_2330 / SHOT_DN_CARD=chemin.png : Déneigement (HTML-in-Canvas) à 10:30, à
+ *   23:30 avec les zones A et B en vigueur, puis la fiche de la zone A.
  * Chaque page de l'application a son horloge épinglée à 12:00 de la journée de référence
  * (`pin`) : les vérifications ne dépendent pas de l'heure du lancement.
  * Sortie : une ligne OK/ÉCHEC par point de contrôle ; code de sortie 1 si un échec.
  * Les tuiles viennent d'OpenFreeMap : chargements courts, une seule vue par page.
  */
-import { stat } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { chromium, type Browser, type Page } from "playwright";
 import { SCENARIO_DAY } from "../../src/lib/aqueduc/scenario";
 import { atHour } from "../../src/lib/territoire/day";
+import { parseCityPage } from "../../src/lib/territoire/meteo";
 
 const BASE = process.env.BASE_URL ?? "http://localhost:3000";
 /** Vue 3D de l'aqueduc (la scène persistante de `/carte`). */
@@ -34,7 +37,8 @@ function collectErrors(p: Page) {
   const errors: string[] = [];
   p.on("pageerror", (e) => errors.push(`exception : ${e.message}`));
   // le cas « sans fichier vidéo » du visiteur sans l'API simule un 404 (page.route) : erreur console attendue
-  p.on("console", (m) => m.type() === "error" && !m.location().url.endsWith("/aqueduc/scenario-hic.webm") && errors.push(`console : ${m.text()}`));
+  // la panne de la météo (Déneigement, ruling P2) simule un 500 sur /api/territoire/meteo : erreur console attendue
+  p.on("console", (m) => m.type() === "error" && !m.location().url.endsWith("/aqueduc/scenario-hic.webm") && !m.location().url.endsWith("/api/territoire/meteo") && errors.push(`console : ${m.text()}`));
   return errors;
 }
 
@@ -214,6 +218,10 @@ async function sceneState(p: Page) {
       streams: w.__openStreams ? w.__openStreams.size : -1,
       hicGlobal: !!w.__hicMap,
       attribution: document.querySelector(".maplibregl-ctrl-attrib")?.textContent ?? "",
+      panelKeys: [...canvas.querySelectorAll<HTMLElement>("[data-panel]")].map((e) => e.dataset.panel ?? "").sort(),
+      dnLayers: style.layers.filter((l: { id: string }) => l.id.startsWith("dn-")).map((l: { id: string }) => l.id) as string[],
+      dnSources: Object.keys(style.sources).filter((k) => k.startsWith("dn-")),
+      snowApi: !!w.__territoire.snow,
     };
   });
 }
@@ -294,7 +302,8 @@ async function envSwitch(b: Browser) {
   check("URL /carte/deneigement, sans rechargement de la page", moved && after.noReload && new URL(p.url()).pathname === "/carte/deneigement", p.url());
   check("même carte (même objet, même __id) et même canvas", after.sameMap && after.id === before.id && after.sameCanvas && after.canvases === 1, `__id ${before.id} → ${after.id}, ${after.canvases} canvas`);
   check("couches de l'aqueduc retirées (aq-pipes absente, aucune couche ni source aq-*)", !after.pipes && after.aqLayers.length === 0 && after.aqSources.length === 0, `${after.aqLayers.join(" ")} ${after.aqSources.join(" ")}`);
-  check("surfaces HTML-in-Canvas démontées (couche, éléments, attributs du canvas), API de l'aqueduc retirée", !after.hicLayer && !after.hicGlobal && after.surfaces === 0 && !after.layoutsubtree && after.markers === 0 && !after.aqueducApi, JSON.stringify({ hic: after.hicLayer, global: after.hicGlobal, surfaces: after.surfaces, layoutsubtree: after.layoutsubtree, markers: after.markers, api: after.aqueducApi }));
+  check("surfaces de l'aqueduc démontées, API de l'aqueduc retirée ; seuls les marquages des zones A, B, C dans le canvas", after.panelKeys.join(" ") === "zone:A zone:B zone:C" && after.markers === 0 && !after.aqueducApi, JSON.stringify({ keys: after.panelKeys, markers: after.markers, api: after.aqueducApi }));
+  check("déneigement monté : couches dn-zone-fill, dn-zone-line, dn-lights, pilotage __territoire.snow", ["dn-zone-fill", "dn-zone-line", "dn-lights"].every((id) => after.dnLayers.includes(id)) && after.dnSources.length === 2 && after.snowApi, `${after.dnLayers.join(" ")} · ${after.dnSources.join(" ")}`);
   check("flux des capteurs fermé (aucun EventSource ouvert)", before.streams === 1 && after.streams === 0, `${before.streams} → ${after.streams}`);
   check("panneau « Déneigement », barre à jour", (await panel.count()) === 1 && (await p.locator(".tr-crumb").innerText()).includes("Déneigement"));
   check("attribution du déneigement (zones), plus celle des conduites", /Zones de stationnement de nuit/.test(after.attribution) && !/Conduites/.test(after.attribution) && /OpenFreeMap/.test(after.attribution), after.attribution.slice(0, 120));
@@ -315,6 +324,7 @@ async function envSwitch(b: Browser) {
     .catch(() => false);
   const again = await sceneState(p);
   check("retour à l'aqueduc : mêmes carte et canvas, couches, surfaces et flux revenus", again.sameMap && again.sameCanvas && again.pipes && again.hicLayer && back && again.aqueducApi && again.noReload && again.streams === 1, JSON.stringify({ pipes: again.pipes, hic: again.hicLayer, surfaces: again.surfaces, streams: again.streams }));
+  check("déneigement démonté sans fuite : aucune couche ni source dn-*, aucun marquage zone:*, __territoire.snow retiré", again.dnLayers.length === 0 && again.dnSources.length === 0 && !again.panelKeys.some((k) => k.startsWith("zone:")) && !again.snowApi, JSON.stringify({ layers: again.dnLayers, sources: again.dnSources, keys: again.panelKeys.filter((k) => k.startsWith("zone:")), snow: again.snowApi }));
 
   // recherche depuis un autre environnement : le résultat y ramène et ouvre sa fiche (focus)
   await opener.click();
@@ -1133,7 +1143,15 @@ async function bellInScene(b: Browser) {
   await p.locator(".tr-envpanel h2", { hasText: "Déneigement" }).waitFor({ timeout: 10_000 }).catch(() => {});
   await p.waitForTimeout(300);
   const f = await p.evaluate(() => (window as any).__territoire.store.getState().focus);
-  check("recherche « Zone A » : arrivée au déneigement, focus effacé", new URL(p.url()).pathname === "/carte/deneigement" && f === null, JSON.stringify(f));
+  const zoneCard = await p.locator("[data-testid=inspector]").innerText({ timeout: 10_000 }).catch(() => "");
+  check("recherche « Zone A » : arrivée au déneigement, focus consommé, fiche « Zone A » ouverte", new URL(p.url()).pathname === "/carte/deneigement" && f === null && /Zone A\s+Zone de stationnement de nuit/.test(zoneCard), `${JSON.stringify(f)} ${zoneCard.slice(0, 60).replace(/\n/g, " ")}`);
+  // une ressource, dans le même environnement : sa fiche, focus consommé
+  await p.locator(".aq-search input").fill("CH-02");
+  await p.keyboard.press("ArrowDown");
+  await p.keyboard.press("Enter");
+  const resCard = await p.locator("[data-testid=inspector]", { hasText: "CH-02" }).innerText({ timeout: 5_000 }).catch(() => "");
+  const f2 = await p.evaluate(() => (window as any).__territoire.store.getState().focus);
+  check("recherche « CH-02 » dans le déneigement : fiche de la ressource (chenillette, zone assignée), focus consommé", resCard.includes("Chenillette") && resCard.includes("Zone assignée") && f2 === null, resCard.slice(0, 80).replace(/\n/g, " "));
   check("aucune erreur console", errors.length === 0, errors.join(" | "));
   await ctx.close();
 }
@@ -1174,6 +1192,219 @@ async function benchPage() {
   check("/bench/aqueduc.csv → 200", csv.status === 200, String(csv.status));
 }
 
+
+/** Plans du déneigement par `window.__territoire.snow` : « A:programmee »… */
+const snowPlans = (p: Page) => p.evaluate(() => ((window as any).__territoire.snow.plans() as { zone: string; ban: string; lights: string }[]).map((x) => `${x.zone}:${x.ban}`).join(" "));
+
+/** État (feature-state) des feux d'une zone, lus par querySourceFeatures. */
+const lightStates = (p: Page, zone: string) =>
+  p.evaluate((z) => {
+    const map = (window as any).__territoire.map;
+    const ids = new Set<string>(map.querySourceFeatures("dn-lights").filter((f: any) => f.properties.zone === z).map((f: any) => String(f.id)));
+    const out: Record<string, number> = {};
+    for (const id of ids) {
+      const st = map.getFeatureState({ source: "dn-lights", id }).lights ?? "eteint";
+      out[st] = (out[st] ?? 0) + 1;
+    }
+    return out;
+  }, zone);
+
+/** Textes du menu de la cloche (ouvert puis refermé). */
+async function bellText(p: Page) {
+  await p.locator(".tr-bell-btn").click();
+  const pop = p.getByRole("dialog", { name: "Alertes" });
+  await pop.waitFor({ timeout: 5_000 }).catch(() => {});
+  const text = await pop.innerText().catch(() => "");
+  await p.keyboard.press("Escape");
+  return text;
+}
+
+/**
+ * Déneigement (HTML-in-Canvas ou classique), horloge épinglée : décision en deux gestes à 08:00
+ * (A et B programmées, C non, alerte « décider » retirée de la cloche), interdiction en vigueur et
+ * feux de A allumés (et clignotants) à 23:30, fiche de la zone A au clic sur son marquage ; à 16:00
+ * sur une page neuve, « Décider pour ce soir » est désactivé, « Trop tard ».
+ */
+async function deneigement(b: Browser, mode: "hic" | "classic") {
+  const DN = `/carte/deneigement?mode=${mode}`;
+  console.log(`\n== ${DN} : décision de l'interdiction, feux, fiche de zone`);
+  const ctx = await b.newContext({ viewport: { width: 1440, height: 860 }, deviceScaleFactor: 1 });
+  const p = await ctx.newPage();
+  const errors = collectErrors(p);
+  await p.goto(`${BASE}${DN}`);
+  await p.waitForFunction(() => (window as any).__territoire?.snow, null, { timeout: 45_000 });
+  await setClock(p, atHour(SCENARIO_DAY, "10:30"));
+  if (mode === "hic") {
+    const active = await p
+      .waitForFunction(() => {
+        const w = window as any;
+        const L = w.__hicMap?.layer;
+        return w.__territoire.store.getState().api === "active" && L && ["zone:A", "zone:B", "zone:C"].every((k) => L.panels.get(k)?.tex);
+      }, null, { timeout: 25_000 })
+      .then(() => true)
+      .catch(() => false);
+    const st = await p.evaluate(() => ({ mode: (window as any).__territoire.store.getState().mode, keys: [...(window as any).__hicMap.layer.panels.keys()].sort().join(" "), markers: document.querySelectorAll(".maplibregl-marker").length }));
+    check("HTML-in-Canvas actif : trois marquages au sol zone:A, zone:B, zone:C capturés, aucun marqueur DOM", active && st.mode === "hic" && st.keys === "zone:A zone:B zone:C" && st.markers === 0, JSON.stringify(st));
+  } else {
+    const n = await p.locator(".dn-flat .dn-mark").count();
+    check("mode classique : trois étiquettes de zones (marqueurs DOM)", n === 3, String(n));
+  }
+  await p.waitForTimeout(1200);
+  const marks = await p.evaluate((hic) => {
+    const sel = hic ? '.maplibregl-canvas > [data-panel^="zone:"]' : ".dn-flat .dn-mark";
+    return [...document.querySelectorAll<HTMLElement>(sel)].map((e) => ({ name: e.querySelector(".dn-mark-name")?.textContent, state: e.querySelector(".dn-mark-state")?.textContent ?? null, figs: e.querySelectorAll(".aq-num").length, focusable: e.tabIndex >= 0 && e.tagName === "BUTTON" }));
+  }, mode === "hic");
+  check(
+    "10:30 : marquages « Zone A/B/C », « Interdiction ce soir » (décision par défaut), un seul chiffre chacun, focusables",
+    marks.length === 3 && marks.every((m) => /^Zone [ABC]$/.test(m.name ?? "") && m.state === "Interdiction ce soir" && m.figs === 1 && m.focusable),
+    JSON.stringify(marks),
+  );
+  const panel = await p.locator(".dn-panel").innerText();
+  check("panneau : météo (source, neige des prochaines 36 h, crédit), « Décidée à 10 h 00 par la direction (simulé) »", /Neige · prochaines 36 h/i.test(panel) && /(Environnement Canada|Simulation)/.test(panel) && /Météo : Environnement et Changement climatique Canada/.test(panel) && panel.includes("Décidée à 10 h 00 par la direction (simulé)"), panel.slice(0, 200).replace(/\n/g, " | "));
+  check("légende : « Simulation : feux inspirés du système de la Ville de Québec » et attribution des zones", panel.includes("Simulation : feux inspirés du système de la Ville de Québec") && panel.includes("Zones de stationnement de nuit : Ville de Trois-Rivières, Données Québec, CC-BY 4.0"));
+  if (mode === "hic" && process.env.SHOT_DN_1030) {
+    await p.waitForTimeout(1500);
+    await p.screenshot({ path: process.env.SHOT_DN_1030 });
+    console.log(`capture : ${process.env.SHOT_DN_1030}`);
+  }
+
+  // 08:00 : décision en deux gestes
+  await setClock(p, atHour(SCENARIO_DAY, "08:00"));
+  await p.waitForTimeout(400);
+  const before = await bellText(p);
+  check("08:00 : la cloche demande de décider l'interdiction", /décider l'interdiction/.test(before), before.slice(0, 120).replace(/\n/g, " | "));
+  const box = (z: string) => p.locator(".dn-zone-opt", { hasText: `Zone ${z}` }).locator("input");
+  check("08:00 : aucune zone cochée, bouton actif", !(await box("A").isChecked()) && !(await box("B").isChecked()) && !(await box("C").isChecked()) && (await p.getByRole("button", { name: "Décider pour ce soir" }).isEnabled()));
+  await box("A").check();
+  await box("B").check();
+  await p.getByRole("button", { name: "Décider pour ce soir" }).click();
+  await p.waitForTimeout(300);
+  check("A et B programmées, C sans interdiction (__territoire.snow.plans)", (await snowPlans(p)) === "A:programmee B:programmee C:aucune", await snowPlans(p));
+  check("panneau : « Décidée par vous à 8 h 00 »", (await p.locator(".dn-decided").innerText()).includes("Décidée par vous à 8 h 00"), await p.locator(".dn-decided").innerText());
+  const actions = await p.evaluate(() => (window as any).__territoire.store.getState().actions.map((a: any) => `${a.kind}:${(a.zones ?? []).join("")}`));
+  check("une seule action « ban » A+B enregistrée", JSON.stringify(actions) === JSON.stringify(["ban:AB"]), JSON.stringify(actions));
+  const after = await bellText(p);
+  check("la cloche ne demande plus de « décider »", !/décider/i.test(after), after.slice(0, 120).replace(/\n/g, " | "));
+  const prog = await lightStates(p, "A");
+  check("feux de A programmés (feature-state)", (prog.programme ?? 0) > 0 && Object.keys(prog).length === 1, JSON.stringify(prog));
+
+  // 23:30 : interdiction en vigueur, feux de A allumés et clignotants
+  await setClock(p, atHour(SCENARIO_DAY, "23:30"));
+  await p.waitForTimeout(1500);
+  check("23:30 : A et B en vigueur, C sans interdiction", (await snowPlans(p)) === "A:en-vigueur B:en-vigueur C:aucune", await snowPlans(p));
+  const lit = await lightStates(p, "A");
+  const off = await lightStates(p, "C");
+  check("23:30 : tous les feux de A allumés (querySourceFeatures + feature-state), ceux de C éteints", (lit.allume ?? 0) > 20 && Object.keys(lit).length === 1 && (off.eteint ?? 0) > 0 && Object.keys(off).length === 1, `A ${JSON.stringify(lit)} · C ${JSON.stringify(off)}`);
+  const phases = new Set<string>();
+  for (let i = 0; i < 5; i++) {
+    phases.add(await p.evaluate(() => JSON.stringify((window as any).__territoire.map.getPaintProperty("dn-lights", "circle-opacity"))));
+    await p.waitForTimeout(260);
+  }
+  check("feux allumés clignotants (circle-opacity alternée)", phases.size === 2, `${phases.size} phase(s)`);
+  const night = await p.evaluate((hic) => {
+    const sel = hic ? '.maplibregl-canvas > [data-panel="zone:A"]' : ".dn-flat .dn-mark";
+    const el = [...document.querySelectorAll<HTMLElement>(sel)].find((e) => e.querySelector(".dn-mark-name")?.textContent === "Zone A");
+    return { state: el?.querySelector(".dn-mark-state")?.textContent, fig: el?.querySelector(".dn-mark-fig")?.textContent };
+  }, mode === "hic");
+  check("marquage de A : « Stationnement interdit · 23 h – 6 h » et l'avancement en %", night.state === "Stationnement interdit · 23 h – 6 h" && /%\s*déneigé/.test(night.fig ?? ""), JSON.stringify(night));
+  if (mode === "hic" && process.env.SHOT_DN_2330) {
+    await p.waitForTimeout(1500);
+    await p.screenshot({ path: process.env.SHOT_DN_2330 });
+    console.log(`capture : ${process.env.SHOT_DN_2330}`);
+  }
+
+  // clic sur le marquage de A → fiche
+  if (mode === "hic") {
+    const pt = await p.evaluate(() => {
+      const q = (window as any).__hicMap.layer.panels.get("zone:A");
+      const box = (window as any).__territoire.map.getCanvas().getBoundingClientRect();
+      if (!q?.proj) return null;
+      const [x, y] = q.proj.project(q.w / 2, q.h * 0.3);
+      return { x: box.left + x, y: box.top + y };
+    });
+    check("marquage de A dessiné dans la scène", !!pt);
+    if (pt) {
+      await p.mouse.move(pt.x, pt.y);
+      await p.waitForTimeout(800);
+      await p.mouse.click(pt.x, pt.y);
+    }
+  } else {
+    await p.locator(".dn-flat .dn-mark", { hasText: "Zone A" }).click();
+  }
+  const card = await p.locator("[data-testid=inspector]").innerText({ timeout: 5_000 }).catch(() => "");
+  check(
+    "clic sur le marquage de A → fiche « Zone A » : état, décision, feux par état, ressources, avancement, attribution",
+    /Zone A\s+Zone de stationnement de nuit/.test(card) && card.includes("Stationnement interdit · 23 h – 6 h") && card.includes("Décidée par vous à 8 h 00") && /Feux allumés\s+102/.test(card) && /Ressources assignées · 8/i.test(card) && card.includes("Avancement") && card.includes("Zones de stationnement de nuit : Ville de Trois-Rivières, Données Québec, CC-BY 4.0"),
+    card.slice(0, 160).replace(/\n/g, " | "),
+  );
+  if (mode === "hic" && process.env.SHOT_DN_CARD) {
+    await p.waitForTimeout(1500);
+    await p.screenshot({ path: process.env.SHOT_DN_CARD });
+    console.log(`capture : ${process.env.SHOT_DN_CARD}`);
+  }
+  // réaffectation de nuit (R5) : permise, la fiche suit
+  await p.locator(".dn-res summary").click();
+  await p.getByLabel(/Zone assignée à CH-01 \(/).selectOption("C");
+  await p.waitForTimeout(300);
+  const moved = await p.evaluate(() => (window as any).__territoire.snow.plans().find((x: any) => x.zone === "C").resources.includes("CH-01"));
+  check("23:30 : réaffectation de CH-01 à la zone C appliquée (de nuit)", moved && /Ressources assignées · 7/i.test(await p.locator("[data-testid=inspector]").innerText()));
+  await p.keyboard.press("Escape");
+  check("Échap referme la fiche", (await p.locator("[data-testid=inspector]").count()) === 0);
+  check("aucune erreur console", errors.length === 0, errors.join(" | "));
+  await ctx.close();
+
+  // 16:00 sur une page neuve : trop tard pour décider
+  const ctx2 = await b.newContext({ viewport: { width: 1440, height: 860 }, deviceScaleFactor: 1 });
+  const p2 = await ctx2.newPage();
+  const errors2 = collectErrors(p2);
+  await p2.goto(`${BASE}${DN}`);
+  await p2.waitForFunction(() => (window as any).__territoire?.snow, null, { timeout: 45_000 });
+  await setClock(p2, atHour(SCENARIO_DAY, "16:00"));
+  await p2.waitForTimeout(1200);
+  const btn = p2.getByRole("button", { name: "Décider pour ce soir" });
+  const reasonId = (await btn.getAttribute("aria-describedby")) ?? "";
+  const reason = reasonId ? await p2.locator(`[id="${reasonId}"]`).innerText().catch(() => "") : "";
+  check("16:00 : « Décider pour ce soir » désactivé, raison « Trop tard pour ce soir (limite 15 h) » (aria-describedby)", (await btn.isDisabled()) && reason === "Trop tard pour ce soir (limite 15 h)", reason);
+  check("16:00 : décision par défaut gardée (A, B, C programmées par la direction)", (await snowPlans(p2)) === "A:programmee B:programmee C:programmee");
+  check("aucune erreur console (16:00)", errors2.length === 0, errors2.join(" | "));
+  await ctx2.close();
+}
+
+/**
+ * Ruling P2 : `/api/territoire/meteo` répond 500 ; le panneau du déneigement affiche « Météo
+ * indisponible » et garde la neige simulée, sans plantage ; l'API revenue (réponse de la fiche
+ * réelle versionnée), « Réessayer » rétablit la prévision.
+ */
+async function meteoDown(b: Browser) {
+  console.log("\n== /api/territoire/meteo → 500 : panneau du déneigement");
+  const ctx = await b.newContext({ viewport: { width: 1440, height: 860 }, deviceScaleFactor: 1 });
+  let calls = 0;
+  await ctx.route("**/api/territoire/meteo", (r) => {
+    calls++;
+    return r.fulfill({ status: 500, contentType: "application/json", body: '{"error":"panne simulée"}' });
+  });
+  const p = await ctx.newPage();
+  const errors = collectErrors(p);
+  await p.goto(`${BASE}/carte/deneigement?mode=classic`);
+  await p.waitForFunction(() => (window as any).__territoire?.snow, null, { timeout: 45_000 });
+  await setClock(p, atHour(SCENARIO_DAY, "08:00"));
+  const off = await p.locator(".dn-weather", { hasText: "Météo indisponible" }).waitFor({ timeout: 10_000 }).then(() => true).catch(() => false);
+  const w = await p.locator(".dn-weather").innerText().catch(() => "");
+  check("500 : « Météo indisponible », source « Simulation », 12 cm simulés, crédit météo", off && /Simulation/.test(w) && /12\s*cm/.test(w) && /Météo : Environnement et Changement climatique Canada/.test(w), w.replace(/\n/g, " | "));
+  check("500 : le reste du panneau fonctionne (décision possible, plans calculés)", (await p.getByRole("button", { name: "Décider pour ce soir" }).isEnabled()) && (await snowPlans(p)) === "A:aucune B:aucune C:aucune");
+  // l'API revient : la fiche réelle versionnée, avec 8 cm de neige pour la nuit
+  const fixture = parseCityPage(JSON.parse(await readFile(new URL("../fixtures/eccc-citypage-snow.json", import.meta.url), "utf8")))!;
+  fixture.periods = fixture.periods.map((x, i) => (i === 1 ? { ...x, snowCm: 8 } : { ...x, snowCm: null }));
+  await ctx.unroute("**/api/territoire/meteo");
+  await ctx.route("**/api/territoire/meteo", (r) => r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ forecast: fixture }) }));
+  await p.getByRole("button", { name: "Réessayer" }).click();
+  const back = await p.locator(".dn-src", { hasText: "Environnement Canada" }).waitFor({ timeout: 10_000 }).then(() => true).catch(() => false);
+  const w2 = await p.locator(".dn-weather").innerText().catch(() => "");
+  check("API revenue, « Réessayer » : source « Environnement Canada », 8 cm, plus de « Météo indisponible »", back && /8\s*cm/.test(w2) && !w2.includes("Météo indisponible"), w2.replace(/\n/g, " | "));
+  check("aucune exception (500 attendus en console seulement)", errors.length === 0 && calls >= 1, `${calls} appel(s) en panne · ${errors.join(" | ")}`);
+  await ctx.close();
+}
+
 const b = await chromium.launch();
 try {
   await homeWithoutJs(b);
@@ -1182,6 +1413,9 @@ try {
   await ssrWithoutJs(b);
   await routes();
   await bellInScene(b);
+  await deneigement(b, "hic");
+  await deneigement(b, "classic");
+  await meteoDown(b);
   await envSwitch(b);
   await narrow(b, false);
   await narrow(b, true);

@@ -1,0 +1,56 @@
+"use client";
+/**
+ * Météo du panneau du déneigement : neige des prochaines 36 h et sa source (« Environnement Canada »
+ * quand la vraie prévision annonce assez de neige ou un avertissement, sinon « Simulation »),
+ * avertissement en cours, crédit de la météo. API indisponible : « Météo indisponible », la journée
+ * garde sa neige simulée, et « Réessayer » redemande la prévision (le store réessaie aussi seul).
+ */
+import { METEO_ATTRIBUTION, SNOW_THRESHOLD_CM, snowTonightCm, snowWarning } from "@/lib/territoire/meteo";
+import { snowSource } from "@/lib/territoire/neige";
+import { loadForecast } from "../../store";
+import { useTerritoire } from "../../useTerritoire";
+
+const cm = (x: number) => `${Math.round(x * 10) / 10}`.replace(".", ",");
+
+export function WeatherCard() {
+  const forecast = useTerritoire((s) => s.forecast);
+  const loading = forecast === "chargement";
+  const f = loading ? null : forecast;
+  const source = snowSource(f);
+  const warning = f && snowWarning(f);
+  return (
+    <section className="dn-weather" aria-labelledby="dn-weather-h" aria-busy={loading}>
+      <div className="dn-weather-h">
+        <h3 id="dn-weather-h">Neige · prochaines 36 h</h3>
+        <span className="dn-src" data-src={source.kind}>
+          {source.kind === "eccc" ? "Environnement Canada" : "Simulation"}
+        </span>
+      </div>
+      <p className="dn-weather-cm">
+        <span className="aq-num">{cm(source.cm)}</span> cm
+        {loading && <span className="dn-weather-note"> · prévision en cours de chargement…</span>}
+      </p>
+      {f === null && !loading && (
+        <div className="dn-weather-off" role="status">
+          <p>
+            <b>Météo indisponible</b> : l&apos;API d&apos;Environnement Canada n&apos;a pas répondu. La journée garde sa neige simulée.
+          </p>
+          <button type="button" className="aq-btn" onClick={() => void loadForecast({ force: true })}>
+            Réessayer
+          </button>
+        </div>
+      )}
+      {f && source.kind === "simulation" && (
+        <p className="dn-weather-note">
+          Simulation : la prévision réelle n&apos;annonce pas de neige ({cm(snowTonightCm(f))} cm, seuil {SNOW_THRESHOLD_CM} cm).
+        </p>
+      )}
+      {warning && (
+        <p className="dn-weather-warn" role="note">
+          {warning}
+        </p>
+      )}
+      <p className="dn-credit">{METEO_ATTRIBUTION}</p>
+    </section>
+  );
+}

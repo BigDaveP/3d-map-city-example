@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { distanceM, pointInPolygon, type Polygon } from "../src/lib/territoire/geo";
+import { distanceM, labelPoint, pointInPolygon, type Polygon } from "../src/lib/territoire/geo";
 import { FLEET } from "../src/lib/territoire/fleet";
 import type { ZoneId } from "../src/lib/territoire/day";
 import { getDeneigementData } from "../src/server/territoire/deneigement";
@@ -56,4 +56,13 @@ test("getDeneigementData : lit les fichiers versionnés, une seule fois", () => 
   assert.equal(d.zones.length, 3);
   assert.equal(d.fleet, FLEET);
   assert.equal(getDeneigementData(), d);
+});
+
+test("labelPoint : dans le polygone, loin des bords, y compris pour une forme en U et pour les vraies zones", () => {
+  // U : le centre de gravité (5, 4,2 environ) tombe dans l'échancrure
+  const u: Polygon = [[[0, 0], [10, 0], [10, 10], [7, 10], [7, 3], [3, 3], [3, 10], [0, 10], [0, 0]]];
+  const p = labelPoint(u);
+  assert.ok(pointInPolygon(p, u), JSON.stringify(p));
+  assert.ok(!pointInPolygon([5, 5], u));
+  for (const z of getDeneigementData().zones) assert.ok(pointInPolygon(labelPoint(z.polygon), z.polygon), z.id);
 });

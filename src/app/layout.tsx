@@ -6,6 +6,7 @@ import "./globals.css";
 import "@/client/territoire/theme.css";
 import "@/client/territoire/shell/shell.css";
 import "@/client/aqueduc/aqueduc.css";
+import "@/client/territoire/modules/deneigement/deneigement.css";
 import { originTrialMeta } from "@/lib/origin-trial";
 
 export const metadata: Metadata = {

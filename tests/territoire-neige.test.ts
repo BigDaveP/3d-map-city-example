@@ -4,7 +4,7 @@ import { SCENARIO_DAY } from "../src/lib/aqueduc/scenario";
 import { atHour, type EnvAction } from "../src/lib/territoire/day";
 import { FLEET } from "../src/lib/territoire/fleet";
 import type { Forecast } from "../src/lib/territoire/meteo";
-import { banDeadlinePassed, snowPlan, snowSource, FLEET as FLEET2, type SnowSource } from "../src/lib/territoire/neige";
+import { banDeadlinePassed, banWindow, isDayBan, snowPlan, snowSource, FLEET as FLEET2, type SnowSource } from "../src/lib/territoire/neige";
 
 const d = SCENARIO_DAY;
 const sim: SnowSource = { kind: "simulation", cm: 12 };
@@ -133,4 +133,24 @@ test("banDeadlinePassed : 15:00", () => {
   assert.equal(banDeadlinePassed(at("14:59")), false);
   assert.equal(banDeadlinePassed(at("15:00")), false);
   assert.equal(banDeadlinePassed(at("15:01")), true);
+});
+
+test("banWindow : avant la prévision de 07:30, ouverte de 07:30 à 15:00, trop tard ensuite", () => {
+  assert.equal(banWindow(at("02:00")), "avant");
+  assert.equal(banWindow(at("07:29")), "avant");
+  assert.equal(banWindow(at("07:30")), "ouverte");
+  assert.equal(banWindow(at("15:00")), "ouverte");
+  assert.equal(banWindow(at("15:01")), "trop-tard");
+});
+
+test("une interdiction posée la nuit (R5) ne vaut pas pour le soir ; une réaffectation de nuit, si", () => {
+  const night: EnvAction = { at: at("02:00"), kind: "ban", zones: ["A"] };
+  const move: EnvAction = { at: at("02:00"), kind: "assign", resource: "CH-01", zone: "B" };
+  assert.equal(isDayBan(night), false);
+  assert.equal(isDayBan({ at: at("06:30"), kind: "ban", zones: ["A"] }), false);
+  assert.equal(isDayBan(banA), true);
+  // 08:00 : rien de décidé (la décision de nuit ne compte pas) ; 11:00 : décision par défaut
+  assert.ok(snowPlan(at("08:00"), [night], sim).every((p) => p.ban === "aucune"));
+  assert.ok(snowPlan(at("11:00"), [night], sim).every((p) => p.decidedBy === "direction" && p.ban === "programmee"));
+  assert.ok(zone(at("08:00"), [night, move], "B").resources.includes("CH-01"));
 });
