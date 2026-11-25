@@ -102,6 +102,26 @@ async function narrow(b: Browser, js: boolean) {
   await ctx.close();
 }
 
+/** I2 : `/` sans ?mode s'ouvre en HTML-in-Canvas quand l'API est présente (comme /carte et /mur). */
+async function defaultMode(b: Browser) {
+  console.log("\n== / sans ?mode, API présente");
+  const ctx = await b.newContext({ viewport: { width: 1440, height: 860 }, deviceScaleFactor: 1 });
+  const p = await ctx.newPage();
+  const errors = collectErrors(p);
+  await p.goto(`${BASE}/`);
+  await p.waitForFunction(() => (window as any).__aqueduc, null, { timeout: 45_000 });
+  await p.waitForFunction(() => (window as any).__hicMap?.layer, null, { timeout: 15_000 }).catch(() => {});
+  const st = await p.evaluate(() => {
+    const s = (window as any).__aqueduc.store.getState();
+    return { mode: s.mode, api: s.api, fallback: s.fallback, hic: !!(window as any).__hicMap?.layer, url: location.search };
+  });
+  check("/ sans ?mode : mode HTML-in-Canvas, API détectée", st.mode === "hic" && st.api !== "absente" && st.hic && st.fallback === "", JSON.stringify(st));
+  check("bouton « HTML-in-Canvas » enfoncé", (await p.getByRole("button", { name: "HTML-in-Canvas", exact: true }).getAttribute("aria-pressed")) === "true");
+  check("URL inchangée (pas de ?mode ajouté)", st.url === "", st.url);
+  check("aucune erreur console (/ sans ?mode)", errors.length === 0, errors.join(" | "));
+  await ctx.close();
+}
+
 /** Étiquettes de capteurs affichées (DOM ou surfaces) : identifiant, type et statut courant. */
 async function shownTags(p: Page) {
   return p.evaluate(() => {
@@ -777,6 +797,7 @@ try {
   await narrow(b, true);
   await classic(b);
   await homeHic(b);
+  await defaultMode(b);
   await undergroundHic(b);
   await scenarioHic(b);
   await scenarioClassic(b);

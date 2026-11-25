@@ -52,7 +52,8 @@ npm install
 npm run dev
 ```
 
-Ouvrir <http://localhost:3000/> (mode classique) ou <http://localhost:3000/?mode=hic>. Aucune base
+Ouvrir <http://localhost:3000/> : HTML-in-Canvas si le navigateur l'active, sinon mode classique
+(forcer un mode : `?mode=classic` ou `?mode=hic`). Aucune base
 de données n'est nécessaire pour cette démo : le réseau est versionné dans `data/aqueduc/`. Sans
 JavaScript, la page affiche un résumé de l'état du réseau rendu par le serveur.
 
