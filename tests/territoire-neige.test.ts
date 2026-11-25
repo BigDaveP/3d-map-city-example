@@ -185,13 +185,23 @@ test("banDecision : celle du visiteur (même sans zone), sinon celle de la direc
   assert.ok(snowPlan(next("00:30"), [none], sim).every((p) => p.ban === "aucune"));
 });
 
-test("une interdiction posée la nuit vaut pour la nuit en cours, pas pour le soir suivant ; une réaffectation de nuit, si", () => {
+test("une interdiction ou une réaffectation posée la nuit vaut pour la nuit en cours, pas pour l'opération suivante (R10)", () => {
   const night: EnvAction = { at: at("02:00"), kind: "ban", zones: ["A"] };
   const move: EnvAction = { at: at("02:00"), kind: "assign", resource: "CH-01", zone: "B" };
   // 08:00 : rien de décidé pour ce soir ; 11:00 : décision par défaut
   assert.ok(snowPlan(at("08:00"), [night], sim).every((p) => p.ban === "aucune"));
   assert.ok(snowPlan(at("11:00"), [night], sim).every((p) => p.decidedBy === "direction" && p.ban === "programmee"));
-  assert.ok(zone(at("08:00"), [night, move], "B").resources.includes("CH-01"));
+  // pendant la nuit, la réaffectation s'applique ; le jour venu, la répartition par défaut revient
+  assert.ok(zone(at("02:30"), [night, move], "B").resources.includes("CH-01"));
+  assert.ok(!zone(at("08:00"), [night, move], "B").resources.includes("CH-01"));
+  assert.ok(zone(at("08:00"), [night, move], "A").resources.includes("CH-01"));
+});
+
+test("R10 : une réaffectation à 03:00 ne s'applique plus à 12:00", () => {
+  const move: EnvAction = { at: at("03:00"), kind: "assign", resource: "CH-01", zone: null };
+  assert.ok(!snowPlan(at("04:00"), [move], sim).some((p) => p.resources.includes("CH-01")));
+  assert.ok(zone(at("12:00"), [move], "A").resources.includes("CH-01"));
+  assert.equal(zone(at("12:00"), [move], "A").resources.length, 8);
 });
 
 // R10 : de 00:00 à 06:00, c'est l'opération de la veille (jour D → nuit du jour D+1)

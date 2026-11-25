@@ -2,7 +2,7 @@
  * Modèle du déneigement (Simulation) : source de la neige, plan d'interdiction de stationner par zone,
  * ressources et progression. Module pur, sans React ni navigateur.
  */
-import { actionsUpTo, atHour, dayStartOf, DAY_TIMES, type EnvAction, type ZoneId } from "./day";
+import { atHour, dayStartOf, DAY_TIMES, type EnvAction, type ZoneId } from "./day";
 import { FLEET, type Resource } from "./fleet";
 import type { Polygon } from "./geo";
 import { snowTonightCm, snowWarning, SNOW_THRESHOLD_CM, type Forecast } from "./meteo";
@@ -128,14 +128,14 @@ function assignment(actions: readonly EnvAction[]): Record<ZoneId, string[]> {
  * Plan par zone à l'instant t, pour l'opération en cours (de 06:00 à 06:00, `operationDayOf`).
  * Avant 23:00, la décision en vigueur programme l'interdiction du soir ; de 23:00 à 06:00, elle est
  * en vigueur, et une décision prise pendant la nuit la change tout de suite (R11) : les feux suivent,
- * et le déneigement d'une zone ajoutée commence à l'heure de la décision. Ressources : celles du jour ;
- * entre 00:00 et 06:00, celles de la veille, plus les `assign` faits depuis minuit (R5, R10).
+ * et le déneigement d'une zone ajoutée commence à l'heure de la décision. Ressources : les `assign`
+ * de l'opération en cours, depuis 06:00 ; ceux faits la nuit valent pour la nuit, pas pour la journée
+ * qui suit (R5, R10).
  */
 export function snowPlan(t: number, actions: readonly EnvAction[], _source: SnowSource): ZonePlan[] {
-  const day = dayStartOf(t);
   const op = operationDayOf(t);
-  const today = actionsUpTo(actions, t);
-  const resources = op === day ? assignment(today) : assignment([...actionsUpTo(actions, day - 1), ...today]);
+  // comme les décisions : seules les réaffectations de l'opération en cours (de 06:00 à 06:00, R10)
+  const resources = assignment(actions.filter((a) => a.kind === "assign" && a.at <= t && operationDayOf(a.at) === op));
   const banStart = atHour(op, DAY_TIMES.banStart);
   const inForce = t >= banStart;
   const all = decisions(t, actions);
