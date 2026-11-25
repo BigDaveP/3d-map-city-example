@@ -161,7 +161,7 @@ export function seekTo(t: number, now = Date.now()) {
 }
 
 export type CloseOutcome = { ok: true } | { ok: false; reason: string };
-type CloseAction = typeof closeValvesAction;
+type CloseAction = (segmentId: string, nodes: number[]) => ReturnType<typeof closeValvesAction>;
 
 /** Ferme les vannes du plan : validées par le serveur, puis incident « sans eau » et fiche ouverte. */
 export async function closeValves(action: CloseAction = closeValvesAction): Promise<CloseOutcome> {
@@ -174,8 +174,8 @@ export async function closeValves(action: CloseAction = closeValvesAction): Prom
   };
   let r: Awaited<ReturnType<CloseAction>>;
   try {
-    // nœuds entiers seulement : l'action écarte silencieusement le reste
-    r = await action(CITY.breakSegment, env.valves.filter((v) => Number.isInteger(v)));
+    // le plan reçu du serveur, tel quel : l'action refuse toute autre liste
+    r = await action(CITY.breakSegment, env.valves);
   } catch {
     return fail("La fermeture n'a pas pu être transmise au serveur. Réessayez.");
   }

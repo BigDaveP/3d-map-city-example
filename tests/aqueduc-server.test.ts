@@ -97,6 +97,26 @@ test("closeValvesAction refuse une vanne étrangère et accepte deux fois la mê
   assert.equal((await closeValvesAction("n'existe-pas", [])).ok, false);
 });
 
+test("closeValvesAction refuse une liste qui n'est pas exactement le plan d'isolation", async () => {
+  const m = getModel();
+  const iso = isolate(m.network, m.network.byId.get(CITY.breakSegment)!, m.valves);
+  const reason = async (seg: unknown, nodes: unknown) => {
+    const r = await closeValvesAction(seg, nodes);
+    assert.equal(r.ok, false, JSON.stringify(nodes));
+    return r.ok ? "" : r.reason;
+  };
+  assert.match(await reason(CITY.breakSegment, "1,2"), /liste de nœuds/);
+  assert.match(await reason(CITY.breakSegment, null), /liste de nœuds/);
+  assert.match(await reason(CITY.breakSegment, [iso.valves[0], 1.5]), /non entiers \(1\.5\)/);
+  assert.match(await reason(CITY.breakSegment, [...iso.valves, "3"]), /non entiers/);
+  assert.match(await reason(CITY.breakSegment, []), /Isolement incomplet/);
+  assert.match(await reason(CITY.breakSegment, [iso.valves[0]]), /Isolement incomplet/);
+  assert.match(await reason(42, iso.valves), /Tronçon invalide/);
+  // ordre et doublons indifférents : c'est l'ensemble qui compte
+  const r = await closeValvesAction(CITY.breakSegment, [...iso.valves].reverse().concat(iso.valves[0]));
+  assert.equal(r.ok, true);
+});
+
 test("publishNoticeAction est idempotente", async () => {
   const a = await publishNoticeAction("centre-ville", "ebullition");
   const b = await publishNoticeAction("centre-ville", "ebullition");

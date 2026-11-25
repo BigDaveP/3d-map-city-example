@@ -61,7 +61,11 @@ export interface Notice {
 
 export type CloseResult = { ok: true; isolation: Isolation } | { ok: false; reason: string };
 
-/** Ferme des vannes : refuse tout nœud qui n'isole pas ce tronçon. Sans état, donc idempotent. */
+/**
+ * Ferme des vannes : exige exactement l'ensemble des vannes du plan d'isolation de ce tronçon (ordre
+ * et doublons indifférents) ; refuse une vanne étrangère, une liste vide ou incomplète. Sans état,
+ * donc idempotent.
+ */
 export function closeValves(segmentId: string, nodes: number[]): CloseResult {
   const m = getModel();
   const seg = m.network.byId.get(segmentId);
@@ -70,6 +74,9 @@ export function closeValves(segmentId: string, nodes: number[]): CloseResult {
   const allowed = new Set(isolation.valves);
   const foreign = nodes.filter((v) => !allowed.has(v));
   if (foreign.length) return { ok: false, reason: `Vanne étrangère à l'isolement de ${segmentId} : ${foreign.join(", ")}` };
+  const asked = new Set(nodes);
+  const missing = isolation.valves.filter((v) => !asked.has(v));
+  if (missing.length) return { ok: false, reason: `Isolement incomplet de ${segmentId} : il faut fermer aussi ${missing.join(", ")}` };
   return { ok: true, isolation };
 }
 
