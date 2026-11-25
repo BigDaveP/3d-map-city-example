@@ -6,7 +6,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Map as MlMap } from "maplibre-gl";
 import { useStore } from "zustand";
-import { CITIES, COURIERS, RESTAURANTS, type CityId } from "@/lib/carte/catalog";
+import { CARTE_VIDEO_CREDITS, CITIES, COURIERS, RESTAURANTS, type CityId } from "@/lib/carte/catalog";
 import { detectApi } from "../hic/detect";
 import { STYLE_URL, WORKER_URL } from "../mapStyle";
 import { Metrics } from "../metrics";
@@ -25,7 +25,7 @@ async function exportVideo(map: MlMap) {
   const mode = carteStore.getState().mode;
   carteStore.setState({ recording: "enregistrement" });
   try {
-    const r = await recordMap(map, 10_000);
+    const r = await recordMap(map, CARTE_VIDEO_CREDITS, 10_000);
     (window as unknown as Record<string, unknown>).__lastVideo = { ...r, mode };
     download(r.url, `carte-${mode === "hic" ? "html-in-canvas" : "classique"}-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.webm`);
   } finally {

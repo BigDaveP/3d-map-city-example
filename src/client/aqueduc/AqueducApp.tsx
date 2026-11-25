@@ -6,7 +6,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import type { CameraOptions, Map as MlMap, MapGeoJSONFeature } from "maplibre-gl";
-import { CITY } from "@/lib/aqueduc/city";
+import { CITY, SIM_CREDIT } from "@/lib/aqueduc/city";
 import { detectApi } from "../hic/detect";
 import { STYLE_URL, WORKER_URL } from "../mapStyle";
 import { Metrics } from "../metrics";
@@ -164,7 +164,7 @@ export default function AqueducApp({ initialMode }: { initialMode?: Mode }) {
           ...START_VIEW,
           maxPitch: 75,
           canvasContextAttributes: { antialias: false, preserveDrawingBuffer: false },
-          attributionControl: { compact: window.matchMedia("(max-width: 720px)").matches, customAttribution: [CITY.attribution.split(" · ")[0], "Capteurs, mesures et incidents : simulation"] },
+          attributionControl: { compact: window.matchMedia("(max-width: 720px)").matches, customAttribution: [CITY.attribution.split(" · ")[0], SIM_CREDIT] },
         });
         map = m;
         m.on("load", async () => {

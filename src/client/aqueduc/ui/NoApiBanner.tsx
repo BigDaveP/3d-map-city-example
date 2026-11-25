@@ -6,6 +6,7 @@
  * fermeture est retenue pour la session.
  */
 import { useEffect, useRef, useState } from "react";
+import { CITY, SIM_CREDIT } from "@/lib/aqueduc/city";
 import { useAq } from "../useAq";
 
 export const VIDEO_URL = "/aqueduc/scenario-hic.webm";
@@ -129,7 +130,10 @@ export function NoApiBanner() {
           onClick={(e) => e.target === e.currentTarget && setPlaying(false)}
         >
           <div className="aq-noapi-frame">
-            <video src={VIDEO_URL} controls autoPlay muted playsInline />
+            <video src={VIDEO_URL} controls autoPlay muted playsInline aria-describedby="aq-noapi-credits" />
+            <p id="aq-noapi-credits" className="aq-noapi-credits">
+              {CITY.attribution}. {SIM_CREDIT}.
+            </p>
             <button
               ref={closeBtn}
               type="button"

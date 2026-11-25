@@ -114,7 +114,8 @@ html[data-aq="app"] .aq-ssr { display: none; }
 .aq-noapi-how code { font-family: var(--aq-numf); font-size: 12px; background: #fff; border: 1px solid #ecd9b4; border-radius: 4px; padding: 0 4px; overflow-wrap: anywhere; }
 .aq-noapi-video { position: fixed; inset: 0; z-index: 80; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(20, 33, 51, 0.6); }
 .aq-noapi-frame { display: grid; justify-items: end; gap: 8px; max-width: min(960px, 100%); }
-.aq-noapi-frame video { width: 100%; max-height: calc(100dvh - 90px); border-radius: 10px; background: #000; }
+.aq-noapi-frame video { width: 100%; max-height: calc(100dvh - 130px); border-radius: 10px; background: #000; }
+.aq-noapi-credits { justify-self: stretch; margin: 0; padding: 6px 10px; border-radius: 8px; background: #142133; font-size: 12px; line-height: 1.4; color: #fff; }
 
 /* ---------------------------------------------------------------- couches */
 .aq-layers { left: var(--aq-gap); top: var(--aq-gap); width: 216px; font-size: 12.5px; }

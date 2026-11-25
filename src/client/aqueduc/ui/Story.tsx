@@ -7,6 +7,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import type { Map as MlMap } from "maplibre-gl";
+import { VIDEO_CREDITS } from "@/lib/aqueduc/city";
 import { SCENARIO_STEPS, type StepId } from "@/lib/aqueduc/scenario";
 import { canRecord, download, recordMap } from "../../carte/video";
 import { clockTime, num } from "../format";
@@ -72,7 +73,7 @@ function useVideoExport(map: MlMap) {
     setState({ busy: true, msg: "Enregistrement de la séquence (10 s)…" });
     const stop = replayForVideo();
     try {
-      const r = await recordMap(map, VIDEO_MS);
+      const r = await recordMap(map, VIDEO_CREDITS, VIDEO_MS);
       if (url.current) URL.revokeObjectURL(url.current);
       url.current = r.url;
       setState({ busy: false, msg: `Vidéo enregistrée : scenario-bris.webm, ${num(r.size / 1e6, 1)} Mo, ${num(r.ms / 1000, 1)} s.` });
@@ -99,8 +100,8 @@ function ExportVideo({ video }: { video: ReturnType<typeof useVideoExport> }) {
           (!video.supported
             ? "Export indisponible : ce navigateur ne prend pas en charge l'enregistrement de la carte (MediaRecorder et canvas.captureStream)."
             : mode === "hic"
-            ? "10 s : les étapes rejouées, avec les inscriptions de la scène."
-            : "10 s : en mode classique, la vidéo ne contient que la carte (les étiquettes DOM n'y sont pas).")}
+            ? "10 s : les étapes rejouées, avec les inscriptions de la scène et un bandeau de crédits."
+            : "10 s : en mode classique, la vidéo ne contient que la carte et un bandeau de crédits (les étiquettes DOM n'y sont pas).")}
       </p>
     </div>
   );

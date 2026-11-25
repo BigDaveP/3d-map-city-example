@@ -35,6 +35,11 @@ export const CITY: CityConfig = {
   ],
 };
 
+/** Mention des données simulées, à côté de l'attribution (carte, vidéo exportée, vidéo du bandeau). */
+export const SIM_CREDIT = "Capteurs, mesures et incidents : simulation";
+/** Crédits de la vidéo du scénario : attribution des conduites et du fond de carte, puis la simulation. */
+export const VIDEO_CREDITS = [CITY.attribution, SIM_CREDIT] as const;
+
 /**
  * Banc de mesures (R7) : points de mesure supplémentaires simulés que le réseau et le flux exposent,
  * au plus `EXTRA_TAGS_MAX` ; identifiants « X-001 », « X-002 »… Partagé par le serveur et le client.
