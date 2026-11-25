@@ -39,7 +39,7 @@ recharger la carte. Le mode se force par `?mode=classic` ou `?mode=hic`.
 | Environnement | Lot | Ce qu'on y fait | Réel | Simulé |
 |---|---|---|---|---|
 | **Aqueduc** | 1 | Pressions, qualité, âge, rinçage ; scénario guidé du bris de 14 h (coupe sous la rue, vannes à fermer) ; vue souterraine | Tracé des 24 137 conduites | Capteurs, mesures, secteurs, adresses, débits, bris |
-| **Déneigement** | 1 | Décider l'interdiction de stationner de la nuit par zone (cocher, décider) ; assigner des ressources ; suivre l'avancement | Les 3 zones de stationnement de nuit ; la prévision d'ECCC quand elle annonce de la neige | Feux d'interdiction (inspirés du système de la Ville de Québec), ressources, avancement, neige quand la prévision réelle n'en annonce pas |
+| **Déneigement** | 1 | Décider l'interdiction de stationner de la nuit par zone (cocher, décider) ; assigner des ressources ; suivre l'avancement | Les 3 zones de stationnement de nuit ; la prévision d'ECCC quand elle annonce de la neige | Feux d'interdiction (inspirés du système de la Ville de Québec), ressources, avancement, neige quand la prévision réelle n'en annonce pas assez |
 | **Collecte** | 2 | **À venir** | | |
 | **Zonage** | 2 | **À venir** | | |
 | **Évaluation foncière** | 2 | **À venir** | | |

@@ -130,6 +130,14 @@ test("météo de l'accueil : conditions actuelles, ce soir et neige des prochain
   assert.match(html, /Bulletin météorologique spécial/);
 });
 
+test("météo de l'accueil : « Données réelles » seulement avec une prévision ; « pas assez de neige » sous le seuil", () => {
+  assert.doesNotMatch(renderWeather("null"), /Données réelles/);
+  const f = parseCityPage(JSON.parse(readFileSync("tests/fixtures/eccc-citypage-qc-130.json", "utf8")));
+  const html = renderWeather(JSON.stringify(f));
+  assert.match(html, /Données réelles/);
+  assert.match(html, /La prévision réelle n&#x27;annonce pas assez de neige \(seuil 5 cm\)/);
+});
+
 test("météo de l'accueil : une prévision périmée (ECCC muet) le dit", () => {
   const f = parseCityPage(JSON.parse(readFileSync("tests/fixtures/eccc-citypage-qc-130.json", "utf8")));
   assert.doesNotMatch(renderWeather(JSON.stringify(f)), /Dernière prévision reçue/);

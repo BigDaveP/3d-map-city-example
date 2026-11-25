@@ -7,7 +7,8 @@
  * lisible sans JavaScript. Une fois hydraté, il recalcule le même instantané avec l'horloge commune
  * et les décisions du visiteur (`territoireStore`), chaque seconde. Pendant l'hydratation, il rend
  * exactement l'instantané du serveur (`useHydrated`) : aucun écart, aucun `suppressHydrationWarning`.
- * La météo (`weather`) est rendue par le serveur et passée telle quelle.
+ * La météo (`weather`) est rendue par le serveur et passée telle quelle ; une fois hydraté, si le store
+ * a une prévision plus récente que celle du serveur, l'îlot rend la carte avec celle-ci.
  */
 import Link from "next/link";
 import { useEffect, type ReactNode } from "react";
@@ -21,6 +22,10 @@ import { offerForecast, territoireStore } from "../store";
 import { useForecastRefresh, useHydrated, useSimNow, useTerritoire } from "../useTerritoire";
 import { AlertsPanel } from "./AlertsPanel";
 import { EnvCard } from "./EnvCard";
+import { WeatherSummary } from "./Weather";
+
+/** Même prévision (même publication d'ECCC, même fraîcheur), ou toutes deux absentes. */
+const sameForecast = (a: Forecast | null, b: Forecast | null) => a === b || (a !== null && b !== null && a.issuedAt === b.issuedAt && !a.stale === !b.stale);
 
 function NextEvents({ next }: { next: HomeSnapshot["next"] }) {
   return (
@@ -78,7 +83,11 @@ export function Home({ snapshot, forecast, mode, weather }: { snapshot: HomeSnap
   }, []);
 
   // avant l'effet ci-dessus (premier rendu après une navigation), le store peut encore se charger
-  const snap = hydrated ? homeSnapshot(t, actions, stored === "chargement" ? forecast : stored, mode) : snapshot;
+  const live = stored === "chargement" ? forecast : stored;
+  const snap = hydrated ? homeSnapshot(t, actions, live, mode) : snapshot;
+  // la météo suit la même prévision que les alertes : celle du serveur (rendue par lui, lisible sans
+  // JavaScript) tant que le store n'en a pas de plus récente, par exemple après un « Réessayer » réussi
+  const card = hydrated && !sameForecast(live, forecast) ? <WeatherSummary forecast={live} /> : weather;
   return (
     <div className="tr-home">
       <header className="aq-bar tr-home-bar">
@@ -115,7 +124,7 @@ export function Home({ snapshot, forecast, mode, weather }: { snapshot: HomeSnap
             <AlertsPanel alerts={snap.alerts} summary={snap.summary} />
             <NextEvents next={snap.next} />
           </div>
-          <div className="tr-home-side">{weather}</div>
+          <div className="tr-home-side">{card}</div>
         </div>
         <section className="tr-home-envs" aria-labelledby="tr-envs-h">
           <h2 id="tr-envs-h">Environnements</h2>

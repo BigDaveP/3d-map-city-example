@@ -2,7 +2,8 @@
  * Météo de l'accueil : conditions actuelles (icône de 48 px, température), les prochaines heures et
  * les deux prochaines périodes d'Environnement Canada (icônes de 16 px), neige des prochaines 36 h et
  * source de la neige de la journée (réelle ou simulée), ou « Météo indisponible ».
- * Composant sans état ni effet : rendu par le serveur (page d'accueil) et par les tests. La météo est
+ * Composant sans état ni effet : rendu par le serveur (page d'accueil, et sans JavaScript), par l'îlot
+ * de l'accueil quand le store a une prévision plus récente, et par les tests. La météo est
  * réelle : les heures affichées suivent l'heure réelle (`now`), pas l'horloge simulée.
  */
 import { hourLabel } from "@/lib/territoire/home";
@@ -38,7 +39,7 @@ export function WeatherSummary({ forecast, now = Date.now() }: { forecast: Forec
     <section className="tr-card tr-weather" aria-labelledby="tr-weather-h">
       <div className="tr-card-h">
         <h2 id="tr-weather-h">Météo à Trois-Rivières</h2>
-        <span className="tr-tag">Données réelles</span>
+        {forecast && <span className="tr-tag">Données réelles</span>}
       </div>
       {forecast ? (
         <>
@@ -90,7 +91,7 @@ export function WeatherSummary({ forecast, now = Date.now() }: { forecast: Forec
           ))}
           {source.kind === "simulation" && (
             <p className="tr-weather-sim">
-              <span className="tr-sim">Simulation</span> La prévision réelle n&apos;annonce pas de neige (seuil {SNOW_THRESHOLD_CM} cm) : la journée scénarisée garde
+              <span className="tr-sim">Simulation</span> La prévision réelle n&apos;annonce pas assez de neige (seuil {SNOW_THRESHOLD_CM} cm) : la journée scénarisée garde
               ses {source.cm} cm simulés.
             </p>
           )}

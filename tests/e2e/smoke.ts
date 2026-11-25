@@ -1076,6 +1076,29 @@ async function homeJs(b: Browser) {
     console.log(`capture : ${process.env.SHOT_HOME}`);
   }
 
+  // la carte météo suit la prévision du store quand elle est plus récente que celle du serveur (« Réessayer » réussi)
+  const saved = await p.evaluate(() => {
+    const s = (window as any).__territoire.store;
+    const { forecast, forecastAt } = s.getState();
+    s.setState({
+      forecast: {
+        source: "eccc",
+        issuedAt: new Date(Date.now() + 60_000).toISOString(),
+        current: { tempC: -7, condition: "Neige passagère (essai du test)", iconCode: 16 },
+        periods: [{ name: "Ce soir et cette nuit", summary: "Neige passagère.", snowCm: 2, rainMm: null, iconCode: 16 }],
+        hourly: [],
+        warnings: [],
+        sun: null,
+      },
+      forecastAt: Date.now(),
+    });
+    return { forecast, forecastAt };
+  });
+  const followed = await p.locator(".tr-weather", { hasText: "Neige passagère (essai du test)" }).waitFor({ timeout: 3_000 }).then(() => true).catch(() => false);
+  const wx = await p.locator(".tr-weather").innerText();
+  check("météo de l'accueil : suit la prévision plus récente du store (îlot client), « Données réelles », plus de « Météo indisponible »", followed && wx.includes("Données réelles") && !wx.includes("Météo indisponible"), wx.slice(0, 120).replace(/\n/g, " | "));
+  await p.evaluate((s) => (window as any).__territoire.store.setState(s), saved);
+
   // cloche : nom accessible, clavier, Échap et retour du focus
   const bell = p.locator(".tr-bell-btn");
   const label = (await bell.getAttribute("aria-label")) ?? "";

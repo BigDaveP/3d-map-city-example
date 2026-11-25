@@ -97,7 +97,7 @@ export const REALITY: Record<EnvId, { real: string; simulated: string }> = {
   },
   deneigement: {
     real: "Les trois zones de stationnement de nuit ; la prévision d'Environnement Canada quand elle annonce de la neige.",
-    simulated: "Feux d'interdiction (inspirés du système de la Ville de Québec), ressources, avancement, neige quand la prévision réelle n'en annonce pas.",
+    simulated: "Feux d'interdiction (inspirés du système de la Ville de Québec), ressources, avancement, neige quand la prévision réelle n'en annonce pas assez.",
   },
   collecte: { real: "Rien : aucun jeu ouvert de collecte n'a été trouvé.", simulated: "Secteurs et horaires (lot 2, à venir)." },
   zonage: { real: "Les 1 666 zones du règlement de zonage (lot 2, à venir).", simulated: "Rien : consultation seulement." },
@@ -114,7 +114,7 @@ export const DEMO_CONSTANTS: { label: string; value: string }[] = [
   { label: "Début de la neige simulée", value: DAY_TIMES.snowStart },
   { label: "Interdiction en vigueur, feux allumés, équipes sur le terrain", value: DAY_TIMES.banStart },
   { label: "Seuil de neige réelle qui déclenche l'alerte (prochaines 36 h)", value: `${SNOW_THRESHOLD_CM} cm` },
-  { label: "Neige simulée quand la prévision n'en annonce pas", value: "12 cm" },
+  { label: "Neige simulée quand la prévision n'en annonce pas assez", value: "12 cm" },
 ];
 
 /** Pistes pour essayer la démo. */
