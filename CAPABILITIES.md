@@ -294,7 +294,7 @@ chargement à l'autre)
 | 60 | Classique | 33,2 | 83 ms | 0 | 207 ms | 2 037 ms |
 | 60 | HTML-in-Canvas | 28,8 | 83 ms | 695 | 588 ms | 2 118 ms |
 | 120 | Classique | 31,8 | 83 ms | 0 | 286 ms | 1 726 ms |
-| 120 | HTML-in-Canvas | 25,9 | 92 ms | 1 632 | 509 ms | 1 989 ms |
+| 120 | HTML-in-Canvas | 25,9 | 92 ms | 1 631 | 509 ms | 1 989 ms |
 
 #### Vue souterraine (HTML-in-Canvas, 60 étiquettes)
 
@@ -306,7 +306,7 @@ chargement à l'autre)
 
 Requêtes d'occlusion (HTML-in-Canvas, survol de 10 étiquettes visibles, 5 seulement à
 20 étiquettes, caméra immobile) : 88 à 98 ms en moyenne entre survol et verdict, 98 ms avec les
-tubes des maîtresses, 144 ms avec tout le réseau, soit une à deux images de cette machine.
+tubes des maîtresses, 143 ms avec tout le réseau, soit une à deux images de cette machine.
 
 \* **Latence lecture → pixel** : de la réception SSE d'une lecture à l'image qui l'affiche
 (classique : image qui suit la mise à jour du marqueur ; HTML-in-Canvas : dessin qui suit
@@ -335,7 +335,7 @@ l'upload de la texture), étiquettes à l'écran seulement, hors première captu
   et les redessins qu'elles déclenchent coûtent cher en WebGL logiciel. C'est le point faible
   mesuré de cette démo.
 - **Scénario : 2,5 à 6 images/s de moins en canvas**, l'écart grandit avec les étiquettes
-  (jusqu'à 1 632 captures par minute à 120).
+  (jusqu'à 1 631 captures par minute à 120).
 - **JS par mise à jour de données** (message du flux, rendu des étiquettes, captures) : p95 de
   3,3 à 4,8 ms dans les deux modes, maximum un peu plus haut en canvas (jusqu'à 10,6 ms contre
   7,5 ms).
@@ -360,8 +360,8 @@ profondeur, et rien de tout cela n'apparaît dans la vidéo.
 
 **Le coût est réel et mesurable**, même avec la règle de huit étiquettes au plus en usage normal :
 des images perdues au repos qui augmentent avec le nombre d'étiquettes, une latence d'affichage
-(p50) 1,5 à 3 fois plus haute, un délai de survol de une à deux images pour le hit testing avec
-occlusion, et une occlusion adoucie (fantôme à 45 %) pour garder les chiffres lisibles. Le mode
+(p50) 1,6 à 2,8 fois plus haute (5,7 fois à 20 étiquettes au repos, sur un petit échantillon), un
+délai de survol de une à deux images pour le hit testing avec occlusion, et une occlusion adoucie (fantôme à 45 %) pour garder les chiffres lisibles. Le mode
 classique reste indispensable : l'API est expérimentale (flag ou Origin Trial) et chaque visiteur
 sans elle y bascule.
 

@@ -10,7 +10,7 @@ version classique en DOM.
 | `/mur` | Mur de supervision : 1 000 cartes HTML, DOM virtualisé vs HTML-in-Canvas |
 | `/carte` | Livraison 3D : panneaux HTML de restaurants et de livreurs dans une carte 3D |
 | `/lab` | Une seule carte HTML-in-Canvas, avec les mesures de l'API |
-| `/bench` | Banc de mesures des trois démos (graphiques, tableaux, CSV) |
+| `/bench` | Banc de mesures du mur et du réseau d'eau (graphiques, tableaux, CSV) |
 
 Le menu « Démos » de la barre d'application mène de l'une à l'autre ; « À propos de cette démo »
 dit ce qu'on regarde, ce qui est simulé et quoi essayer. Bilans écrits : **[RULES.md](RULES.md)**
