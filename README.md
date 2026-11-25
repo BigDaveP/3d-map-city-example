@@ -1,10 +1,119 @@
-# Mur de supervision — HTML-in-Canvas vs DOM virtualisé
+# Démos HTML-in-Canvas
 
-Démo d'apprentissage de l'API expérimentale **HTML-in-Canvas** (Chrome/Edge) dans un contexte
-réaliste : un canvas infini et zoomable de **1 000 cartes HTML** (200 succursales fictives ×
-5 indicateurs), alimentées par cinq sources hétérogènes à des fréquences différentes.
+Démos d'apprentissage de l'API expérimentale **HTML-in-Canvas** (Chrome/Edge) : du vrai HTML
+(formulaires, focus, lecteurs d'écran) dessiné dans un canvas WebGL, comparé à chaque fois à une
+version classique en DOM.
 
-Le même mur, avec le même store et les mêmes composants React, est rendu de deux façons :
+| URL | Démo |
+|---|---|
+| `/` | **Réseau d'eau potable 3D** de Trois-Rivières (démo par défaut, ci-dessous) |
+| `/mur` | Mur de supervision : 1 000 cartes HTML, DOM virtualisé vs HTML-in-Canvas |
+| `/carte` | Livraison 3D : panneaux HTML de restaurants et de livreurs dans une carte 3D |
+| `/lab` | Une seule carte HTML-in-Canvas, avec les mesures de l'API |
+| `/bench` | Banc de mesures des trois démos (graphiques, tableaux, CSV) |
+
+Le menu « Démos » de la barre d'application mène de l'une à l'autre ; « À propos de cette démo »
+dit ce qu'on regarde, ce qui est simulé et quoi essayer. Bilans écrits : **[RULES.md](RULES.md)**
+(mur) et **[CAPABILITIES.md](CAPABILITIES.md)** (livraison 3D et réseau d'eau).
+
+## Réseau d'eau potable 3D (`/`)
+
+La vue d'un **directeur des travaux publics** sur le **vrai réseau d'aqueduc de Trois-Rivières**
+(24 137 tronçons de conduites), avec des capteurs **simulés** : 30 de pression, 10 débitmètres,
+10 stations de qualité de l'eau (chlore résiduel, turbidité, pH), 11 sondes de réservoir, et
+10 secteurs de distribution nommés d'après les quartiers.
+
+- **Exploration libre** d'un réseau vivant : horloge simulée (temps réel ou ×60), frise de 24 h,
+  couches (pression, qualité de l'eau, âge et matériau, rinçage 2026, incidents), fiche du
+  tronçon, du capteur ou du secteur sélectionné.
+- **Scénario guidé de bris** (bouton « Lancer le scénario de bris ») sur la conduite maîtresse
+  13C1949 : détection, isolation (coupe sous la chaussée, vannes à fermer), intervention,
+  rétablissement, rapport avec export vidéo. « Explorer librement » rend la main à tout moment.
+- **Vue souterraine** : de vrais tubes 3D sous les rues (WebGL2, même tampon de profondeur que
+  la carte), diamètres exagérés ×12 et indiqués à l'écran ; conduites maîtresses et
+  centre-ville par défaut, « Tout le réseau » en option.
+- **Deux modes, même vue** (bascule « Classique / HTML-in-Canvas » dans la barre) :
+  - classique : noms de secteurs et étiquettes des capteurs en marqueurs DOM plats, toujours
+    au premier plan ;
+  - HTML-in-Canvas : les mêmes composants React, couchés au sol ou face caméra dans la scène 3D,
+    masqués par les bâtiments, cliquables et accessibles au clavier.
+
+Toute mesure, débit, adresse desservie, vanne et incident est **simulé** et étiqueté comme tel ;
+seul le tracé des conduites est réel. Chaque visiteur a son propre état (un bris déclenché par
+un visiteur n'apparaît pas chez les autres).
+
+### Lancer
+
+```bash
+npm install
+```
+
+```bash
+npm run dev
+```
+
+Ouvrir <http://localhost:3000/> (mode classique) ou <http://localhost:3000/?mode=hic>. Aucune base
+de données n'est nécessaire pour cette démo : le réseau est versionné dans `data/aqueduc/`. Sans
+JavaScript, la page affiche un résumé de l'état du réseau rendu par le serveur.
+
+Sans l'API, la page reste en mode classique et un bandeau propose « Voir la version
+HTML-in-Canvas en vidéo » (`public/aqueduc/scenario-hic.webm`) et « Comment l'activer ».
+
+### Données
+
+- **Conduites d'eau potable**, Ville de Trois-Rivières, publiées sur
+  [Données Québec](https://www.donneesquebec.ca/recherche/dataset/7ad4ea4e-cfc5-417b-9eb8-6e7f379a8f6e),
+  licence **CC-BY 4.0**. Attribution affichée partout où les conduites apparaissent :
+  « Conduites : Ville de Trois-Rivières, Données Québec, CC-BY 4.0 ».
+- Fond de carte : [OpenFreeMap](https://openfreemap.org), © OpenMapTiles, données ©
+  OpenStreetMap.
+- Extraction, champs conservés et sources des seuils d'alerte :
+  [data/aqueduc/SOURCE.md](data/aqueduc/SOURCE.md).
+
+### Commandes
+
+Le banc et les preuves visent un serveur de production (`npm run build`, puis
+`PORT=3300 npm start`) ; `BASE_URL` vaut `http://localhost:3300` par défaut.
+
+| Commande | Effet |
+|---|---|
+| `npm run aqueduc:data` | Retélécharge les conduites depuis Données Québec et réécrit `data/aqueduc/trois-rivieres.json` et `SOURCE.md` (la section des seuils est conservée). Inutile pour lancer la démo. Derrière un proxy TLS : `NODE_EXTRA_CA_CERTS`. |
+| `npm run bench:aqueduc` | Banc classique vs HTML-in-Canvas (20, 60, 120 étiquettes ; rotation, caméra immobile, scénario ; vue souterraine). Écrit `bench/results/aqueduc.csv` et `aqueduc-meta.json`, affichés dans la section « Réseau d'eau » de `/bench`. Environ 12 min. Variables : `REPEAT`, `TAGS`, `MODES`, `SCALE`, `UNDERGROUND=0`. |
+| `npm run proofs:aqueduc` | Régénère les captures, les vidéos WebM et `docs/aqueduc/proofs.json` (occlusion, clic masqué, arbre ARIA, focus clavier, repli sans l'API), et copie la vidéo du scénario dans `public/aqueduc/`. Demande `ffmpeg` et `ffprobe` pour les images extraites des vidéos. |
+
+Résultats et preuves (mesurés **sans GPU**) : section « Réseau d'eau » de
+[CAPABILITIES.md](CAPABILITIES.md#réseau-deau-potable-3d--classique-vs-html-in-canvas).
+
+## Activer l'API
+
+| Navigateur | Comment |
+|---|---|
+| Chrome Canary / Dev | `chrome://flags/#canvas-draw-element` → *Enabled*, relancer |
+| Ligne de commande (Playwright, CI) | `--enable-blink-features=CanvasDrawElement` |
+| Simuler un Chrome **sans** l'API | `--disable-blink-features=CanvasDrawElement` |
+| Production | jeton d'Origin Trial : variable d'environnement `HIC_ORIGIN_TRIAL_TOKEN` |
+
+**Jeton d'Origin Trial.** Si `HIC_ORIGIN_TRIAL_TOKEN` est définie à l'exécution, le layout ajoute
+`<meta http-equiv="origin-trial" content="…">` à toutes les pages (`src/lib/origin-trial.ts`) ;
+sans jeton, rien ne change. Le jeton est lié au domaine d'hébergement : en demander un pour ce
+domaine, puis par exemple `docker run -e HIC_ORIGIN_TRIAL_TOKEN=… …`. Aucun jeton n'est fourni
+ici.
+
+Constat : le Chromium 158 fourni avec Playwright 1.63 expose déjà l'API **sans flag** ;
+`--disable-blink-features=CanvasDrawElement` la retire bien (le nom de la fonctionnalité Blink
+derrière le flag est donc `CanvasDrawElement`). Les bancs passent tout de même
+`--enable-blink-features=CanvasDrawElement` pour rester valables sur les versions où elle est
+désactivée par défaut.
+
+Testez sur `localhost`, jamais dans un iframe sandboxé : l'API peut y être détectée sans
+transmettre aucun pixel (texture noire). Les démos le détectent (lecture de texels après
+upload) et basculent en mode classique avec la raison affichée.
+
+## Mur de supervision (`/mur`)
+
+Un canvas infini et zoomable de **1 000 cartes HTML** (200 succursales fictives × 5 indicateurs),
+alimentées par cinq sources hétérogènes à des fréquences différentes. Le même mur, avec le même
+store et les mêmes composants React, est rendu de deux façons :
 
 | Mode | Rendu |
 |---|---|
@@ -14,10 +123,12 @@ Le même mur, avec le même store et les mêmes composants React, est rendu de d
 > ⚠️ **Toutes les données sont simulées** (succursales, chiffres, avis, responsables). Un bandeau
 > le rappelle à l'écran.
 
-Le livrable principal est **[RULES.md](RULES.md)** : quand et comment utiliser HTML-in-Canvas
-dans un dashboard, chiffres du banc à l'appui.
+Le livrable est **[RULES.md](RULES.md)** : quand et comment utiliser HTML-in-Canvas dans un
+dashboard, chiffres du banc à l'appui.
 
-## Démarrer
+### Démarrer le mur
+
+Le mur garde ses notes dans Postgres (repli en mémoire sinon).
 
 ```bash
 cp .env.example .env
@@ -43,14 +154,6 @@ Puis ouvrir <http://localhost:3000/mur> (paramètres : `?n=250|500|1000`, `?mode
 `npm run db:setup` applique les migrations Drizzle et le seed (idempotent ; `db:migrate` et
 `db:seed` séparément). Sans Postgres joignable, l'application fonctionne quand même : les notes
 sont gardées en mémoire et la barre d'outils l'indique.
-
-Pages :
-
-| URL | Contenu |
-|---|---|
-| `/mur` | le mur (vue d'ensemble SSR + mur client) ; `/` est la page d'accueil des démos |
-| `/lab` | une seule carte HTML-in-Canvas, avec les mesures de l'API (unité, captures, vérification) |
-| `/bench` | résultats du banc (graphiques + tableaux), CSV dans `/bench/results.csv` |
 
 Interactions : molette = zoom au curseur, glisser = déplacer, `+`/`-`/flèches au clavier,
 clic sur une carte intermédiaire = ouvrir son panneau complet (Échap pour fermer), Tab parcourt
@@ -115,26 +218,7 @@ BASE_URL=http://localhost:3100 npm run proofs:carte
 était matériel ou logiciel) ; `proofs:carte` régénère les captures, les vidéos WebM et
 `docs/carte/proofs.json`. `HEADED=1` ouvre un vrai navigateur pour le script de preuves.
 
-## Activer l'API
-
-| Navigateur | Comment |
-|---|---|
-| Chrome Canary / Dev | `chrome://flags/#canvas-draw-element` → *Enabled*, relancer |
-| Ligne de commande (Playwright, CI) | `--enable-blink-features=CanvasDrawElement` |
-| Simuler un Chrome **sans** l'API | `--disable-blink-features=CanvasDrawElement` |
-| Production | jeton d'Origin Trial (balise `<meta http-equiv="origin-trial">`), non fourni ici |
-
-Constat : le Chromium 158 fourni avec Playwright 1.63 expose déjà l'API **sans flag** ;
-`--disable-blink-features=CanvasDrawElement` la retire bien (le nom de la fonctionnalité Blink
-derrière le flag est donc `CanvasDrawElement`). Le banc passe tout de même
-`--enable-blink-features=CanvasDrawElement` pour rester valable sur les versions où elle est
-désactivée par défaut.
-
-Testez sur `localhost`, jamais dans un iframe sandboxé : l'API peut y être détectée sans
-transmettre aucun pixel (texture noire). L'application le détecte (voir plus bas) et bascule
-en mode DOM avec la raison affichée.
-
-## Architecture
+## Architecture du mur
 
 ```
  sources                     store unique                 DOM = source de vérité
@@ -200,7 +284,7 @@ React à la création de l'élément, avant son insertion.
 Le badge de la barre d'outils passe de *absente* / *détectée* à *active et vérifiée* après la
 première vérification réussie.
 
-## Banc de mesures et vérification
+## Banc du mur et vérification
 
 ```bash
 npm run build
@@ -220,13 +304,20 @@ niveau intermédiaire, en supplément). Variables : `COUNTS=250,500,1000`,
 `CONFIGS=dom,canvas-atlas,canvas-percard`, `SPEEDS=10`, `BUDGETS=12:6`, `CAMPAIGN`,
 `APPEND=1`. Résultats dans `bench/results/results.csv` (+ `meta.json`), affichés sur `/bench`.
 
-Vérification fonctionnelle (deux modes, repli sans API, SSR sans JavaScript) :
+Vérification fonctionnelle du mur sur `/mur` (deux modes, repli sans API, SSR sans JavaScript) :
 
 ```bash
 BASE_URL=http://localhost:3100 npx tsx tests/e2e/verify.ts
 ```
 
-Tests unitaires (simulation, store, planificateur) :
+Vérification rapide (réseau d'eau dans les deux modes, scénario, vue souterraine, bandeau
+sans l'API, `/carte` en HTML-in-Canvas, réponse de `/mur` et `/bench`) :
+
+```bash
+BASE_URL=http://localhost:3100 npx tsx tests/e2e/smoke.ts
+```
+
+Tests unitaires (simulations, graphe et isolation, store, planificateur, géométrie) :
 
 ```bash
 npm test
@@ -235,17 +326,19 @@ npm test
 ## Docker / Coolify
 
 ```bash
-docker build -t mur-supervision .
+docker build -t demos-hic .
 ```
 
 ```bash
 docker compose --profile app up
 ```
 
-Image `node:22-alpine`, build standalone, utilisateur non root, `HEALTHCHECK`. Variables :
-`DATABASE_URL`, `DB_AUTO_SETUP=1` (migrations + seed au démarrage via `instrumentation.ts`).
-Sur Coolify : déployer le `Dockerfile`, ajouter un service Postgres et renseigner ces deux
-variables.
+Image `node:22-alpine`, build standalone, utilisateur non root, `HEALTHCHECK`. Elle sert toutes
+les démos ; le réseau d'eau (données versionnées) et la vidéo de `public/aqueduc/` y sont inclus
+et fonctionnent sans réseau ni base. Variables : `DATABASE_URL` et `DB_AUTO_SETUP=1` (migrations
++ seed au démarrage via `instrumentation.ts`) pour les notes du mur, `HIC_ORIGIN_TRIAL_TOKEN`
+(facultatif, voir « Activer l'API »). Sur Coolify : déployer le `Dockerfile`, ajouter un
+service Postgres et renseigner ces variables.
 
 ## Limites connues de l'API (constatées sur Chromium 158)
 
