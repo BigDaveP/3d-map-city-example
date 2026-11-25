@@ -21,7 +21,7 @@ import { AppBar } from "../shell/AppBar";
 import { EnvSwitcher } from "../shell/EnvSwitcher";
 import { NoApiBanner } from "../shell/NoApiBanner";
 import { Timeline } from "../shell/Timeline";
-import { territoireStore, type Mode } from "../store";
+import { setFocus, territoireStore, type Mode } from "../store";
 import { useTerritoire } from "../useTerritoire";
 import { restyleBasemap, STYLE_URL, WORKER_URL } from "./basemap";
 
@@ -115,6 +115,10 @@ export default function TerritoireScene() {
         const mount = () => {
           if (cancelled) return;
           unmount = mod.mount(ctx);
+          // le module a lu le focus qui le visait ; un focus visant un autre environnement (recherche
+          // ou alerte suivie d'un autre choix) ne sera plus lu par personne : on l'efface
+          const f = territoireStore.getState().focus;
+          if (f && f.env !== mod.id) setFocus(null);
           attribution(mod.attribution);
           setActive(mod);
         };

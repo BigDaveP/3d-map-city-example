@@ -44,12 +44,15 @@
   --state-simulated: #8a5a00;
   --state-simulated-soft: #fbf0d6;
 
-  /* environnements : pastilles du sélecteur, repères de la frise */
-  --env-aqueduc: #1f7fd0;
-  --env-deneigement: #5b6bd6;
-  --env-collecte: #2f9e6e;
-  --env-zonage: #b5762a;
-  --env-evaluation: #8a5cc2;
+  /* environnements : vignettes, repères de la frise (losanges de 9 px), cartes de l'accueil.
+     Teintes et clartés séparées : aqueduc / déneigement / collecte (les trois qui ont des repères)
+     restent ≥ 36 ΔE l'un de l'autre, y compris en deutéranopie et en protanopie simulées ;
+     ≥ 3:1 sur blanc (pictogrammes). */
+  --env-aqueduc: #1a5fc2;
+  --env-deneigement: #0b93b0;
+  --env-collecte: #2a9255;
+  --env-zonage: #b5711c;
+  --env-evaluation: #b8478f;
 
   /* typographie (Inter et JetBrains Mono auto-hébergées) */
   --tr-font: "Inter Variable", "Inter", "Segoe UI", system-ui, sans-serif;
