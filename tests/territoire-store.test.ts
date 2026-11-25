@@ -3,7 +3,8 @@ import { test } from "node:test";
 import { scenarioSteps } from "../src/lib/aqueduc/scenario";
 import { actionsUpTo, atHour, dayStartOf } from "../src/lib/territoire/day";
 import { aqueducStore, currentIncident, isolatedAt } from "../src/client/aqueduc/store";
-import { attachScenario, closeValves, exploreFreely, startScenario, syncIncident } from "../src/client/aqueduc/scenarioController";
+import { closeValves, exploreFreely, startScenario } from "../src/client/aqueduc/scenarioController";
+import { attachScenario, syncIncident } from "../src/client/aqueduc/scenarioSync";
 import { act, backToNow, seek, setFocus, setSpeed, simNow, territoireStore, undoLast } from "../src/client/territoire/store";
 
 /** 3 décembre 2026, minuit heure de l'Est : une autre journée que celle des tests de l'aqueduc. */

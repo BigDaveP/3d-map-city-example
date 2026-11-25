@@ -11,7 +11,6 @@ import { cutLayout, valveLabel, VALVE_AT } from "../src/client/aqueduc/scene/cut
 import { aqueducStore, currentIncident } from "../src/client/aqueduc/store";
 import { simNow, territoireStore } from "../src/client/territoire/store";
 import {
-  attachScenario,
   closeValves,
   exploreFreely,
   faceBearing,
@@ -21,9 +20,9 @@ import {
   seekTo,
   startScenario,
   STEP_VIEW,
-  syncIncident,
   turnValve,
 } from "../src/client/aqueduc/scenarioController";
+import { attachScenario, syncIncident } from "../src/client/aqueduc/scenarioSync";
 import { CITY } from "../src/lib/aqueduc/city";
 import { buildModel, incidentImpact, readingsAt, THRESHOLDS } from "../src/lib/aqueduc/sim";
 import { loadNetwork } from "./aqueduc-fixture";

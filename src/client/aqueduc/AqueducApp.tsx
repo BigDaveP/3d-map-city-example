@@ -24,7 +24,8 @@ import {
 } from "./pipes";
 import { territoireStore, type Mode } from "../territoire/store";
 import { useTerritoire } from "../territoire/useTerritoire";
-import { attachScenario, closeValves, exploreFreely, faceBearing, goToStep, startScenario, STEP_VIEW, stepSelection, syncIncident, type CameraTarget, type StepId } from "./scenarioController";
+import { closeValves, exploreFreely, faceBearing, goToStep, startScenario, STEP_VIEW, type StepId } from "./scenarioController";
+import { attachScenario, stepSelection, syncIncident, type CameraTarget } from "./scenarioSync";
 import { cutLayout } from "./scene/cut";
 import { attachUnderground, type TubeLayer } from "./scene/tubes";
 import { SceneSurfaces } from "./scene/Surfaces";
