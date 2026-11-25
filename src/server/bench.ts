@@ -76,7 +76,12 @@ export function readAqueducCsv(): string | null {
   }
 }
 
-/** Lignes moyennées sur les répétitions par (mode, étiquettes, souterrain, tubes, phase), et méta. */
+/**
+ * Lignes par (mode, étiquettes, souterrain, tubes, phase), et méta. Une cellule vide du CSV (rien
+ * mesuré) vaut NaN, jamais 0. Métriques : moyenne des répétitions qui en ont une valeur. Latences
+ * p50/p95 : moyenne pondérée par le nombre d'échantillons des répétitions qui en ont (`latWeighted`
+ * quand plusieurs répétitions y contribuent) ; `latSamples` : total des échantillons.
+ */
 export function loadAqueducBench(): { rows: AqueducRow[]; meta: Record<string, unknown> | null } | null {
   const csv = readAqueducCsv();
   if (!csv) return null;
@@ -86,15 +91,23 @@ export function loadAqueducBench(): { rows: AqueducRow[]; meta: Record<string, u
   for (const l of lines) {
     const v = l.split(",");
     const r: Record<string, number | string> = {};
-    cols.forEach((c, i) => (r[c] = AQ_TEXT.includes(c) ? v[i] : Number(v[i])));
+    cols.forEach((c, i) => (r[c] = AQ_TEXT.includes(c) ? v[i] : v[i] === undefined || v[i] === "" ? NaN : Number(v[i])));
     const k = `${r.mode}|${r.tags}|${r.underground}|${r.tubes}|${r.phase}`;
     groups.set(k, [...(groups.get(k) ?? []), r]);
   }
+  const LAT = ["latP50", "latP95"];
   const rows = [...groups.values()].map((g) => {
     const out = { ...g[0] } as AqueducRow;
-    for (const c of cols) if (![...AQ_TEXT, "tags", "rep"].includes(c)) out[c] = g.reduce((a, r) => a + Number(r[c]), 0) / g.length;
-    // échantillons de latence : total des répétitions (les percentiles restent des moyennes)
-    out.latSamples = g.reduce((a, r) => a + Number(r.latSamples), 0);
+    for (const c of cols) {
+      if ([...AQ_TEXT, "tags", "rep", "latSamples", ...LAT].includes(c)) continue;
+      const vals = g.map((r) => Number(r[c])).filter(Number.isFinite);
+      out[c] = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : NaN;
+    }
+    const withLat = g.filter((r) => Number(r.latSamples) > 0 && Number.isFinite(Number(r.latP50)));
+    const n = withLat.reduce((a, r) => a + Number(r.latSamples), 0);
+    for (const c of LAT) out[c] = n ? withLat.reduce((a, r) => a + Number(r[c]) * Number(r.latSamples), 0) / n : NaN;
+    out.latSamples = g.reduce((a, r) => a + (Number(r.latSamples) || 0), 0);
+    out.latWeighted = withLat.length > 1 ? 1 : 0;
     out.rep = g.length;
     return out;
   });

@@ -24,10 +24,10 @@ const COLS: [string, string, number][] = [
   ["updP95", "JS / mise à jour p95 (ms)", 1],
   ["updMax", "JS / mise à jour max (ms)", 1],
   ["capturesPerMin", "Captures / min", 0],
-  ["latP50", "Latence p50 (ms)", 0],
-  ["latP95", "Latence p95 (ms)", 0],
-  ["latSamples", "Échantillons", 0],
-  ["occlMsAvg", "Occlusion (ms / requête)", 1],
+  ["latP50", "Latence p50 (ms) *", 0],
+  ["latP95", "Latence p95 (ms) *", 0],
+  ["latSamples", "Échantillons (total)", 0],
+  ["occlMsAvg", "Occlusion (ms / requête) †", 1],
   ["tubeInstances", "Tubes (instances)", 0],
 ];
 
@@ -58,6 +58,7 @@ function AqueducResults({ rows, meta }: { rows: AqueducRow[]; meta: Record<strin
   const get = (phase: string, metric: string) => (n: number | string, mode: string) => num(main.find((r) => r.tags === Number(n) && r.mode === mode && r.phase === phase)?.[metric]);
   const phases = meta?.phases as Record<string, { planned: string; meanMs: number }> | undefined;
   const vp = meta?.viewport as { width: number; height: number } | undefined;
+  const onScreen = meta?.tagsOnScreen as Record<string, number> | undefined;
   return (
     <>
       <p className="lead">
@@ -90,12 +91,25 @@ function AqueducResults({ rows, meta }: { rows: AqueducRow[]; meta: Record<strin
         <Bars title="Temps de frame p95, rotation" unit="ms" groups={tags} groupLabel={(g) => `${g} étiq.`} series={SERIES} value={get("1-rotation", "frameP95")} />
         <Bars title="JS par mise à jour, max (immobile ×60)" unit="ms" groups={tags} groupLabel={(g) => `${g} étiq.`} series={SERIES} value={get("2-immobile", "updMax")} note="flux, rendus, captures" />
         <Bars title="Captures par minute (immobile ×60)" unit="captures/min" groups={tags} groupLabel={(g) => `${g} étiq.`} series={SERIES} value={get("2-immobile", "capturesPerMin")} digits={0} note="0 en classique" />
-        <Bars title="Latence lecture → pixel p50 (immobile ×60)" unit="ms" groups={tags} groupLabel={(g) => `${g} étiq.`} series={SERIES} value={get("2-immobile", "latP50")} digits={0} />
-        <Bars title="Latence lecture → pixel p95 (immobile ×60)" unit="ms" groups={tags} groupLabel={(g) => `${g} étiq.`} series={SERIES} value={get("2-immobile", "latP95")} digits={0} note="cadence de 2 s incluse" />
+        <Bars title="Latence lecture → pixel p50 * (immobile ×60)" unit="ms" groups={tags} groupLabel={(g) => `${g} étiq.`} series={SERIES} value={get("2-immobile", "latP50")} digits={0} />
+        <Bars title="Latence lecture → pixel p95 * (immobile ×60)" unit="ms" groups={tags} groupLabel={(g) => `${g} étiq.`} series={SERIES} value={get("2-immobile", "latP95")} digits={0} note="cadence de 2 s incluse" />
       </div>
       <p className="note">
         Latence : de la réception SSE d&apos;une lecture à l&apos;image qui l&apos;affiche (classique : image suivant la mise à jour du marqueur ; HTML-in-Canvas : dessin
-        suivant l&apos;upload de la texture de l&apos;étiquette), hors première capture. Les étiquettes se mettent à jour au plus toutes les 2 s dans les deux modes.
+        suivant l&apos;upload de la texture de l&apos;étiquette), hors première capture, étiquettes à l&apos;écran seulement. Les étiquettes se mettent à jour au plus
+        toutes les 2 s dans les deux modes. HTML-in-Canvas compte un échantillon par capture : une lecture remplacée avant sa capture n&apos;est pas comptée
+        (regroupement), d&apos;où moins d&apos;échantillons qu&apos;en classique.
+      </p>
+      <p className="note">
+        * Moyenne pondérée par le nombre d&apos;échantillons des répétitions qui en ont ; « — » : aucun échantillon. † Survol de 10 étiquettes visibles en
+        HTML-in-Canvas, caméra immobile, après la phase 2 : rapporté sur la ligne « Immobile » seulement.
+        {onScreen && (
+          <>
+            {" "}
+            Étiquettes à l&apos;écran à la caméra de départ (les autres sont montées hors du cadre) :{" "}
+            {tags.map((n) => `${n} → ${onScreen[`classic/${n}`] ?? "?"} en classique, ${onScreen[`hic/${n}`] ?? "?"} en HTML-in-Canvas`).join(" ; ")}.
+          </>
+        )}
       </p>
       <div className="tablewrap">
         <table>

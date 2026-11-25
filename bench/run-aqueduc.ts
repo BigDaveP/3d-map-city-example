@@ -67,8 +67,32 @@ async function phase(p: Page, name: string, body: () => Promise<void>): Promise<
     const a = (window as any).__aqueduc;
     return { ...a.metrics.endPhase(), tubeInstances: a.tubes?.stats.instances ?? 0 };
   });
+  // aucune latence mesurée : percentiles laissés vides (percentile([]) vaudrait 0, un faux chiffre)
+  if (!r.latSamples) r.latP50 = r.latP95 = "";
   return { ...r, capturesPerMin: (r.capturesTotal * 60000) / r.durationMs } as Row;
 }
+
+/** Étiquettes à l'écran à la caméra de départ (emprise qui recoupe la carte), dans les deux modes. */
+const tagsOnScreen = (p: Page) =>
+  p.evaluate(() => {
+    const w = window as any;
+    const c = w.__aqueduc.map.getCanvas() as HTMLCanvasElement;
+    const W = c.clientWidth;
+    const H = c.clientHeight;
+    if (w.__hicMap?.layer)
+      return [...w.__hicMap.layer.panels.values()].filter((q: any) => {
+        if (!q.key.startsWith("sensor:") || !q.proj) return false;
+        const pts = [q.proj.project(0, 0), q.proj.project(q.w, 0), q.proj.project(0, q.h), q.proj.project(q.w, q.h)];
+        const xs = pts.map((v: number[]) => v[0]);
+        const ys = pts.map((v: number[]) => v[1]);
+        return Math.max(...xs) > 0 && Math.min(...xs) < W && Math.max(...ys) > 0 && Math.min(...ys) < H;
+      }).length;
+    const box = c.getBoundingClientRect();
+    return [...document.querySelectorAll(".aq-pin [data-sensor]")].filter((e) => {
+      const b = e.getBoundingClientRect();
+      return b.right > box.left && b.left < box.right && b.bottom > box.top && b.top < box.bottom;
+    }).length;
+  });
 
 const idle = (p: Page) =>
   p.evaluate(
@@ -81,7 +105,7 @@ const idle = (p: Page) =>
       }),
   );
 
-async function runOne(ctx: BrowserContext, c: Config, rep: number, errors: string[]): Promise<Row[]> {
+async function runOne(ctx: BrowserContext, c: Config, rep: number, errors: string[], onScreen: Record<string, number[]>): Promise<Row[]> {
   const p = await ctx.newPage();
   // tsx (esbuild, keepNames) enveloppe les fonctions nommées des callbacks dans __name
   await p.addInitScript("window.__name = (f) => f");
@@ -120,6 +144,7 @@ async function runOne(ctx: BrowserContext, c: Config, rep: number, errors: strin
   });
   if (st.mode !== c.mode) throw new Error(`mode ${c.mode} demandé, ${st.mode} actif (${st.fallback})`);
   if (st.tags !== c.tags) errors.push(`${c.mode}/${c.tags}: ${st.tags} étiquettes montées`);
+  if (!c.underground) (onScreen[`${c.mode}/${c.tags}`] ??= []).push(await tagsOnScreen(p));
 
   const rows: Row[] = [];
   let occl = { queries: 0, ms: 0 };
@@ -187,7 +212,11 @@ async function runOne(ctx: BrowserContext, c: Config, rep: number, errors: strin
   const end = await p.evaluate(() => (window as any).__aqueduc.store.getState().mode);
   if (end !== c.mode) errors.push(`${c.mode}/${c.tags}: repli en cours de mesure (${end})`);
   await p.close();
-  return rows.map((r) => ({ mode: c.mode, tags: c.tags, underground: String(c.underground), tubes: c.tubes, rep, ...r, occlQueries: occl.queries, occlMsAvg: occl.ms }));
+  // occlusion (HTML-in-Canvas) mesurée entre les phases 2 et 3, caméra immobile : rapportée sur la ligne 2-immobile seulement
+  return rows.map((r) => ({
+    mode: c.mode, tags: c.tags, underground: String(c.underground), tubes: c.tubes, rep, ...r,
+    ...(r.phase === "2-immobile" && c.mode === "hic" ? { occlQueries: occl.queries, occlMsAvg: occl.ms } : { occlQueries: "", occlMsAvg: "" }),
+  }));
 }
 
 async function main() {
@@ -199,6 +228,7 @@ async function main() {
     for (const tubes of ["maitresses", "tout"] as Tubes[]) configs.push({ mode: "hic", tags: 60, underground: true, tubes, phases: ["1-rotation", "2-immobile"] });
   const all: Row[] = [];
   const errors: string[] = [];
+  const onScreen: Record<string, number[]> = {};
   let browser = "";
   for (let rep = 1; rep <= REPEAT; rep++)
     for (const c of configs) {
@@ -207,7 +237,7 @@ async function main() {
       const ctx = await chromium.launchPersistentContext(PROFILE, { args: ARGS, viewport: VIEW, deviceScaleFactor: 1 });
       browser = ctx.browser()?.version() ?? browser;
       try {
-        const rows = await runOne(ctx, c, rep, errors);
+        const rows = await runOne(ctx, c, rep, errors, onScreen);
         all.push(...rows);
         const f = (r: Row | undefined, k: string, d = 1) => (r ? Number(r[k]).toFixed(d) : "-");
         const [rot, imm] = rows;
@@ -252,7 +282,9 @@ async function main() {
         },
         warmupMs: WARMUP_MS,
         tubes: "souterrain=false : tubes non dessinés quel que soit le réglage, représenté par les lignes hic/60 ; souterrain=true mesuré pour maitresses et tout",
-        latency: "réception SSE du message → image qui affiche la valeur : classique, requestAnimationFrame après le commit du DOM du marqueur ; HTML-in-Canvas, dessin qui suit l'upload de la texture de l'étiquette (HicHost, SurfaceSpec.changedAt) ; hors première capture ; inclut la cadence de 2 s des étiquettes (useThrottled) dans les deux modes",
+        latency: "réception SSE du message → image qui affiche la valeur : classique, requestAnimationFrame après le commit du DOM du marqueur ; HTML-in-Canvas, dessin qui suit l'upload de la texture de l'étiquette (HicHost, SurfaceSpec.changedAt) ; hors première capture ; inclut la cadence de 2 s des étiquettes (useThrottled) dans les deux modes ; étiquettes à l'écran seulement ; percentiles vides quand aucun échantillon. HTML-in-Canvas compte un échantillon par capture : une lecture remplacée avant sa capture n'est pas comptée (regroupement)",
+        tagsOnScreen: Object.fromEntries(Object.entries(onScreen).map(([k, v]) => [k, Math.round(v.reduce((a, b) => a + b, 0) / v.length)])),
+        tagsOnScreenNote: "étiquettes dont l'emprise recoupe la carte à la caméra de départ, après la chauffe (moyenne des répétitions) ; les autres sont montées hors du cadre",
         work: "workP50/workP95/workMax : JS par image (rAF) ; upd* : JS par mise à jour de données (message du flux de bout en bout, lots d'étiquettes hors message, paint avec captures)",
         runtimeS: Math.round((Date.now() - started) / 1000),
         errors,
