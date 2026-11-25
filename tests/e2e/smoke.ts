@@ -102,6 +102,27 @@ async function narrow(b: Browser, js: boolean) {
   await ctx.close();
 }
 
+/** M3 : si la carte ne peut pas démarrer (ici, réseau en 500), le résumé du serveur reste visible. */
+async function startupError(b: Browser) {
+  console.log("\n== / carte indisponible : le résumé du serveur reste lisible");
+  const ctx = await b.newContext({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1 });
+  await ctx.route("**/api/aqueduc/network", (r) => r.fulfill({ status: 500, body: "" }));
+  const p = await ctx.newPage();
+  await p.goto(`${BASE}/?mode=classic`);
+  const alert = p.locator(".aq-fatal[role=alert]");
+  await alert.waitFor({ timeout: 45_000 }).catch(() => {});
+  const text = (await alert.count()) ? await alert.innerText() : "";
+  check("alerte « Le réseau n'a pas pu être chargé »", /Le réseau n'a pas pu être chargé/.test(text), text);
+  const r = await p.evaluate(() => ({
+    ssr: !!document.querySelector(".aq-ssr")?.checkVisibility(),
+    bar: !!document.querySelector(".aq-ssr-bar")?.checkVisibility(),
+    app: document.querySelectorAll(".aq-app").length,
+    flag: document.documentElement.dataset.aq ?? "",
+  }));
+  check("résumé et barre du serveur visibles, pas d'application qui les recouvre", r.ssr && r.bar && r.app === 0 && r.flag === "", JSON.stringify(r));
+  await ctx.close();
+}
+
 /** I2 : `/` sans ?mode s'ouvre en HTML-in-Canvas quand l'API est présente (comme /carte et /mur). */
 async function defaultMode(b: Browser) {
   console.log("\n== / sans ?mode, API présente");
@@ -798,6 +819,7 @@ try {
   await classic(b);
   await homeHic(b);
   await defaultMode(b);
+  await startupError(b);
   await undergroundHic(b);
   await scenarioHic(b);
   await scenarioClassic(b);

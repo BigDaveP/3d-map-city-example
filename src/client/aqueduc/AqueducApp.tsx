@@ -131,11 +131,13 @@ export default function AqueducApp({ initialMode }: { initialMode?: Mode }) {
   const [tubes, setTubes] = useState<TubeLayer | null>(null);
   const mode = useAq((s) => s.mode);
 
-  // la vue SSR (résumé lisible sans JavaScript) laisse la place à l'application
+  // la vue SSR (résumé lisible sans JavaScript) laisse la place à l'application, sauf si la carte
+  // ne peut pas démarrer (MapLibre, WebGL2, réseau) : le résumé reste alors lisible
   useEffect(() => {
+    if (error) return;
     document.documentElement.dataset.aq = "app";
     return () => void delete document.documentElement.dataset.aq;
-  }, []);
+  }, [error]);
 
   // --- détection de l'API, carte et données du réseau
   useEffect(() => {
@@ -177,7 +179,11 @@ export default function AqueducApp({ initialMode }: { initialMode?: Mode }) {
             applyPipeLayers(m, d, aqueducStore.getState().layer);
             setCtx({ ml, map: m, metrics, net: indexNetwork(d) });
           } catch (e) {
+            if (disposed) return;
             setError(`Le réseau n'a pas pu être chargé (${(e as Error).message}).`);
+            // la carte est retirée : le résumé du serveur prend sa place
+            m.remove();
+            map = undefined;
           }
         });
         m.on("click", (e) => select(pick(m, e.point.x, e.point.y)));
@@ -186,7 +192,7 @@ export default function AqueducApp({ initialMode }: { initialMode?: Mode }) {
           m.on("mouseleave", id, () => (m.getCanvas().style.cursor = ""));
         }
       })
-      .catch((e) => setError(`La carte n'a pas pu démarrer (${(e as Error).message}).`));
+      .catch((e) => !disposed && setError(`La carte n'a pas pu démarrer (${(e as Error).message}).`));
     return () => {
       disposed = true;
       map?.remove();
@@ -268,20 +274,23 @@ export default function AqueducApp({ initialMode }: { initialMode?: Mode }) {
     return () => void delete w.__aqueduc;
   }, [ctx, tubes]);
 
+  // échec du démarrage : une alerte qui ne recouvre pas le résumé rendu par le serveur
+  if (error)
+    return (
+      <p className="aq-fatal" role="alert">
+        {error} Le résumé ci-dessous reste consultable ; la carte 3D demande WebGL2.
+      </p>
+    );
+
   return (
     <div className="aq-app" data-mode={mode}>
       <AppBar map={ctx?.map ?? null} net={ctx?.net ?? null} metrics={ctx?.metrics ?? null} tubes={tubes?.stats ?? null} />
       <NoApiBanner />
       <main className="aq-stage">
         <div className="aq-map" ref={container} role="region" aria-label="Carte 3D du réseau d'aqueduc de Trois-Rivières" />
-        {!ctx && !error && (
+        {!ctx && (
           <p className="aq-loading" role="status">
             Chargement du réseau de conduites…
-          </p>
-        )}
-        {error && (
-          <p className="aq-loading aq-bad" role="alert">
-            {error}
           </p>
         )}
         {ctx && mode === "classic" && <ClassicScene ml={ctx.ml} map={ctx.map} net={ctx.net} metrics={ctx.metrics} />}

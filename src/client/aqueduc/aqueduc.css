@@ -58,6 +58,9 @@ html[data-aq="app"] .aq-ssr { display: none; }
 .aq-stage .maplibregl-ctrl-bottom-right { bottom: 140px; }
 .aq-stage .maplibregl-ctrl-attrib { font-size: 11px; background: rgba(255, 255, 255, 0.85); }
 .aq-panel { position: absolute; background: rgba(255, 255, 255, 0.96); border: 1px solid var(--aq-line); border-radius: 12px; box-shadow: var(--aq-shadow); }
+/* la carte n'a pas pu démarrer : alerte en bas de l'écran, le résumé du serveur reste lisible au-dessus */
+.aq-fatal { position: fixed; left: 0; right: 0; bottom: 0; z-index: 30; margin: 0; padding: 10px var(--aq-gap); background: #fdeceb; border-top: 1px solid #f0c4c0; color: #8f1d14; font-size: 13px; }
+html:has(.aq-fatal) .aq-ssr { padding-bottom: 96px; }
 .aq-loading { position: absolute; left: 50%; top: 38%; transform: translateX(-50%); margin: 0; padding: 10px 16px; background: #fff; border: 1px solid var(--aq-line); border-radius: 10px; box-shadow: var(--aq-shadow); font-size: 13px; color: var(--aq-ink-2); }
 .aq-btn { border: 1px solid var(--aq-line); background: #fff; color: var(--aq-ink); border-radius: 7px; padding: 5px 10px; font: 600 12px var(--aq-ui); cursor: pointer; white-space: nowrap; }
 .aq-btn:hover { border-color: #c5ced9; }
