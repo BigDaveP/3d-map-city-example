@@ -1,16 +1,16 @@
 "use client";
 /**
- * Puce de performance (images/s, temps JS p95) ; un clic ouvre le détail des mesures de `/carte` et le
+ * Puce de performance (images/s, temps JS p95) ; un clic ouvre le détail des mesures (`MetricsDetail`) et le
  * lien vers les résultats du banc (`/bench#aqueduc`). Le temps JS affiché est le plus grand des deux
  * p95 : par image, et par mise à jour des données (message du flux une fois par seconde, re-rendu des
  * étiquettes, captures) ; le p95 par image seul cacherait la mise à jour, une image sur soixante.
  */
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { CarteMetrics } from "../../carte/CarteMetrics";
-import type { Metrics } from "../../metrics";
+import type { Metrics } from "../../hic3d/metrics";
 import { num } from "../format";
 import { useAq } from "../useAq";
+import { MetricsDetail } from "./MetricsDetail";
 
 /** `tubes` : statistiques de la couche des tubes souterrains (instances dessinées, 0 hors vue souterraine). */
 export function PerfChip({ metrics, tubes }: { metrics: Metrics | null; tubes: { instances: number } | null }) {
@@ -54,7 +54,7 @@ export function PerfChip({ metrics, tubes }: { metrics: Metrics | null; tubes: {
       </button>
       {open && metrics && (
         <div className="aq-perf-detail" id="aq-perf-detail" role="dialog" aria-label="Mesures de performance">
-          <CarteMetrics metrics={metrics} mode={mode} rows={[["Capteurs simulés", String(sensors)], ["Tubes souterrains (instances)", num(snap.tubes)]]} />
+          <MetricsDetail metrics={metrics} mode={mode} rows={[["Capteurs simulés", String(sensors)], ["Tubes souterrains (instances)", num(snap.tubes)]]} />
           <p className="aq-note">
             Mesuré en direct dans ce navigateur : les chiffres dépendent de la machine et de son GPU. <Link href="/bench#aqueduc">Résultats du banc</Link>
           </p>

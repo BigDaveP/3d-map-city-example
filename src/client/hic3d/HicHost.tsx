@@ -24,9 +24,9 @@
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { Map as MlMap } from "maplibre-gl";
-import { PanelLayer, type PanelGpu, type PanelLayerOptions } from "../carte/hic/panelLayer";
-import { detectApi } from "../hic/detect";
-import type { Metrics } from "../metrics";
+import { PanelLayer, type PanelGpu, type PanelLayerOptions } from "./panelLayer";
+import { detectApi } from "./detect";
+import type { Metrics } from "./metrics";
 import { useOcclusionHitTesting, type OcclusionHooks } from "./occlusion";
 
 type ML = typeof import("maplibre-gl");

@@ -1,7 +1,7 @@
 "use client";
 /**
  * Cadence des surfaces : une donnée simulée ne re-rend pas une surface plus d'une fois toutes les 2 s
- * (au plus une capture par élément toutes les 2 s, RULES.md). Partagé par `/carte` et la démo réseau d'eau.
+ * (au plus une capture par élément toutes les 2 s, RULES.md). Utilisé par les étiquettes de la démo réseau d'eau.
  */
 import { useEffect, useRef, useState } from "react";
 

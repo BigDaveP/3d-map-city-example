@@ -9,7 +9,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Map as MlMap } from "maplibre-gl";
 import { VIDEO_CREDITS } from "@/lib/aqueduc/city";
 import { SCENARIO_STEPS, type StepId } from "@/lib/aqueduc/scenario";
-import { canRecord, download, recordMap } from "../../carte/video";
+import { canRecord, download, recordMap } from "../video";
 import { clockTime, num } from "../format";
 import type { NetIndex } from "../net";
 import { exploreFreely, goToStep, nextStep, prevStep, replayForVideo, startScenario } from "../scenarioController";

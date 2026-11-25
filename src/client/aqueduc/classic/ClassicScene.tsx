@@ -8,7 +8,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import { createPortal } from "react-dom";
 import type { Map as MlMap, PositionAnchor } from "maplibre-gl";
 import { CITY } from "@/lib/aqueduc/city";
-import type { Metrics } from "../../metrics";
+import type { Metrics } from "../../hic3d/metrics";
 import { lineCenter, segment, type NetIndex } from "../net";
 import { IncidentMark } from "../scene/IncidentMark";
 import { SectorMark, useVisibleSectors } from "../scene/SectorMark";

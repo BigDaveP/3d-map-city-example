@@ -4,8 +4,8 @@ const nextConfig: NextConfig = {
   // Build autonome pour l'image Docker (Coolify).
   output: "standalone",
   reactStrictMode: true,
-  // Les migrations SQL sont lues au démarrage par l'instrumentation.
-  outputFileTracingIncludes: { "/*": ["./drizzle/**/*", "./data/aqueduc/**/*"], "/bench": ["./bench/results/**/*"], "/bench/results.csv": ["./bench/results/**/*"], "/bench/aqueduc.csv": ["./bench/results/**/*"], "/maplibre/[file]": ["./node_modules/maplibre-gl/dist/maplibre-gl-worker.mjs", "./node_modules/maplibre-gl/dist/maplibre-gl-shared.mjs"] },
+  // Fichiers lus à l'exécution : réseau (data/aqueduc), résultats du banc, worker de MapLibre.
+  outputFileTracingIncludes: { "/*": ["./data/aqueduc/**/*"], "/bench": ["./bench/results/**/*"], "/bench/aqueduc.csv": ["./bench/results/**/*"], "/maplibre/[file]": ["./node_modules/maplibre-gl/dist/maplibre-gl-worker.mjs", "./node_modules/maplibre-gl/dist/maplibre-gl-shared.mjs"] },
 };
 
 export default nextConfig;
