@@ -1,4 +1,20 @@
 {
+  "environment": {
+    "date": "2026-11-25T02:03:45.550Z",
+    "browser": "Chromium 158.0.8127.36",
+    "flags": [
+      "--enable-blink-features=CanvasDrawElement"
+    ],
+    "webgl": "ANGLE (Google, Vulkan 1.3.0 (SwiftShader Device (Subzero) (0x0000C0DE)), SwiftShader driver)",
+    "gpu": false,
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz × 4",
+    "viewport": {
+      "width": 1440,
+      "height": 860
+    },
+    "deviceScaleFactor": 1,
+    "base": "http://localhost:3300"
+  },
   "occlusion_classic": {
     "state": {
       "mode": "classic",
@@ -129,71 +145,85 @@
     "instances": 12568,
     "errors": []
   },
-  "aria_classic": [
-    "- 'button \"Capteur de pression P-01 (simulation) : 4,4 bar, normal\"': 4,4 bar",
-    "- 'button \"Capteur de pression P-28 (simulation) : 4,7 bar, normal\"': 4,7 bar",
-    "- 'button \"Débitmètre D-10 (simulation) : 40,5 L/s, normal\"': 40,5 L/s",
-    "- 'button \"Capteur de pression P-27 (simulation) : 4,3 bar, normal\"': 4,3 bar",
-    "- 'button \"Capteur de pression P-24 (simulation) : 4,4 bar, normal\"': 4,4 bar",
-    "- 'button \"Débitmètre D-04 (simulation) : 92,6 L/s, normal\"': 92,6 L/s",
-    "- 'button \"Capteur de pression P-12 (simulation) : 5,0 bar, normal\"': 5,0 bar",
-    "- 'button \"Débitmètre D-03 (simulation) : 90,0 L/s, normal\"': 90,0 L/s"
-  ],
+  "aria_classic": {
+    "capteurs": [
+      "- 'button \"Capteur de pression P-01 (simulation) : 4,5 bar, normal\"': 4,5 bar",
+      "- 'button \"Capteur de pression P-28 (simulation) : 4,8 bar, normal\"': 4,8 bar",
+      "- 'button \"Débitmètre D-10 (simulation) : 34,5 L/s, normal\"': 34,5 L/s",
+      "- 'button \"Capteur de pression P-27 (simulation) : 4,4 bar, normal\"': 4,4 bar",
+      "- 'button \"Capteur de pression P-24 (simulation) : 4,5 bar, normal\"': 4,5 bar",
+      "- 'button \"Débitmètre D-04 (simulation) : 79,3 L/s, normal\"': 79,3 L/s",
+      "- 'button \"Capteur de pression P-12 (simulation) : 5,1 bar, normal\"': 5,1 bar",
+      "- 'button \"Débitmètre D-03 (simulation) : 76,7 L/s, normal\"': 76,7 L/s"
+    ],
+    "secteurs": [
+      "- 'button \"Secteur Centre-ville (simulé) : 2 417 adresses desservies\"': CENTRE-VILLE 2 417 adresses desservies",
+      "- 'button \"Secteur Sainte-Cécile (simulé) : 986 adresses desservies\"': SAINTE-CÉCILE 986 adresses desservies",
+      "- 'button \"Secteur Saint-Philippe (simulé) : 4 731 adresses desservies\"': SAINT-PHILIPPE 4 731 adresses desservies"
+    ]
+  },
   "focus_classic": {
     "tabs": 9,
     "sensor": "P-01",
     "inCanvas": false,
-    "label": "Capteur de pression P-01 (simulation) : 4,4 bar, normal",
+    "label": "Capteur de pression P-01 (simulation) : 4,5 bar, normal",
     "enterOpensInspector": true,
     "inspector": "× · P-01 · Capteur de pression · simulation · Centre-ville"
   },
-  "aria_hic": [
-    "- 'button \"Secteur Centre-ville (simulé) : 2 417 adresses desservies\"': CENTRE-VILLE 2 417 adresses desservies",
-    "- 'button \"Capteur de pression P-01 (simulation) : 4,4 bar, normal\"': 4,4 bar",
-    "- 'button \"Débitmètre D-10 (simulation) : 41,2 L/s, normal\"': 41,2 L/s",
-    "- 'button \"Capteur de pression P-27 (simulation) : 4,2 bar, normal\"': 4,2 bar",
-    "- 'button \"Capteur de pression P-24 (simulation) : 4,4 bar, normal\"': 4,4 bar",
-    "- 'button \"Débitmètre D-04 (simulation) : 92,5 L/s, normal\"': 92,5 L/s",
-    "- 'button \"Capteur de pression P-12 (simulation) : 5,0 bar, normal\"': 5,0 bar",
-    "- 'button \"Débitmètre D-03 (simulation) : 90,0 L/s, normal\"': 90,0 L/s"
-  ],
+  "aria_hic": {
+    "capteurs": [
+      "- 'button \"Capteur de pression P-01 (simulation) : 4,5 bar, normal\"': 4,5 bar",
+      "- 'button \"Débitmètre D-10 (simulation) : 34,9 L/s, normal\"': 34,9 L/s",
+      "- 'button \"Capteur de pression P-27 (simulation) : 4,3 bar, normal\"': 4,3 bar",
+      "- 'button \"Capteur de pression P-24 (simulation) : 4,5 bar, normal\"': 4,5 bar",
+      "- 'button \"Débitmètre D-04 (simulation) : 79,1 L/s, normal\"': 79,1 L/s",
+      "- 'button \"Capteur de pression P-12 (simulation) : 5,0 bar, normal\"': 5,0 bar",
+      "- 'button \"Débitmètre D-03 (simulation) : 78,6 L/s, normal\"': 78,6 L/s",
+      "- 'button \"Sonde de réservoir R-01 (simulation) : 68 %, normal\"': 68 %"
+    ],
+    "secteurs": [
+      "- 'button \"Secteur Centre-ville (simulé) : 2 417 adresses desservies\"': CENTRE-VILLE 2 417 adresses desservies",
+      "- 'button \"Secteur Sainte-Cécile (simulé) : 986 adresses desservies\"': SAINTE-CÉCILE 986 adresses desservies",
+      "- 'button \"Secteur Saint-Philippe (simulé) : 4 731 adresses desservies\"': SAINT-PHILIPPE 4 731 adresses desservies"
+    ]
+  },
   "focus_hic": {
     "tabs": 12,
     "sensor": "P-01",
     "inCanvas": true,
-    "label": "Capteur de pression P-01 (simulation) : 4,4 bar, normal",
+    "label": "Capteur de pression P-01 (simulation) : 4,5 bar, normal",
     "enterOpensInspector": true,
     "inspector": "× · P-01 · Capteur de pression · simulation · Centre-ville"
   },
   "video_classic": {
     "file": "docs/aqueduc/video-classic.webm",
-    "octets": 1412069,
-    "message": "Vidéo enregistrée : scenario-bris.webm, 1,4 Mo, 10,2 s.",
-    "wallMs": 10414,
+    "octets": 1501142,
+    "message": "Vidéo enregistrée : scenario-bris.webm, 1,5 Mo, 10,2 s.",
+    "wallMs": 10520,
     "errors": [],
     "ffprobe": {
       "stream": "vp9,1440,808",
-      "frames": 81,
-      "lastFrameS": 9.871
+      "frames": 73,
+      "lastFrameS": 9.799
     },
     "image5s": "docs/aqueduc/video-classic-image-5s.png"
   },
   "video_hic": {
     "file": "docs/aqueduc/video-hic.webm",
-    "octets": 1643224,
-    "message": "Vidéo enregistrée : scenario-bris.webm, 1,6 Mo, 10,1 s.",
-    "wallMs": 10567,
+    "octets": 1487599,
+    "message": "Vidéo enregistrée : scenario-bris.webm, 1,5 Mo, 10,2 s.",
+    "wallMs": 10573,
     "errors": [],
     "ffprobe": {
       "stream": "vp9,1440,808",
-      "frames": 80,
-      "lastFrameS": 9.712
+      "frames": 77,
+      "lastFrameS": 9.787
     },
     "image5s": "docs/aqueduc/video-hic-image-5s.png"
   },
   "publicVideo": {
     "file": "public/aqueduc/scenario-hic.webm",
-    "octets": 1643224
+    "octets": 1487599
   },
   "sans_api": {
     "state": {
