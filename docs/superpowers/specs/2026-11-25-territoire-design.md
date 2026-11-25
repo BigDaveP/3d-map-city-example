@@ -148,15 +148,35 @@ frise 24 h est commune à tous les environnements. On arrive sur « maintenant �
 locale réelle (America/Toronto) appliquée à la journée scénarisée. On peut avancer, reculer
 et accélérer (×1, ×60) comme aujourd'hui.
 
-Journée scénarisée (validée par David) :
+**Qui agit, et quand (précisions de David).** Dans une ville, les décisions se prennent **le
+jour** : il n'y a pas de gestionnaire ni de fonctionnaire de soir ou de nuit. La nuit, ce sont
+les **ouvriers** (équipes de garde, déneigement, réparations) qui travaillent. Pour le
+déneigement, l'interdiction se décide **le matin même ou en début d'après-midi** : passé le
+milieu de l'après-midi, c'est trop tard, les citoyens n'ont plus le temps de s'informer.
+
+**La journée se déroule toute seule.** Si le visiteur n'agit pas, la direction (simulée) prend
+les décisions du jour à l'heure prévue, et les équipes de nuit (simulées) font le travail. Ce
+que le visiteur fait remplace simplement ce qu'aurait fait la direction. Un visiteur qui
+arrive à 2 h voit donc une ville cohérente : l'interdiction décidée à 10 h « par la direction
+(simulé) », les feux allumés, les équipes sur le terrain.
+
+Journée scénarisée (validée par David, corrigée selon ses précisions) :
 
 ```
-06 h  levée automatique de l'interdiction de stationner de la veille
-07 h  collecte : secteurs « en cours » les uns après les autres
-14 h  bris de conduite au centre-ville (scénario actuel de l'aqueduc)
-19 h  neige prévue → alerte « décréter l'interdiction ? »
-23 h  interdiction en vigueur, ressources sur le terrain
+06 h    levée automatique de l'interdiction de la nuit ; feux éteints
+07 h    collecte : secteurs « en cours » les uns après les autres
+07 h 30 prévision météo : neige ce soir → alerte « Décider l'interdiction de stationner »
+10 h    décision par défaut (direction, simulé) si le visiteur n'a pas décidé :
+        zones visées, ressources assignées ; feux « programmés »
+14 h    bris de conduite au centre-ville (scénario de l'aqueduc) ; isolation décidée de jour
+15 h    limite de décision pour ce soir (au-delà, alerte : trop tard pour ce soir)
+19 h    début de la neige
+23 h    interdiction en vigueur, feux allumés, équipes de déneigement sur le terrain (nuit)
+06 h    levée automatique (cycle suivant)
 ```
+
+Les heures exactes (décision par défaut, limite de décision, début de l'interdiction) sont des
+constantes de démo, ajustables par le constructeur, documentées dans « À propos ».
 
 À toute heure, l'accueil a quelque chose de vivant à montrer, et la section « À venir » de
 l'accueil annonce le prochain événement.
@@ -167,8 +187,9 @@ Le scénario guidé du bris (récit, coupe, vannes) reste disponible dans l'envi
 - **Le bris existe sur l'horloge commune** à partir de 14 h pour tout visiteur, en
   exploration libre comme dans le récit : le flux des capteurs le contient dès que l'heure
   simulée dépasse 14 h. Le scénario guidé devient un récit posé sur cet événement ; ses
-  étapes sont décalées pour commencer à 14 h. La réparation peut chevaucher la neige de 19 h,
-  ce qui est réaliste.
+  étapes sont décalées pour commencer à 14 h. Comme pour le déneigement, si le visiteur
+  n'isole pas, la direction (simulée) le fait à l'heure prévue du récit, et l'équipe de garde
+  répare en soirée. La réparation peut chevaucher la neige de 19 h, ce qui est réaliste.
 - **Actions datées en temps simulé.** Chaque opération du visiteur (interdiction, ressources,
   vannes, rinçage) est enregistrée avec son heure simulée. Reculer avant une action la fait
   disparaître de l'affichage, sans l'effacer ; avancer à nouveau la fait réapparaître. Les
@@ -255,15 +276,31 @@ le module apporte :
 | Environnement | Ce qu'on voit | Opérations | Dans la scène (HIC) | Réel / simulé |
 |---|---|---|---|---|
 | **Aqueduc** | Ce qui existe : pressions, bris, rinçage, vue souterraine | Isoler un bris (scénario actuel), planifier un rinçage de secteur | Ce qui existe (marquages, capteurs, coupe) | Conduites réelles ; capteurs et bris simulés |
-| **Déneigement** | Les 3 zones de stationnement de nuit, l'interdiction en vigueur, les ressources assignées, l'avancement par zone | Décréter l'interdiction de stationner la nuit sur une ou plusieurs zones, rapidement (deux gestes) ; assigner des ressources (équipes, chenillettes, souffleuses, camions) à une zone. La levée se fait seule à 6 h (David). | Au sol, par zone : « Stationnement interdit · 23 h – 6 h », avancement ; ressources assignées montrées dans la zone | Zones réelles ; météo, ressources, avancement simulés |
+| **Déneigement** | Les 3 zones de stationnement de nuit, l'interdiction décidée ou en vigueur, les **feux d'interdiction** (éteints, programmés, allumés), les ressources assignées, l'avancement par zone | Décider l'interdiction de stationner pour la nuit sur une ou plusieurs zones, rapidement (deux gestes), de jour avant la limite ; assigner des ressources (équipes, chenillettes, souffleuses, camions) à une zone. Décider pour une zone allume **tous** ses feux, sans exception de rue (David). La levée se fait seule à 6 h. | Au sol, par zone : état de l'interdiction et heures, avancement ; ressources assignées montrées dans la zone | Zones réelles ; feux, météo, ressources, avancement simulés |
 | **Collecte** | Les secteurs de collecte du jour et leur état : à venir, en cours, terminé | Consulter l'horaire d'un secteur. Pas de suivi bac par bac (David). | Au sol, par secteur : état et heure | Entièrement simulé (aucun jeu ouvert trouvé) |
 | **Zonage** | Les 1 666 zones colorées par groupe d'usage, codes de zone | Fiche de zone (code, groupe d'usage, description, statut, date) ; comparer deux zones côte à côte | Codes de zone posés au sol en perspective, masqués par les bâtiments | Réel (le règlement fait foi ; le détail des usages permis n'est pas dans les données, la fiche le dit) |
 | **Évaluation** | Les unités d'évaluation colorées par valeur | Fiche de l'unité (adresse, utilisation, valeurs terrain / bâtiment / totale, année de construction, logements selon disponibilité) ; total d'un secteur dessiné à la main | Valeur de l'unité sélectionnée, total du secteur dessiné, posés dans la scène | Réel (rôle 2026, caviardé) |
 
+**Feux d'interdiction de stationnement.** Québec (et, à vérifier, Montréal) signale
+l'interdiction par des feux orange clignotants sur rue : un feu allumé veut dire que le
+stationnement est interdit, et la Ville publie une carte des feux en fonction ou éteints.
+Trois-Rivières n'a pas de tels feux à notre connaissance (elle publie les zones et une page
+d'état). La démo les montre quand même, **comme une possibilité, clairement marquée
+« Simulation : feux inspirés du système de la Ville de Québec »** :
+- emplacements simulés le long des rues principales de chaque zone (aucune donnée ouverte
+  d'emplacements utilisable n'a été trouvée ; le jeu « Opérations déneigement — Interdictions
+  de stationnement » de la Ville de Québec n'est plus accessible sur Données Québec) ;
+- trois états : **éteint**, **programmé** (interdiction décidée pour ce soir), **allumé**
+  (interdiction en vigueur, avec clignotement) ;
+- visibles sur la carte de l'environnement Déneigement, avec leur état, et comptés par zone
+  (« 42 feux allumés ») ;
+- décider pour une zone change d'un coup l'état de tous les feux de la zone.
+
 Alertes (proposition, à affiner par le constructeur dans le même esprit) :
 - Aqueduc : celles d'aujourd'hui (bris, basse pression, qualité).
-- Déneigement : à 19 h, « Neige prévue — décréter l'interdiction ? » (attention), qui devient
-  critique si rien n'est décrété à 21 h ; « Interdiction en vigueur » (info) de 23 h à 6 h.
+- Déneigement : à 7 h 30, « Neige prévue ce soir — décider l'interdiction » (attention), qui
+  devient critique à midi si rien n'est décidé ; à 15 h sans décision, « Trop tard pour ce
+  soir » ; « Interdiction en vigueur » (info) de 23 h à 6 h.
 - Collecte : un retard simulé sur un secteur dans la journée (attention).
 - Zonage et Évaluation : pas d'alerte (données de référence).
 
