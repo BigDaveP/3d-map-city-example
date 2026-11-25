@@ -1,7 +1,7 @@
 /**
  * Scénario de bris guidé (Simulation), sans React : testé sous Node.
  *
- * Le scénario a sa propre ligne de temps (06:58 → rapport) qui remplace l'horloge vivante pendant
+ * Le scénario a sa propre ligne de temps (14:01 → rapport) qui remplace l'horloge vivante pendant
  * sa lecture. À chaque étape (ou heure visée sur la frise), il reconstruit l'incident du flux à
  * partir de l'étape et de l'état des vannes (`scenarioIncidentParams`) : jamais un incident figé
  * qu'on ferait défiler, puisque l'incident n'a pas d'heure de fermeture des vannes.
@@ -11,7 +11,8 @@
  */
 import { closeValvesAction } from "@/app/aqueduc-actions";
 import { CITY } from "@/lib/aqueduc/city";
-import { SCENARIO_STEPS, scenarioIncidentParams, stepAtTime, type StepId } from "@/lib/aqueduc/scenario";
+import { SCENARIO_DAY, scenarioIncidentParams, scenarioSteps, stepAtTime, type StepId } from "@/lib/aqueduc/scenario";
+import { dayStartOf } from "@/lib/territoire/day";
 import { aqueducStore, seek, simNow, type AqState, type Mode, type Selection } from "./store";
 
 export type { StepId };
@@ -52,8 +53,10 @@ export function faceBearing(from: readonly [number, number], to: readonly [numbe
 }
 export const STEP_MS = 1500;
 
-const ORDER: StepId[] = SCENARIO_STEPS.map((s) => s.id);
-const timeOf = (id: StepId) => SCENARIO_STEPS.find((s) => s.id === id)!.at;
+// l'horloge de l'aqueduc reste propre au client jusqu'à l'horloge commune : le scénario part de la journée de référence
+const STEPS = scenarioSteps(SCENARIO_DAY);
+const ORDER: StepId[] = STEPS.map((s) => s.id);
+const timeOf = (id: StepId) => STEPS.find((s) => s.id === id)!.at;
 const INCIDENT: Selection = { kind: "incident", id: CITY.breakSegment };
 
 let env: ScenarioEnv = { valves: [] };
@@ -88,7 +91,7 @@ function apply(step: StepId, t: number, now: number, patch: Partial<AqState["sce
   aqueducStore.setState({
     clock: { t0: t, speed: s.clock.speed, startedAt: now },
     scenario,
-    incident: scenarioIncidentParams(step, scenario.valvesClosed, env.valves),
+    incident: scenarioIncidentParams(step, scenario.valvesClosed, env.valves, dayStartOf(t)),
     ...(select ? { selection: stepSelection(step, s.mode, scenario.valvesClosed) } : {}),
   });
 }
@@ -185,7 +188,7 @@ export async function closeValves(action: CloseAction = closeValvesAction): Prom
   if (!cur.scenario.active || cur.scenario.step !== "isolation") return { ok: false, reason: "Étape quittée avant la réponse du serveur." };
   aqueducStore.setState({
     scenario: { ...cur.scenario, valvesClosed: true, valvesTurned: [...r.isolation.valves], error: "" },
-    incident: scenarioIncidentParams("isolation", true, r.isolation.valves),
+    incident: scenarioIncidentParams("isolation", true, r.isolation.valves, SCENARIO_DAY),
     selection: stepSelection("isolation", cur.mode, true),
   });
   return { ok: true };

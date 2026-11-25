@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { publishNoticeAction } from "@/app/aqueduc-actions";
 import { CITY } from "@/lib/aqueduc/city";
-import { SCENARIO_STEPS } from "@/lib/aqueduc/scenario";
+import { SCENARIO_DAY, scenarioSteps } from "@/lib/aqueduc/scenario";
 import { demand, FLUSHING_2026, localHour, nominalFlowLs, THRESHOLDS } from "@/lib/aqueduc/sim";
 import { MATERIAL, num, PIPE_CLASS, sectorStatus, SENSOR_KIND, sensorValue, STATUS_LABEL } from "../format";
 import { segment, type NetIndex } from "../net";
@@ -220,7 +220,8 @@ function Isolation({ net }: { net: NetIndex }) {
 
 function IncidentCard({ net, id }: { net: NetIndex; id: string }) {
   const step = useAq((s) => s.scenario.step);
-  const k = SCENARIO_STEPS.findIndex((x) => x.id === step);
+  const steps = scenarioSteps(SCENARIO_DAY);
+  const k = steps.findIndex((x) => x.id === step);
   const idx = net.segById.get(id);
   return (
     <>
@@ -228,7 +229,7 @@ function IncidentCard({ net, id }: { net: NetIndex; id: string }) {
       {id === CITY.breakSegment && <Isolation net={net} />}
       <h3 className="aq-h3">Intervention</h3>
       <ol className="aq-steps">
-        {SCENARIO_STEPS.map((x, i) => (
+        {steps.map((x, i) => (
           <li key={x.id} data-state={i < k ? "done" : i === k ? "now" : undefined}>
             {x.title}
           </li>

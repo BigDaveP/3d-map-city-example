@@ -8,7 +8,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { Map as MlMap } from "maplibre-gl";
 import { VIDEO_CREDITS } from "@/lib/aqueduc/city";
-import { SCENARIO_STEPS, type StepId } from "@/lib/aqueduc/scenario";
+import { SCENARIO_DAY, scenarioSteps, type StepId } from "@/lib/aqueduc/scenario";
 import { canRecord, download, recordMap } from "../video";
 import { clockTime, num } from "../format";
 import type { NetIndex } from "../net";
@@ -18,6 +18,7 @@ import { useImpactTotals } from "../scene/SectorMark";
 import { useAq } from "../useAq";
 
 export const VIDEO_MS = 10_000;
+const SCENARIO_STEPS = scenarioSteps(SCENARIO_DAY);
 const timeOf = (id: StepId) => SCENARIO_STEPS.find((s) => s.id === id)!.at;
 const plural = (n: number, one: string, many: string) => `${num(n)} ${n > 1 ? many : one}`;
 

@@ -3,7 +3,8 @@
  * par la page serveur, les routes, le client et les tests (aucun import React ni navigateur).
  */
 import type { Material, PipeClass } from "@/lib/aqueduc/network";
-import { localHour, type SectorStat, type SensorKind } from "@/lib/aqueduc/sim";
+import type { SectorStat, SensorKind } from "@/lib/aqueduc/sim";
+import { dayStartOf } from "@/lib/territoire/day";
 
 export const TIME_ZONE = "America/Toronto";
 
@@ -65,10 +66,7 @@ export function clockDay(t: number): string {
 }
 
 /** Minuit local (heure de l'Est) de la journée qui contient t, à la minute près. */
-export function dayStart(t: number): number {
-  const d = t - localHour(t) * 3_600_000;
-  return Math.round(d / 60_000) * 60_000;
-}
+export const dayStart = dayStartOf;
 
 /** Statut d'un secteur : 2 si un capteur y est en alerte, 1 si le débit de nuit est élevé (fuite probable), sinon 0. */
 export function sectorStatus(stat: Pick<SectorStat, "nightRatio">, alerts: number): { level: 0 | 1 | 2; label: string } {

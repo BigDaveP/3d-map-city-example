@@ -3,7 +3,8 @@ import { test } from "node:test";
 import { closeValvesAction } from "../src/app/aqueduc-actions";
 import { GET as getNetwork } from "../src/app/api/aqueduc/network/route";
 import { isolate, isolationPath } from "../src/lib/aqueduc/graph";
-import { SCENARIO_DAY, SCENARIO_STEPS, scenarioIncident, scenarioIncidentParams, stepAtTime } from "../src/lib/aqueduc/scenario";
+import { breakAt, dayIncident, SCENARIO_DAY, scenarioIncident, scenarioIncidentParams, scenarioSteps, stepAtTime } from "../src/lib/aqueduc/scenario";
+import { atHour } from "../src/lib/territoire/day";
 import { indexNetwork } from "../src/client/aqueduc/net";
 import type { NetworkData } from "../src/client/aqueduc/pipes";
 import { cutLayout, valveLabel, VALVE_AT } from "../src/client/aqueduc/scene/cut";
@@ -29,28 +30,33 @@ const n = loadNetwork();
 const m = buildModel(n, CITY);
 const brk = n.byId.get(CITY.breakSegment)!;
 const P01 = m.sensors.find((s) => s.id === "P-01")!;
+const SCENARIO_STEPS = scenarioSteps(SCENARIO_DAY);
 const step = (id: string) => SCENARIO_STEPS.find((s) => s.id === id)!;
 /** heure locale (UTC−5 en novembre) au format HH:MM */
 const local = (t: number) => new Date(t - 5 * 3_600_000).toISOString().slice(11, 16);
 
-test("étapes dans l'ordre, détection à 06:58", () => {
-  assert.equal(local(SCENARIO_DAY), "06:00");
+test("étapes dans l'ordre, bris à 14:00 et détection à 14:01", () => {
+  assert.equal(local(SCENARIO_DAY), "00:00");
+  assert.equal(local(breakAt(SCENARIO_DAY)), "14:00");
   assert.deepEqual(
     SCENARIO_STEPS.map((s) => s.id),
     ["detection", "isolation", "intervention", "retablissement", "rapport"],
   );
   for (let i = 1; i < SCENARIO_STEPS.length; i++) assert.ok(SCENARIO_STEPS[i].at > SCENARIO_STEPS[i - 1].at);
-  assert.equal(local(step("detection").at), "06:58");
+  assert.deepEqual(
+    SCENARIO_STEPS.map((s) => local(s.at)),
+    ["14:01", "14:23", "15:08", "18:43", "20:48"],
+  );
   for (const s of SCENARIO_STEPS) assert.ok(s.title.length > 0 && s.text.length > 0);
   // à la détection, P-01 est déjà en alerte
-  const inc = scenarioIncident("detection", false, m);
+  const inc = scenarioIncident("detection", false, m, SCENARIO_DAY);
   assert.equal(inc.segment, brk);
   assert.ok(inc.startedAt < step("detection").at);
   assert.equal(readingsAt(m, step("detection").at, inc)[P01.idx].status, "alerte");
 });
 
 test("isolation sans vannes fermées : pression basse autour du bris", () => {
-  const inc = scenarioIncident("isolation", false, m);
+  const inc = scenarioIncident("isolation", false, m, SCENARIO_DAY);
   assert.deepEqual(inc.closedValves, []);
   assert.equal(inc.restoredAt, null);
   const t = step("isolation").at;
@@ -63,20 +69,20 @@ test("isolation sans vannes fermées : pression basse autour du bris", () => {
 
 test("isolation avec vannes fermées, puis rétablissement et rapport", () => {
   const iso = isolate(n, brk, m.valves);
-  const closed = scenarioIncident("isolation", true, m);
+  const closed = scenarioIncident("isolation", true, m, SCENARIO_DAY);
   assert.deepEqual(closed.closedValves, iso.valves);
   const imp = incidentImpact(m, step("isolation").at, closed);
   assert.ok(imp.withoutWaterAddresses > 0);
   // après l'isolation, l'équipe a fermé les vannes quoi qu'il arrive
-  assert.deepEqual(scenarioIncident("intervention", false, m).closedValves, iso.valves);
-  assert.equal(scenarioIncident("intervention", true, m).restoredAt, null);
-  const ret = scenarioIncident("retablissement", true, m);
+  assert.deepEqual(scenarioIncident("intervention", false, m, SCENARIO_DAY).closedValves, iso.valves);
+  assert.equal(scenarioIncident("intervention", true, m, SCENARIO_DAY).restoredAt, null);
+  const ret = scenarioIncident("retablissement", true, m, SCENARIO_DAY);
   assert.equal(ret.restoredAt, step("retablissement").at);
-  assert.equal(scenarioIncident("rapport", true, m).restoredAt, step("retablissement").at);
+  assert.equal(scenarioIncident("rapport", true, m, SCENARIO_DAY).restoredAt, step("retablissement").at);
   // au rapport, la turbidité est redescendue sous 0,3 UTN (plus de 2 h après la remise en eau)
   assert.ok(step("rapport").at - step("retablissement").at >= 2 * 3_600_000);
   // toutes les étapes partagent le même début d'incident
-  const starts = new Set(SCENARIO_STEPS.map((s) => scenarioIncident(s.id, true, m).startedAt));
+  const starts = new Set(SCENARIO_STEPS.map((s) => scenarioIncident(s.id, true, m, SCENARIO_DAY).startedAt));
   assert.equal(starts.size, 1);
 });
 
@@ -88,10 +94,29 @@ const STEPS = SCENARIO_STEPS.map((s) => s.id);
 test("scenarioIncidentParams : même incident que scenarioIncident, sans le modèle (client)", () => {
   for (const id of STEPS)
     for (const closed of [false, true]) {
-      const { segment, ...ref } = scenarioIncident(id, closed, m);
+      const { segment, ...ref } = scenarioIncident(id, closed, m, SCENARIO_DAY);
       assert.equal(segment, brk);
-      assert.deepEqual(scenarioIncidentParams(id, closed, iso.valves), ref, `${id} ${closed}`);
+      assert.deepEqual(scenarioIncidentParams(id, closed, iso.valves, SCENARIO_DAY), ref, `${id} ${closed}`);
     }
+});
+
+test("stepAtTime : l'isolation est en cours à 14:24", () => {
+  assert.equal(stepAtTime(atHour(SCENARIO_DAY, "14:24")), "isolation");
+  assert.equal(stepAtTime(atHour(SCENARIO_DAY + 36 * 3_600_000, "14:24")), "isolation");
+});
+
+test("dayIncident : rien avant 14:00, vannes fermées par le visiteur ou par l'équipe", () => {
+  const d = SCENARIO_DAY;
+  const v = [3, 7];
+  assert.equal(dayIncident(atHour(d, "13:59"), null, v), null);
+  const early = dayIncident(atHour(d, "14:30"), null, v)!;
+  assert.deepEqual(early.closedValves, []);
+  assert.equal(early.startedAt, breakAt(d));
+  assert.equal(early.restoredAt, step("retablissement").at);
+  assert.deepEqual(dayIncident(atHour(d, "15:10"), null, v)!.closedValves, v);
+  const visitor = atHour(d, "14:25");
+  assert.deepEqual(dayIncident(atHour(d, "14:26"), visitor, v)!.closedValves, v);
+  assert.deepEqual(dayIncident(atHour(d, "14:24"), visitor, v)!.closedValves, []);
 });
 
 test("stepAtTime : étape en cours à une heure du scénario", () => {
@@ -135,8 +160,8 @@ test("network : plan d'isolation du scénario calculé par le serveur", () => {
   assert.deepEqual(data.scenario.valves, iso.valves);
   assert.deepEqual(data.scenario.isolated, iso.isolated);
   assert.deepEqual(data.scenario.path, isolationPath(n, iso));
-  const open = incidentImpact(m, step("isolation").at, scenarioIncident("isolation", false, m));
-  const shut = incidentImpact(m, step("isolation").at, scenarioIncident("isolation", true, m));
+  const open = incidentImpact(m, step("isolation").at, scenarioIncident("isolation", false, m, SCENARIO_DAY));
+  const shut = incidentImpact(m, step("isolation").at, scenarioIncident("isolation", true, m, SCENARIO_DAY));
   assert.deepEqual(data.scenario.impact, { lowPressure: open.lowPressureAddresses, withoutWater: shut.withoutWaterAddresses });
 });
 
@@ -192,7 +217,7 @@ test("startScenario : horloge du scénario, incident de l'étape, couche Pressio
   assert.equal(s.clock.startedAt, NOW);
   // la ligne de temps du scénario avance en temps réel, quelle que soit la vitesse quittée (×60)
   assert.equal(s.clock.speed, 1);
-  assert.deepEqual(s.incident, scenarioIncidentParams("detection", false, iso.valves));
+  assert.deepEqual(s.incident, scenarioIncidentParams("detection", false, iso.valves, SCENARIO_DAY));
   assert.deepEqual(views, ["start", "detection"]);
   // relancer pendant le scénario garde l'heure quittée
   goToStep("rapport", NOW + 5_000);
@@ -229,7 +254,7 @@ test("goToStep : incident reconstruit à chaque étape, caméra de l'étape, cou
     const s = aqueducStore.getState();
     assert.equal(s.scenario.step, id);
     assert.equal(s.clock.t0, step(id).at);
-    assert.deepEqual(s.incident, scenarioIncidentParams(id, false, iso.valves));
+    assert.deepEqual(s.incident, scenarioIncidentParams(id, false, iso.valves, SCENARIO_DAY));
     // en HIC, la coupe est dans la scène : pas de fiche ouverte d'office
     assert.equal(s.selection, null);
   }
@@ -322,7 +347,7 @@ test("vannes de la coupe : les deux fermées → action serveur, incident « san
   assert.deepEqual(calls, [[CITY.breakSegment, [a, b]]]);
   const s = aqueducStore.getState();
   assert.equal(s.scenario.valvesClosed, true);
-  assert.deepEqual(s.incident, scenarioIncidentParams("isolation", true, iso.valves));
+  assert.deepEqual(s.incident, scenarioIncidentParams("isolation", true, iso.valves, SCENARIO_DAY));
   assert.deepEqual(s.selection, { kind: "incident", id: CITY.breakSegment });
   // l'incident fermé prive d'eau le tronçon isolé (même calcul que le serveur)
   const imp = incidentImpact(m, step("isolation").at, { segment: brk, ...s.incident! });

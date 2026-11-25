@@ -6,13 +6,14 @@
  */
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import { CITY } from "@/lib/aqueduc/city";
-import { SCENARIO_STEPS } from "@/lib/aqueduc/scenario";
+import { SCENARIO_DAY, scenarioSteps } from "@/lib/aqueduc/scenario";
 import { clockTime, dayStart, num } from "../format";
 import { seekTo } from "../scenarioController";
 import { backToNow, incidentQuery, selectionKey, setSpeed, simNow } from "../store";
 import { useAq, useSimNow } from "../useAq";
 
 const DAY = 86_400_000;
+const SCENARIO_STEPS = scenarioSteps(SCENARIO_DAY);
 const KEY_STEP = 15 * 60_000;
 
 interface Series {
