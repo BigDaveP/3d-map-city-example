@@ -156,8 +156,8 @@ function layerOptions(ml: ML, map: MlMap, net: NetIndex): HicHostProps["layerOpt
       return p;
     },
     effects: () => ({ fog: true, shadow: false, transition: "dissolve", transitionMs: TRANSITION_MS }),
-    // marquages au sol : ils transparaissent sous les bâtiments, translucides (opacité 0,78), comme
-    // les conduites et le fond de carte ; les étiquettes de capteurs restent masquées
+    // marquages au sol : la partie cachée par un bâtiment transparaît à l'opacité GROUND_GHOST (0,45),
+    // comme les conduites sous les bâtiments translucides ; les étiquettes de capteurs restent masquées
     ghost: (key) => (parseKey(key)?.kind === "sensor" ? 0 : GROUND_GHOST),
   };
 }
