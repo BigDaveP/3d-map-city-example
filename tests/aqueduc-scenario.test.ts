@@ -21,6 +21,7 @@ import {
   seekTo,
   startScenario,
   STEP_VIEW,
+  syncIncident,
   turnValve,
 } from "../src/client/aqueduc/scenarioController";
 import { CITY } from "../src/lib/aqueduc/city";
@@ -364,6 +365,56 @@ test("vannes de la coupe : les deux fermées → action serveur, isolation daté
   assert.equal(imp.lowPressureAddresses, 0);
 });
 
+/** Coupe, récit, fiche et flux d'accord : vannes de la coupe, état du scénario et incident dérivé. */
+function assertAgree(closed: boolean, label: string) {
+  const s = aqueducStore.getState();
+  assert.equal(s.scenario.valvesClosed, closed, `${label} : valvesClosed`);
+  assert.deepEqual(s.scenario.valvesTurned, closed ? iso.valves : [], `${label} : valvesTurned`);
+  assert.deepEqual(s.incident!.closedValves, closed ? iso.valves : [], `${label} : incident.closedValves`);
+  // en HIC, la fiche de l'incident s'ouvre une fois les vannes fermées (coupe dans la scène sinon)
+  assert.deepEqual(s.selection, closed ? { kind: "incident", id: CITY.breakSegment } : null, `${label} : fiche`);
+}
+
+test("retour à l'isolation : coupe, récit, fiche et flux d'accord avant et après la décision, une seule isolation", async () => {
+  reset();
+  startScenario(NOW);
+  goToStep("isolation", NOW);
+  const [a, b] = data.scenario.valves;
+  const decided = step("isolation").at + 20_000;
+  await turnValve(a, undefined, NOW + 20_000);
+  await turnValve(b, undefined, NOW + 20_000);
+  assert.deepEqual(territoireStore.getState().actions, [{ at: decided, kind: "isolate" }]);
+  assertAgree(true, "décision");
+  // « Étape suivante » puis « Précédent » : l'isolation est montrée à l'heure de la décision
+  nextStep(NOW + 25_000);
+  prevStep(NOW + 30_000);
+  assert.equal(aqueducStore.getState().scenario.step, "isolation");
+  assert.equal(territoireStore.getState().clock.t0, decided);
+  assertAgree(true, "retour");
+  syncIncident(simNow(NOW + 60_000));
+  assertAgree(true, "retour + 30 s");
+  // un clic sur une vanne fermée ne fait rien : pas de seconde isolation
+  assert.equal(await turnValve(a, undefined, NOW + 60_000), null);
+  // frise avant la décision : vannes ouvertes partout, puis fermées partout à l'heure de la décision
+  seekTo(step("isolation").at + 5_000, NOW + 70_000);
+  assertAgree(false, "frise avant la décision");
+  syncIncident(simNow(NOW + 100_000));
+  assertAgree(true, "30 s plus tard");
+  // fermer de nouveau avant la décision la remplace, sans doublon
+  seekTo(step("isolation").at + 5_000, NOW + 110_000);
+  await turnValve(a, undefined, NOW + 110_000);
+  await turnValve(b, undefined, NOW + 110_000);
+  assert.deepEqual(territoireStore.getState().actions, [{ at: step("isolation").at + 5_000, kind: "isolate" }]);
+  assertAgree(true, "nouvelle décision");
+  // un clic en attente ne survit pas à un changement d'étape
+  startScenario(NOW + 120_000);
+  goToStep("isolation", NOW + 120_000);
+  await turnValve(a, undefined, NOW + 120_000);
+  goToStep("detection", NOW + 125_000);
+  goToStep("isolation", NOW + 130_000);
+  assertAgree(false, "clic en attente puis retour");
+});
+
 test("rejouer le scénario : la séquence repart vannes ouvertes ; quitter garde l'isolation du visiteur", async () => {
   reset();
   startScenario(NOW);
@@ -372,17 +423,10 @@ test("rejouer le scénario : la séquence repart vannes ouvertes ; quitter garde
   await turnValve(a, undefined, NOW + 10_000);
   await turnValve(b, undefined, NOW + 10_000);
   assert.equal(territoireStore.getState().actions.length, 1);
-  // revenir à l'isolation (14:23:00) : vannes ouvertes jusqu'à l'heure de la décision (14:23:10)
-  goToStep("detection", NOW + 20_000);
-  goToStep("isolation", NOW + 30_000);
-  assert.equal(aqueducStore.getState().scenario.valvesClosed, false);
-  seekTo(step("isolation").at + 15_000, NOW + 30_000);
-  assert.equal(aqueducStore.getState().scenario.valvesClosed, true);
   startScenario(NOW + 40_000);
   assert.deepEqual(territoireStore.getState().actions, []);
   goToStep("isolation", NOW + 50_000);
-  assert.equal(aqueducStore.getState().scenario.valvesClosed, false);
-  assert.deepEqual(aqueducStore.getState().incident!.closedValves, []);
+  assertAgree(false, "rejouer");
   await turnValve(a, undefined, NOW + 60_000);
   await turnValve(b, undefined, NOW + 60_000);
   exploreFreely(NOW + 70_000);

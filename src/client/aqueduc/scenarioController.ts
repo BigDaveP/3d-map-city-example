@@ -72,12 +72,31 @@ export function stepSelection(step: StepId, mode: Mode, valvesClosed: boolean): 
 }
 
 /**
+ * Pendant le scénario, les vannes de la coupe suivent la décision du visiteur à l'heure t : fermées
+ * (toutes tournées) dès son isolation, ouvertes avant. Au passage, la fiche suit la règle de
+ * l'isolation (`stepSelection`). Un clic en attente sur une vanne reste tant que rien ne change.
+ */
+function syncValves(t: number) {
+  const s = aqueducStore.getState();
+  if (!s.scenario.active) return;
+  const closed = isolatedAt(territoireStore.getState().actions, t) !== null;
+  if (closed === s.scenario.valvesClosed) return;
+  aqueducStore.setState({
+    scenario: { ...s.scenario, valvesClosed: closed, valvesTurned: closed ? [...env.valves] : [] },
+    ...(s.scenario.step === "isolation" ? { selection: stepSelection("isolation", territoireStore.getState().mode, closed) } : {}),
+  });
+}
+
+/**
  * Reporte sur `aqueducStore.incident` l'incident de l'heure simulée `t` (par défaut, l'heure
- * courante) ; sans effet s'il ne change pas, pour ne pas rouvrir le flux pour rien.
+ * courante), sans effet s'il ne change pas, pour ne pas rouvrir le flux pour rien ; pendant le
+ * scénario, l'état des vannes de la coupe suit (`syncValves`) : coupe, récit, fiche et flux
+ * s'accordent à toute heure.
  */
 export function syncIncident(t = simNow()) {
   const inc = currentIncident(t, territoireStore.getState().actions, env.valves);
   if (incidentQuery(inc) !== incidentQuery(aqueducStore.getState().incident)) aqueducStore.setState({ incident: inc });
+  syncValves(t);
 }
 
 /**
@@ -110,12 +129,17 @@ function reopenValves(day: number) {
   if (kept.length !== actions.length) territoireStore.setState({ actions: kept });
 }
 
-/** Applique une étape à l'heure simulée t : horloge commune (l'incident en découle), étape, fiche. */
+/**
+ * Applique une étape à l'heure simulée t : horloge commune (l'incident en découle), étape, vannes de
+ * la coupe selon la décision du visiteur à t (un clic en attente ne survit qu'au sein de l'étape),
+ * fiche.
+ */
 function apply(step: StepId, t: number, now: number, patch: Partial<AqState["scenario"]> = {}, select = true) {
   seek(t, now);
   const s = aqueducStore.getState();
   const valvesClosed = isolatedAt(territoireStore.getState().actions, t) !== null;
-  const scenario = { ...s.scenario, valvesClosed, ...patch, active: true, step };
+  const valvesTurned = valvesClosed ? [...env.valves] : step === s.scenario.step ? s.scenario.valvesTurned : [];
+  const scenario = { ...s.scenario, valvesClosed, valvesTurned, ...patch, active: true, step };
   const { mode } = territoireStore.getState();
   aqueducStore.setState({ scenario, ...(select ? { selection: stepSelection(step, mode, scenario.valvesClosed) } : {}) });
 }
@@ -145,10 +169,21 @@ export function startScenario(now = Date.now()) {
   env.camera?.("detection", STEP_MS);
 }
 
+/**
+ * Heure où montrer une étape : la sienne, sauf à l'isolation déjà décidée pendant l'étape, montrée à
+ * l'heure de la décision du visiteur (revenir en arrière ne la fait pas disparaître).
+ */
+function stepTime(step: StepId, day: number): number {
+  const at = timeOf(step, day);
+  if (step !== "isolation") return at;
+  const end = timeOf("intervention", day);
+  return territoireStore.getState().actions.find((a) => a.kind === "isolate" && a.at >= at && a.at < end)?.at ?? at;
+}
+
 /** Va à une étape (horloge à son heure, incident qui en découle, caméra) ; sans effet hors scénario. */
 export function goToStep(step: StepId, now = Date.now(), durationMs = STEP_MS) {
   if (!aqueducStore.getState().scenario.active) return;
-  apply(step, timeOf(step, simDay(now)), now, { error: "" });
+  apply(step, stepTime(step, simDay(now)), now, { error: "" });
   env.camera?.(step, durationMs);
 }
 
@@ -191,8 +226,13 @@ export function seekTo(t: number, now = Date.now()) {
 export type CloseOutcome = { ok: true } | { ok: false; reason: string };
 type CloseAction = (segmentId: string, nodes: number[]) => ReturnType<typeof closeValvesAction>;
 
-/** Le visiteur isole le tronçon à l'heure simulée : décision datée, incident « sans eau » aussitôt. */
+/**
+ * Le visiteur isole le tronçon à l'heure simulée : décision datée, incident « sans eau » aussitôt.
+ * Une seule isolation par journée : celle-ci remplace une décision plus tardive (laissée par un
+ * retour en arrière sur la frise), jamais en double.
+ */
 function isolateNow(now: number) {
+  reopenValves(simDay(now));
   act({ kind: "isolate" }, now);
   syncIncident(simNow(now));
 }
