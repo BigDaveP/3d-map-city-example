@@ -1,9 +1,12 @@
 # RULES.md — HTML-in-Canvas dans un dashboard : quand et comment
 
 Ce document répond à une question : **quand et comment utiliser HTML-in-Canvas dans un
-dashboard ?** Il s'appuie sur le mur de supervision de ce dépôt (1 000 cartes, 5 sources de
-données simulées), mesuré avec le banc `bench/run-bench.ts`. Résultats bruts :
-`bench/results/results.csv`, graphiques sur `/bench`.
+dashboard ?** Il s'appuie sur un mur de supervision (1 000 cartes, 5 sources de données
+simulées) mesuré par un banc Playwright. Le mur, son banc et ses résultats ont depuis été
+retirés du dépôt, qui ne garde que la démo réseau d'eau (`/`) ; on les retrouve dans
+l'historique git, jusqu'au commit `da1c01b` (`src/client/wall/`, `bench/run-bench.ts`,
+`bench/results/results.csv`). Les règles ci-dessous valent toujours pour HTML-in-Canvas et
+guident la démo réseau d'eau (bilan dans [CAPABILITIES.md](CAPABILITIES.md)).
 
 ## En bref
 
@@ -306,7 +309,7 @@ le canvas dans l'ordre de tabulation, donc après la barre d'outils : c'est l'or
 
 ## Accessibilité
 
-La vue « Voir ce que voit un robot » et `tests/e2e/verify.ts` montrent que **les cartes du
+La vue « Voir ce que voit un robot » et la vérification de bout en bout du mur montraient que **les cartes du
 canvas sont dans l'arbre d'accessibilité** (articles, tableaux, `textbox`, `combobox`, bouton) au
 même titre qu'en mode DOM : c'est l'avantage décisif de HTML-in-Canvas sur un rendu WebGL pur.
 Mais **seules les cartes montées existent** : au niveau éloigné, le mode canvas n'expose aucune
@@ -357,7 +360,8 @@ compte ou si seule l'ancienne API est disponible. Les deux sont derrière la mê
 
 Toutes les observations ci-dessous ont été faites sur Chromium 158.0.8127.36 (Chrome for
 Testing livré avec Playwright 1.63), Linux, WebGL2 via ANGLE + SwiftShader. Les sondes sont
-reproductibles avec `/lab` et `tests/e2e/verify.ts`.
+reproductibles avec la page `/lab` et la vérification du mur (`tests/e2e/verify.ts`), retirées
+depuis (historique git, commit `da1c01b`).
 
 | # | Ce qu'on attendait | Ce qu'on observe | Conséquence dans le code |
 |---|---|---|---|
@@ -381,7 +385,7 @@ reproductibles avec `/lab` et `tests/e2e/verify.ts`.
 ## Limites de cette étude
 
 - **Pas de GPU** : à refaire sur une machine équipée avant de conclure sur les FPS du mode
-  canvas. Le banc est prêt : `BASE_URL=… npm run bench`.
+  canvas. Le banc du mur (`npm run bench`) est dans l'historique git (commit `da1c01b`).
 - Une seule version de Chromium (158) ; l'API est expérimentale et évolue (renommages de
   Chrome 155). Le chemin « ancienne API » est codé mais n'a pas pu être exécuté.
 - Headless, DPR 1 : à DPR 2, chaque capture et chaque texture coûtent 4 fois plus de texels.

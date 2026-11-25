@@ -1,5 +1,5 @@
 /**
- * Barres groupées en SVG (rendu serveur) : x = nombre de cartes, une barre par configuration.
+ * Barres groupées en SVG (rendu serveur) : x = groupes (nombre d'étiquettes), une barre par mode.
  * Infobulle au survol via <title> (natif, accessible au clavier par lecteur d'écran) et
  * surbrillance CSS ; les valeurs exactes sont dans le tableau sous les graphiques.
  */
