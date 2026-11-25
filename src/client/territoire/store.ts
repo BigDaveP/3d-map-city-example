@@ -95,6 +95,16 @@ export function undoLast(kind: EnvAction["kind"], now = Date.now()): EnvAction |
   return last;
 }
 
+/** Repli de HicHost (aucun pixel transmis, API absente…) : la scène passe en mode classique. */
+export function hicFallback(reason: string) {
+  territoireStore.setState({ mode: "classic", fallback: `Mode classique activé automatiquement : ${reason}` });
+}
+
+/** Vérification `readPixels` réussie : l'API HTML-in-Canvas est active. */
+export function hicActive() {
+  if (territoireStore.getState().api !== "active") territoireStore.setState({ api: "active" });
+}
+
 export function setFocus(focus: Focus) {
   territoireStore.setState({ focus });
 }

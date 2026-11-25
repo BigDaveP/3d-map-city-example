@@ -12,12 +12,12 @@
 import { useMemo } from "react";
 import type { Map as MlMap } from "maplibre-gl";
 import { CITY } from "@/lib/aqueduc/city";
-import { metersPerPixel, placeGround, placePanel, placeVertical, verticalFlip, type PanelPlacement } from "../../hic3d/geometry";
+import { metersPerPixel, placeGround, placePanel, placeVertical, pxPerMeter, verticalFlip, type PanelPlacement } from "../../hic3d/geometry";
 import { TRANSITION_MS } from "../../hic3d/panelLayer";
 import { HicHost, type HicHostProps, type SurfaceSpec } from "../../hic3d/HicHost";
 import type { Metrics } from "../../hic3d/metrics";
 import { lineCenter, segment, type NetIndex } from "../net";
-import { territoireStore } from "../../territoire/store";
+import { hicActive, hicFallback } from "../../territoire/store";
 import { aqueducStore } from "../store";
 import { useAq } from "../useAq";
 import { cutLayout, cutView } from "./cut";
@@ -56,15 +56,6 @@ const GAP_PX = { sector: 12, incident: 24 } as const;
  */
 const SECTOR_AWAY_PX = 170;
 const INCIDENT_SLIDE_PX = 190;
-
-/** px écran par mètre à un point, mesurés dans la direction de la droite de l'écran (sans raccourci). */
-function pxPerMeter(map: MlMap, at: [number, number], bearing: number): number {
-  const b = (bearing * Math.PI) / 180;
-  const d = 10;
-  const p0 = map.project(at);
-  const p1 = map.project([at[0] + (Math.cos(b) * d) / (111_320 * Math.cos((at[1] * Math.PI) / 180)), at[1] - (Math.sin(b) * d) / 110_540]);
-  return Math.hypot(p1.x - p0.x, p1.y - p0.y) / d;
-}
 
 interface Anchor {
   lngLat: [number, number];
@@ -163,11 +154,6 @@ function layerOptions(ml: ML, map: MlMap, net: NetIndex): HicHostProps["layerOpt
   };
 }
 
-const onFallback = (reason: string) => territoireStore.setState({ mode: "classic", fallback: `Mode classique activé automatiquement : ${reason}` });
-const onActive = () => {
-  if (territoireStore.getState().api !== "active") territoireStore.setState({ api: "active" });
-};
-
 export function SceneSurfaces({ ml, map, metrics, net }: { ml: ML; map: MlMap; metrics: Metrics; net: NetIndex }) {
   const sectors = useVisibleSectors(map, net);
   const cut = useMemo(() => cutLayout(net), [net]);
@@ -265,5 +251,5 @@ export function SceneSurfaces({ ml, map, metrics, net }: { ml: ML; map: MlMap; m
     ],
     [sectors, incident, tagged, net, showCut, cut, shownAt, shownBy],
   );
-  return <HicHost ml={ml} map={map} metrics={metrics} surfaces={surfaces} layerOptions={options} onFallback={onFallback} onActive={onActive} latencyOnScreen />;
+  return <HicHost ml={ml} map={map} metrics={metrics} surfaces={surfaces} layerOptions={options} onFallback={hicFallback} onActive={hicActive} latencyOnScreen />;
 }
