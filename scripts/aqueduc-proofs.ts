@@ -191,6 +191,23 @@ async function exportVideo(ctx: BrowserContext, mode: Mode) {
 
 async function main() {
   const ctx = await chromium.launchPersistentContext(PROFILE, { args: ["--enable-blink-features=CanvasDrawElement"], viewport: VIEW, deviceScaleFactor: 1, acceptDownloads: true });
+  // environnement, comme la méta du banc
+  {
+    const p = await ctx.newPage();
+    const webgl = String(await p.evaluate(`(() => { const gl = document.createElement("canvas").getContext("webgl2"); const e = gl && gl.getExtension("WEBGL_debug_renderer_info"); return gl ? (e ? gl.getParameter(e.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER)) : "aucun WebGL2"; })()`));
+    results.environment = {
+      date: new Date().toISOString(),
+      browser: `Chromium ${ctx.browser()?.version() ?? (await p.evaluate(() => navigator.userAgent))}`,
+      flags: ["--enable-blink-features=CanvasDrawElement"],
+      webgl,
+      gpu: !/SwiftShader|llvmpipe|software/i.test(webgl),
+      cpu: `${os.cpus()[0]?.model} × ${os.cpus().length}`,
+      viewport: VIEW,
+      deviceScaleFactor: 1,
+      base: BASE,
+    };
+    await p.close();
+  }
 
   // 1. occlusion : même caméra ; en HTML-in-Canvas les bâtiments masquent le marquage au sol et les
   // étiquettes, en classique les étiquettes DOM restent au premier plan
@@ -269,7 +286,12 @@ async function main() {
   for (const mode of ["classic", "hic"] as const) {
     const { p } = await open(ctx, mode);
     const aria = await p.locator("body").ariaSnapshot();
-    results[`aria_${mode}`] = aria.split("\n").filter((l) => /(pression|débit|réservoir|point de mesure).*\(simulation\)|centre-ville/i.test(l) && !/status:/.test(l)).slice(0, 8).map((l) => l.trim());
+    // capteurs et secteurs listés à part : une coupe commune laissait tomber les secteurs
+    const lines = aria.split("\n").map((l) => l.trim()).filter((l) => /^- '?button/.test(l));
+    results[`aria_${mode}`] = {
+      capteurs: lines.filter((l) => /(pression|débit|réservoir|point de mesure).*\(simulation\)/i.test(l)).slice(0, 8),
+      secteurs: lines.filter((l) => /Secteur .*\(simulé\)/.test(l)),
+    };
     results[`focus_${mode}`] = await keyboardFocus(p, mode);
     await p.close();
   }
