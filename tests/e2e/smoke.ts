@@ -777,6 +777,16 @@ async function fallbackNote(b: Browser) {
   const text = (await note.count()) ? await note.innerText() : "";
   check("note de repli visible : raison et mode classique", /s'est désactivé pendant l'affichage/.test(text) && text.includes("texture vide (test)"), text.slice(0, 140));
   check("note de repli : pas de « Comment l'activer » (l'API est présente)", (await p.getByRole("button", { name: "Comment l'activer" }).count()) === 0);
+  // M5 : un retour manuel à HTML-in-Canvas efface la raison ; revenir ensuite en classique ne la ressort pas
+  await p.getByRole("button", { name: "HTML-in-Canvas", exact: true }).click();
+  await p.waitForTimeout(500);
+  const back = await p.evaluate(() => { const s = (window as any).__aqueduc.store.getState(); return { mode: s.mode, fallback: s.fallback }; });
+  check("retour manuel à HTML-in-Canvas : raison du repli effacée", back.mode === "hic" && back.fallback === "", JSON.stringify(back));
+  await p.getByRole("button", { name: "Classique", exact: true }).click();
+  await p.waitForTimeout(500);
+  check("puis Classique : pas de note périmée « s'est désactivé pendant l'affichage »", (await p.locator("[data-testid=noapi]").count()) === 0);
+  await p.evaluate(() => (window as any).__aqueduc.store.setState({ mode: "classic", fallback: "Mode classique activé automatiquement : texture vide (test)." }));
+  await note.waitFor({ timeout: 5_000 }).catch(() => {});
   await p.getByRole("button", { name: "Fermer le bandeau" }).click();
   check("note refermable", (await p.locator("[data-testid=noapi]").count()) === 0);
   check("aucune erreur console", errors.length === 0, errors.join(" | "));

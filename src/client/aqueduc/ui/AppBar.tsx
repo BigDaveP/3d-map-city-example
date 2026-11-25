@@ -92,7 +92,9 @@ export function AppBar({ map, net, metrics, tubes }: { map: MlMap | null; net: N
     exact.go();
   };
 
-  const setMode = (m: Mode) => aqueducStore.setState({ mode: m });
+  // retour manuel à HTML-in-Canvas : la raison d'un repli précédent ne vaut plus (un nouveau repli
+  // en écrirait une autre)
+  const setMode = (m: Mode) => aqueducStore.setState(m === "hic" ? { mode: m, fallback: "" } : { mode: m });
   return (
     <header className="aq-bar">
       <DemoNav current="aqueduc" />
