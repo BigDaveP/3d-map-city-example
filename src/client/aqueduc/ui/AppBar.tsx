@@ -50,7 +50,7 @@ function Clock() {
   );
 }
 
-export function AppBar({ map, net, metrics }: { map: MlMap | null; net: NetIndex | null; metrics: Metrics | null }) {
+export function AppBar({ map, net, metrics, tubes }: { map: MlMap | null; net: NetIndex | null; metrics: Metrics | null; tubes?: { instances: number } | null }) {
   const mode = useAq((s) => s.mode);
   const api = useAq((s) => s.api);
   const scenario = useAq((s) => s.scenario.active);
@@ -150,7 +150,7 @@ export function AppBar({ map, net, metrics }: { map: MlMap | null; net: NetIndex
           HTML-in-Canvas
         </button>
       </div>
-      <PerfChip metrics={metrics} />
+      <PerfChip metrics={metrics} tubes={tubes ?? null} />
     </header>
   );
 }

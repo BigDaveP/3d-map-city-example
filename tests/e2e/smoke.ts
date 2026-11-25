@@ -3,7 +3,8 @@
  *   BASE_URL=http://localhost:3300 npx tsx tests/e2e/smoke.ts
  *   SHOT=chemin.png pour enregistrer une capture de la page d'accueil (mode classique, 1440 × 860) ;
  *   SHOT_HIC=chemin.png pour la même vue en mode HTML-in-Canvas ;
- *   SHOT_SCENARIO_HIC / SHOT_SCENARIO_CLASSIC=chemin.png : étape 2 du scénario (isolation, coupe).
+ *   SHOT_SCENARIO_HIC / SHOT_SCENARIO_CLASSIC=chemin.png : étape 2 du scénario (isolation, coupe) ;
+ *   SHOT_UNDERGROUND=chemin.png : vue souterraine (HTML-in-Canvas) sur le tronçon 13C1949.
  * Sortie : une ligne OK/ÉCHEC par point de contrôle ; code de sortie 1 si un échec.
  * Les tuiles viennent d'OpenFreeMap : chargements courts, une seule vue par page.
  */
@@ -313,6 +314,74 @@ async function homeHic(b: Browser) {
   await ctx.close();
 }
 
+/** Vue souterraine (HTML-in-Canvas) : tubes 3D sous la rue, fond estompé, puis retour à la vue normale. */
+async function undergroundHic(b: Browser) {
+  console.log("\n== /?mode=hic, vue souterraine (tubes 3D)");
+  const ctx = await b.newContext({ viewport: { width: 1440, height: 860 }, deviceScaleFactor: 1 });
+  const p = await ctx.newPage();
+  const errors = collectErrors(p);
+  await p.goto(`${BASE}/?mode=hic`);
+  await p.waitForFunction(() => (window as any).__aqueduc?.tubes && (window as any).__hicMap?.layer, null, { timeout: 45_000 });
+  await p.waitForFunction(() => (window as any).__aqueduc.store.getState().live.t > 0, null, { timeout: 15_000 });
+  // caméra sur le tronçon du scénario
+  await p.evaluate(async () => {
+    const { map, net } = (window as any).__aqueduc;
+    const c = net.data.segments.features[net.segById.get("13C1949")].geometry.coordinates;
+    map.jumpTo({ center: c[Math.floor(c.length / 2)], zoom: 17.2, pitch: 62, bearing: -25 });
+    await new Promise((r) => map.once("idle", r));
+  });
+  const state = () =>
+    p.evaluate(() => {
+      const { map, tubes, store } = (window as any).__aqueduc;
+      return {
+        layer: !!map.getLayer("aq-tubes"),
+        instances: tubes.stats.instances as number,
+        buildings: map.getPaintProperty("building-3d", "fill-extrusion-opacity"),
+        pipes: map.getPaintProperty("aq-pipes", "line-opacity") ?? 1,
+        casing: map.getLayoutProperty("aq-pipes-casing", "visibility") ?? "visible",
+        note: document.querySelector(".aq-under-note")?.textContent ?? "",
+        on: store.getState().underground as boolean,
+      };
+    });
+  const drawn = (min: number) =>
+    p
+      .waitForFunction((min) => (window as any).__aqueduc.tubes.stats.instances > min, min, { timeout: 15_000 })
+      .then(() => true)
+      .catch(() => false);
+  const before = await state();
+  check("vue normale : pas de couche de tubes, conduites en lignes au sol", !before.layer && before.instances === 0 && before.pipes === 1 && before.casing === "visible", JSON.stringify(before));
+  await p.getByRole("button", { name: "Vue souterraine" }).click();
+  const ok = await drawn(0);
+  const on = await state();
+  check("bouton « Vue souterraine » : couche aq-tubes présente, instances > 0", ok && on.on && on.layer && on.instances > 0, `${on.instances} instances`);
+  check("mention « Diamètres exagérés ×12 » visible", on.note.includes("Diamètres exagérés ×12") && (await p.locator(".aq-under-note").isVisible()), on.note);
+  check("bâtiments à 0,35, conduites au sol masquées", on.buildings === 0.35 && on.pipes === 0 && on.casing === "none", JSON.stringify(on));
+  const order = await p.evaluate(() => {
+    const ids: string[] = (window as any).__aqueduc.map.style._order;
+    return { tubes: ids.indexOf("aq-tubes"), pipes: ids.indexOf("aq-pipes"), buildings: ids.indexOf("building-3d"), panels: ids.indexOf("hic-panels") };
+  });
+  check("ordre des couches : lignes < tubes < bâtiments < surfaces HTML", order.pipes < order.tubes && order.tubes < order.buildings && order.buildings < order.panels, JSON.stringify(order));
+  const floating = await p.evaluate(() => [...document.querySelectorAll<HTMLElement>(".aq-panel")].filter((e) => e.offsetParent !== null).map((e) => e.className));
+  check("rien d'autre ne flotte : couches et frise (plus la mention)", floating.length === 2 && floating.some((c) => c.includes("aq-layers")) && floating.some((c) => c.includes("aq-timeline")), floating.join(" | "));
+  if (process.env.SHOT_UNDERGROUND) {
+    await p.waitForTimeout(4000);
+    await p.screenshot({ path: process.env.SHOT_UNDERGROUND });
+    console.log(`capture : ${process.env.SHOT_UNDERGROUND}`);
+  }
+  await p.getByLabel("Tout le réseau").check();
+  const all = await drawn(on.instances);
+  const full = await state();
+  check("« Tout le réseau » : plus d'instances que maîtresses + zone suivie", all && full.instances > on.instances, `${on.instances} → ${full.instances}`);
+  await p.getByRole("button", { name: "Vue souterraine" }).click();
+  await p.waitForTimeout(500);
+  const off = await state();
+  check("retour à la vue normale : tubes retirés, opacités et conduites rendues", !off.on && !off.layer && off.instances === 0 && off.buildings === 0.78 && off.pipes === 1 && off.casing === "visible" && off.note === "", JSON.stringify(off));
+  const fallback = await p.evaluate(() => (window as any).__aqueduc.store.getState().fallback);
+  check("pas de repli en mode classique", !fallback, fallback);
+  check("aucune erreur console", errors.length === 0, errors.join(" | "));
+  await ctx.close();
+}
+
 /** Lance le scénario par la barre et passe à l'étape d'isolation ; renvoie l'heure simulée quittée. */
 async function toIsolation(p: Page) {
   const before = await p.evaluate(() => {
@@ -519,6 +588,7 @@ try {
   await narrow(b, true);
   await classic(b);
   await homeHic(b);
+  await undergroundHic(b);
   await scenarioHic(b);
   await scenarioClassic(b);
   await carteHic(b);

@@ -13,8 +13,8 @@ export const NO_DATA = "#a3adba";
 const BAD = "#d23b2b";
 
 /**
- * Paliers de couleur par couche (valeur → couleur), partagés par `pipeColor`, la légende et, plus
- * tard, la couleur RGB des tubes souterrains. Pression : paliers de la décision R12 (4,0 et 5,2 bar en
+ * Paliers de couleur par couche (valeur → couleur), partagés par `pipeColor`, la légende et la
+ * couleur RGB des tubes souterrains (`rampColor`). Pression : paliers de la décision R12 (4,0 et 5,2 bar en
  * haut de l'échelle, pour qu'un réseau sain varie du clair au foncé avec la distance aux sources).
  */
 export const PIPE_STOPS = {
@@ -68,22 +68,40 @@ export const PIPE_STOPS = {
 type Stops = readonly (readonly [number, string])[];
 const flat = (stops: Stops) => stops.flatMap(([v, c]) => [v, c]);
 
-/** Couleur d'une valeur sur des paliers (interpolation RGB linéaire, comme MapLibre). */
-export function rampHex(stops: Stops, v: number): string {
-  if (v <= stops[0][0]) return stops[0][1];
+/** Couleur RGB (0–255) d'une valeur sur des paliers (interpolation RGB linéaire, comme MapLibre). */
+function rampRgb(stops: Stops, v: number): [number, number, number] {
+  const rgb = (c: string): [number, number, number] => {
+    const n = parseInt(c.slice(1), 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  };
+  if (v <= stops[0][0]) return rgb(stops[0][1]);
   for (let i = 1; i < stops.length; i++) {
     const [v1, c1] = stops[i];
     if (v <= v1) {
       const [v0, c0] = stops[i - 1];
       const u = (v - v0) / (v1 - v0);
-      const a = parseInt(c0.slice(1), 16);
-      const b = parseInt(c1.slice(1), 16);
-      const ch = (s: number) => Math.round(((a >> s) & 255) * (1 - u) + ((b >> s) & 255) * u);
-      return `#${((ch(16) << 16) | (ch(8) << 8) | ch(0)).toString(16).padStart(6, "0")}`;
+      const a = rgb(c0);
+      const b = rgb(c1);
+      return [0, 1, 2].map((k) => Math.round(a[k] * (1 - u) + b[k] * u)) as [number, number, number];
     }
   }
-  return stops[stops.length - 1][1];
+  return rgb(stops[stops.length - 1][1]);
 }
+
+/** Couleur d'une valeur sur des paliers (interpolation RGB linéaire, comme MapLibre). */
+export function rampHex(stops: Stops, v: number): string {
+  const [r, g, b] = rampRgb(stops, v);
+  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, "0")}`;
+}
+
+/** Couleur RGB (0–255) d'une valeur de la couche, sur les mêmes paliers que `pipeColor` (tubes souterrains). */
+export function rampColor(layer: LayerId, value: number): [number, number, number] {
+  return rampRgb(PIPE_STOPS[layer].stops, value);
+}
+
+/** Gris neutre et rouge d'incident en RGB, pour les tubes. */
+export const NO_DATA_RGB = rampRgb([[0, NO_DATA]], 0);
+export const BAD_RGB = rampRgb([[0, BAD]], 0);
 
 /** Couleur de la période de rinçage de chaque secteur. */
 export const FLUSH_COLORS: string[] = FLUSHING_2026.map((_, k) => rampHex(PIPE_STOPS.rincage.stops, k));
@@ -270,6 +288,42 @@ export function restyleBasemap(map: MlMap) {
     map.setPaintProperty(BEFORE, "fill-extrusion-color", "#dde2e8");
     map.setPaintProperty(BEFORE, "fill-extrusion-opacity", 0.78);
   }
+}
+
+/** Opacités de la vue souterraine : sol, routes et eau estompés, bâtiments translucides. */
+export const UNDERGROUND_OPACITY = { ground: 0.25, buildings: 0.35 };
+type PaintProp = Parameters<MlMap["setPaintProperty"]>[1];
+type PaintValue = Parameters<MlMap["setPaintProperty"]>[2];
+const saved = new WeakMap<MlMap, [string, PaintProp, PaintValue][]>();
+
+/**
+ * Vue souterraine : couches de sol, de routes et d'eau (remplissages et lignes du fond) à 0,25,
+ * bâtiments à 0,35, conduites au sol masquées. `aq-pipes` passe à une opacité nulle plutôt qu'en
+ * `visibility: none` : elle reste interrogeable au clic, au droit des tubes. Les valeurs d'origine
+ * sont rendues telles quelles à la sortie.
+ */
+export function setUnderground(map: MlMap, on: boolean) {
+  if (!on) {
+    for (const [id, prop, v] of saved.get(map) ?? []) if (map.getLayer(id)) map.setPaintProperty(id, prop, v);
+    saved.delete(map);
+    if (map.getLayer("aq-pipes-casing")) map.setLayoutProperty("aq-pipes-casing", "visibility", "visible");
+    return;
+  }
+  if (saved.has(map)) return;
+  const list: [string, PaintProp, PaintValue][] = [];
+  const set = (id: string, prop: PaintProp, v: number) => {
+    list.push([id, prop, map.getPaintProperty(id, prop) as PaintValue]);
+    map.setPaintProperty(id, prop, v);
+  };
+  for (const l of map.getStyle().layers ?? []) {
+    if (l.id === "aq-pipes") set(l.id, "line-opacity", 0);
+    else if (l.id.startsWith("aq-")) continue;
+    else if (l.type === "fill") set(l.id, "fill-opacity", UNDERGROUND_OPACITY.ground);
+    else if (l.type === "line") set(l.id, "line-opacity", UNDERGROUND_OPACITY.ground);
+    else if (l.type === "fill-extrusion") set(l.id, "fill-extrusion-opacity", UNDERGROUND_OPACITY.buildings);
+  }
+  saved.set(map, list);
+  if (map.getLayer("aq-pipes-casing")) map.setLayoutProperty("aq-pipes-casing", "visibility", "none");
 }
 
 /** Couches interrogées au clic, de la plus précise à la plus étendue. */

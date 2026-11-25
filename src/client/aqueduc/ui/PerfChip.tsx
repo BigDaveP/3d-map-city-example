@@ -6,8 +6,9 @@ import type { Metrics } from "../../metrics";
 import { num } from "../format";
 import { useAq } from "../useAq";
 
-export function PerfChip({ metrics }: { metrics: Metrics | null }) {
-  const [snap, setSnap] = useState({ fps: 0, work: 0 });
+/** `tubes` : statistiques de la couche des tubes souterrains (instances dessinées, 0 hors vue souterraine). */
+export function PerfChip({ metrics, tubes }: { metrics: Metrics | null; tubes: { instances: number } | null }) {
+  const [snap, setSnap] = useState({ fps: 0, work: 0, tubes: 0 });
   const [open, setOpen] = useState(false);
   const mode = useAq((s) => s.mode);
   const sensors = useAq((s) => s.live.readings.length);
@@ -16,10 +17,10 @@ export function PerfChip({ metrics }: { metrics: Metrics | null }) {
     if (!metrics) return;
     const id = setInterval(() => {
       const s = metrics.snapshot();
-      setSnap({ fps: s.fps, work: s.workP95 });
+      setSnap({ fps: s.fps, work: s.workP95, tubes: tubes?.instances ?? 0 });
     }, 1000);
     return () => clearInterval(id);
-  }, [metrics]);
+  }, [metrics, tubes]);
   // fermeture : Échap ou clic à l'extérieur
   useEffect(() => {
     if (!open) return;
@@ -40,7 +41,7 @@ export function PerfChip({ metrics }: { metrics: Metrics | null }) {
       </button>
       {open && metrics && (
         <div className="aq-perf-detail" id="aq-perf-detail" role="dialog" aria-label="Mesures de performance">
-          <CarteMetrics metrics={metrics} mode={mode} rows={[["Capteurs simulés", String(sensors)]]} />
+          <CarteMetrics metrics={metrics} mode={mode} rows={[["Capteurs simulés", String(sensors)], ["Tubes souterrains (instances)", num(snap.tubes)]]} />
           <p className="aq-note">Mesuré en direct dans ce navigateur : les chiffres dépendent de la machine et de son GPU.</p>
         </div>
       )}

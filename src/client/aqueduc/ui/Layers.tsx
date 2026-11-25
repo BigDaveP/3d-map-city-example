@@ -86,6 +86,8 @@ function Legend({ layer }: { layer: LayerId }) {
 
 export function Layers() {
   const layer = useAq((s) => s.layer);
+  const underground = useAq((s) => s.underground);
+  const all = useAq((s) => s.undergroundAll);
   const incidents = useAq((s) => (s.incident ? 1 : 0));
   const [open, setOpen] = useState(true);
   const bodyId = useId();
@@ -115,6 +117,17 @@ export function Layers() {
               </label>
             ))}
           </fieldset>
+          <div className="aq-under">
+            <button type="button" className="aq-btn aq-under-btn" aria-pressed={underground} onClick={() => aqueducStore.setState({ underground: !underground })}>
+              Vue souterraine
+            </button>
+            {underground && (
+              <label className="aq-under-all">
+                <input type="checkbox" checked={all} onChange={(e) => aqueducStore.setState({ undergroundAll: e.target.checked })} />
+                Tout le réseau
+              </label>
+            )}
+          </div>
           <Legend layer={layer} />
         </div>
       )}
