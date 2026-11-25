@@ -10,7 +10,9 @@
  *   SHOT_HOME / SHOT_BELL / SHOT_ABOUT=chemin.png : accueil à 14:05, cloche ouverte, « À propos » ;
  *   SHOT_DN_1030 / SHOT_DN_2330 / SHOT_DN_2330_LOW / SHOT_DN_CARD=chemin.png : Déneigement
  *   (HTML-in-Canvas) à 10:30, à 23:30 avec les zones A et B en vigueur (feux allumés en phase haute,
- *   puis basse du clignotement), puis la fiche de la zone A.
+ *   puis basse du clignotement), puis la fiche de la zone A ;
+ *   SHOT_DN_METEO_OFF / SHOT_DN_SNOW=chemin.png : Déneigement (classique) à 23:30, météo en panne,
+ *   puis jour de neige réel avec avertissement.
  * Chaque page de l'application a son horloge épinglée à 12:00 de la journée de référence
  * (`pin`) : les vérifications ne dépendent pas de l'heure du lancement.
  * Sortie : une ligne OK/ÉCHEC par point de contrôle ; code de sortie 1 si un échec.
@@ -1228,18 +1230,22 @@ async function bellText(p: Page) {
  * reste possible, avec une mise en garde (R11 : jamais bloquée). La légende (mention de simulation,
  * attribution des zones) est visible sans défiler à 1440 × 860.
  */
-/** Mention de simulation et attribution des zones de la légende : entières dans la partie visible du panneau. */
+/**
+ * Mention de simulation et attribution des zones de la légende : dans le pied fixe du panneau (hors de
+ * la zone qui défile), entières dans le panneau et non recouvertes (élément du dessus en leur centre).
+ */
 async function legendVisible(p: Page) {
   return p.evaluate(() => {
     const panel = document.querySelector<HTMLElement>(".dn-panel");
     const items = [document.querySelector<HTMLElement>(".dn-sim-note"), document.querySelector<HTMLElement>(".dn-legend .dn-credit")];
     if (!panel || items.some((e) => !e)) return { ok: false, detail: "absent" };
     const r = panel.getBoundingClientRect();
-    const inside = items.map((e) => {
+    const ok = items.map((e) => {
       const q = e!.getBoundingClientRect();
-      return q.height > 0 && q.top >= r.top && q.bottom <= r.bottom + 0.5;
+      const top = document.elementFromPoint(q.left + q.width / 2, q.top + q.height / 2);
+      return q.height > 0 && q.top >= r.top && q.bottom <= r.bottom + 0.5 && !!top && e!.contains(top) && !!e!.closest(".tr-envpanel-foot") && !e!.closest(".tr-envpanel-scroll");
     });
-    return { ok: inside.every(Boolean) && panel.scrollTop === 0, detail: `panneau ${Math.round(r.top)}–${Math.round(r.bottom)} · ${items.map((e) => { const q = e!.getBoundingClientRect(); return `${Math.round(q.top)}–${Math.round(q.bottom)}`; }).join(" ")}` };
+    return { ok: ok.every(Boolean), detail: `panneau ${Math.round(r.top)}–${Math.round(r.bottom)} · ${items.map((e) => { const q = e!.getBoundingClientRect(); return `${Math.round(q.top)}–${Math.round(q.bottom)}`; }).join(" ")}` };
   });
 }
 
@@ -1470,6 +1476,18 @@ async function meteoDown(b: Browser) {
   const w = await p.locator(".dn-weather").innerText().catch(() => "");
   check("500 : « Météo indisponible », source « Simulation », 12 cm simulés, crédit météo", off && /Simulation/.test(w) && /12\s*cm/.test(w) && /Météo : Environnement et Changement climatique Canada/.test(w), w.replace(/\n/g, " | "));
   check("500 : le reste du panneau fonctionne (décision possible, plans calculés)", (await p.locator(".dn-decide-btn").isEnabled()) && (await snowPlans(p)) === "A:aucune B:aucune C:aucune");
+  const legOff = await legendVisible(p);
+  check("500, 08:00, 1440 × 860 : mention de simulation et attribution des zones visibles sans défiler", legOff.ok, legOff.detail);
+  await setClock(p, atHour(SCENARIO_DAY, "23:30"));
+  await p.waitForTimeout(800);
+  const legOffNight = await legendVisible(p);
+  check("500, 23:30 : légende visible sans défiler (« Météo indisponible » affichée)", legOffNight.ok && (await p.locator(".dn-weather-off").count()) === 1, legOffNight.detail);
+  if (process.env.SHOT_DN_METEO_OFF) {
+    await p.screenshot({ path: process.env.SHOT_DN_METEO_OFF });
+    console.log(`capture : ${process.env.SHOT_DN_METEO_OFF}`);
+  }
+  await setClock(p, atHour(SCENARIO_DAY, "08:00"));
+  await p.waitForTimeout(300);
   // l'API revient : la fiche réelle versionnée, avec 8 cm de neige pour la nuit
   const fixture = parseCityPage(JSON.parse(await readFile(new URL("../fixtures/eccc-citypage-snow.json", import.meta.url), "utf8")))!;
   fixture.periods = fixture.periods.map((x, i) => (i === 1 ? { ...x, snowCm: 8 } : { ...x, snowCm: null }));
@@ -1480,6 +1498,46 @@ async function meteoDown(b: Browser) {
   const w2 = await p.locator(".dn-weather").innerText().catch(() => "");
   check("API revenue, « Réessayer » : source « Environnement Canada », 8 cm, plus de « Météo indisponible »", back && /8\s*cm/.test(w2) && !w2.includes("Météo indisponible"), w2.replace(/\n/g, " | "));
   check("aucune exception (500 attendus en console seulement)", errors.length === 0 && calls >= 1, `${calls} appel(s) en panne · ${errors.join(" | ")}`);
+  await ctx.close();
+}
+
+/**
+ * Jour de neige réel : la fiche versionnée (eccc-citypage-snow) avec 8 cm ce soir et un avertissement
+ * de neige ; la source est « Environnement Canada », l'avertissement s'affiche, et la légende reste
+ * visible sans défiler à 1440 × 860 (le jour et la nuit).
+ */
+async function snowDay(b: Browser) {
+  console.log("\n== jour de neige (fiche réelle + avertissement) : légende du déneigement");
+  const ctx = await b.newContext({ viewport: { width: 1440, height: 860 }, deviceScaleFactor: 1 });
+  const fixture = parseCityPage(JSON.parse(await readFile(new URL("../fixtures/eccc-citypage-snow.json", import.meta.url), "utf8")))!;
+  fixture.periods = fixture.periods.map((x, i) => (i === 1 ? { ...x, snowCm: 8 } : { ...x, snowCm: null }));
+  fixture.warnings = [{ title: "AVERTISSEMENT DE NEIGE EN VIGUEUR", type: "warning", expires: "" }];
+  await ctx.route("**/api/territoire/meteo", (r) => r.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify({ forecast: fixture }) }));
+  const p = await ctx.newPage();
+  const errors = collectErrors(p);
+  await p.goto(`${BASE}/carte/deneigement?mode=classic`);
+  await p.waitForFunction(() => (window as any).__territoire?.snow, null, { timeout: 45_000 });
+  await setClock(p, atHour(SCENARIO_DAY, "10:30"));
+  const shown = await p.locator(".dn-weather-warn", { hasText: "AVERTISSEMENT DE NEIGE" }).waitFor({ timeout: 10_000 }).then(() => true).catch(() => false);
+  const w = await p.locator(".dn-weather").innerText().catch(() => "");
+  check("neige réelle : source « Environnement Canada », 8 cm, avertissement affiché", shown && /Environnement Canada/.test(w) && /8\s*cm/.test(w), w.replace(/\n/g, " | "));
+  const legDay = await legendVisible(p);
+  check("neige réelle, 10:30, 1440 × 860 : mention de simulation et attribution des zones visibles sans défiler", legDay.ok, legDay.detail);
+  await setClock(p, atHour(SCENARIO_DAY, "23:30"));
+  await p.waitForTimeout(800);
+  const legNight = await legendVisible(p);
+  check("neige réelle, 23:30 : légende visible sans défiler", legNight.ok, legNight.detail);
+  if (process.env.SHOT_DN_SNOW) {
+    await p.screenshot({ path: process.env.SHOT_DN_SNOW });
+    console.log(`capture : ${process.env.SHOT_DN_SNOW}`);
+  }
+  // ressources dépliées : seul le milieu défile, la légende reste en place
+  await p.locator(".dn-res summary").click();
+  await p.waitForTimeout(300);
+  const legOpen = await legendVisible(p);
+  const scrolls = await p.evaluate(() => { const e = document.querySelector<HTMLElement>(".dn-panel .tr-envpanel-scroll"); return !!e && e.scrollHeight > e.clientHeight; });
+  check("ressources dépliées : le milieu du panneau défile, la légende reste visible", legOpen.ok && scrolls, legOpen.detail);
+  check("aucune erreur console", errors.length === 0, errors.join(" | "));
   await ctx.close();
 }
 
@@ -1494,6 +1552,7 @@ try {
   await deneigement(b, "hic");
   await deneigement(b, "classic");
   await meteoDown(b);
+  await snowDay(b);
   await envSwitch(b);
   await narrow(b, false);
   await narrow(b, true);

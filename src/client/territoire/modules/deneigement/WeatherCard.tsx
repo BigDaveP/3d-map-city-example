@@ -5,7 +5,7 @@
  * avertissement en cours, crédit de la météo. API indisponible : « Météo indisponible », la journée
  * garde sa neige simulée, et « Réessayer » redemande la prévision (le store réessaie aussi seul).
  */
-import { METEO_ATTRIBUTION, SNOW_THRESHOLD_CM, snowTonightCm, snowWarning } from "@/lib/territoire/meteo";
+import { METEO_ATTRIBUTION, SNOW_THRESHOLD_CM, snowTonightCm, snowWarning, warningTitle } from "@/lib/territoire/meteo";
 import { snowSource } from "@/lib/territoire/neige";
 import { loadForecast } from "../../store";
 import { useTerritoire } from "../../useTerritoire";
@@ -47,7 +47,7 @@ export function WeatherCard() {
       )}
       {warning && (
         <p className="dn-weather-warn" role="note">
-          {warning}
+          {warningTitle(warning)}
         </p>
       )}
       <p className="dn-credit">{METEO_ATTRIBUTION}</p>

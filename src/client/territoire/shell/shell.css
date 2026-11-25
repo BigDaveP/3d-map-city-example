@@ -149,7 +149,12 @@ a.tr-bell-item:focus-visible { background: var(--tr-accent-soft); outline: 2px s
 .aq-noapi-credits { justify-self: stretch; margin: 0; padding: 8px 12px; border-radius: var(--r-md); background: var(--tr-ink); font-size: var(--tr-text-xs); line-height: 1.4; color: var(--tr-on-ink); }
 
 /* ---------------------------------------------------------------- panneau d'un environnement */
-.tr-envpanel { left: var(--aq-gap); top: var(--aq-gap); width: 264px; max-height: calc(100% - var(--aq-tl-h) - 4 * var(--aq-gap) - var(--tr-switcher-h)); overflow: auto; font-size: var(--tr-text-sm); }
+/* en-tête et pied fixes, le milieu défile : le pied (légende, mentions) reste toujours visible */
+.tr-envpanel { left: var(--aq-gap); top: var(--aq-gap); width: 264px; max-height: calc(100% - var(--aq-tl-h) - 4 * var(--aq-gap) - var(--tr-switcher-h)); display: flex; flex-direction: column; overflow: hidden; font-size: var(--tr-text-sm); }
+.tr-envpanel-h,
+.tr-envpanel-foot { flex: none; }
+.tr-envpanel-scroll { flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; }
+.tr-envpanel-foot { border-top: 1px solid var(--tr-line); }
 .tr-envpanel-h { display: flex; align-items: center; gap: 12px; padding: 12px 8px 4px 16px; }
 .tr-envpanel-icon { display: grid; place-items: center; flex: none; width: 32px; height: 32px; border: 1px solid var(--tr-line); border-radius: var(--r-md); color: var(--tr-ink-2); background: var(--tr-surface); }
 .tr-envpanel-t { display: grid; flex: 1; min-width: 0; }

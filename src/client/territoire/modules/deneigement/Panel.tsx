@@ -174,9 +174,9 @@ export function SnowPanel({ data }: { data: DeneigementData }) {
           <Decision t={t} />
         </>
       }
+      footer={<Legend />}
     >
       <Resources data={data} plans={plans} />
-      <Legend />
     </EnvPanel>
   );
 }

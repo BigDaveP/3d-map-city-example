@@ -16,13 +16,14 @@
 
 /* météo : carte 12 dans un panneau 16 à 16 de marge, rayons imbriqués ramenés au minimum de la commande */
 .dn-weather { padding: 8px 12px; border: 1px solid var(--tr-line); border-radius: var(--r-md); background: var(--tr-surface-2); }
-.dn-weather-h { display: flex; align-items: baseline; gap: 8px; }
-.dn-weather-h h3 { flex: 1; margin: 0; text-wrap: balance; font-size: var(--tr-text-xs); font-weight: 500; color: var(--tr-ink-2); }
-.dn-weather-h .dn-src { align-self: center; }
+/* chiffre et source sur une ligne, libellé dessous (la source « Environnement Canada » est longue) */
+.dn-weather-h { display: grid; grid-template-columns: 1fr auto; grid-template-areas: "cm src" "label label"; align-items: center; column-gap: 8px; }
+.dn-weather-h h3 { grid-area: label; margin: 0; font-size: var(--tr-text-xs); font-weight: 500; color: var(--tr-ink-2); }
+.dn-weather-h .dn-src { grid-area: src; }
 .dn-src { flex: none; display: inline-flex; align-items: center; height: 20px; padding: 0 6px; border: 1px solid; border-radius: var(--r-sm); font: 500 var(--tr-text-xs)/1 var(--tr-font); white-space: nowrap; }
 .dn-src[data-src="eccc"] { color: var(--sev-info-text); border-color: var(--tr-line); }
 .dn-src[data-src="simulation"] { color: var(--state-simulated); border-color: var(--state-simulated-line); }
-.dn-weather-cm { order: -1; margin: 0; font-size: var(--tr-text-sm); color: var(--tr-ink-2); white-space: nowrap; }
+.dn-weather-cm { grid-area: cm; margin: 0; font-size: var(--tr-text-sm); color: var(--tr-ink-2); white-space: nowrap; }
 .dn-weather-cm .aq-num { font: 500 var(--tr-text-xl) var(--tr-font); font-variant-numeric: tabular-nums; color: var(--tr-ink); }
 .dn-weather-note { margin: 4px 0 0; font-size: var(--tr-text-xs); line-height: 1.4; color: var(--tr-ink-2); }
 .dn-weather-off { display: grid; gap: 8px; justify-items: start; margin-top: 8px; padding: 8px; border: 1px solid var(--sev-attention-line); border-radius: var(--r-sm); background: var(--sev-attention-soft); font-size: var(--tr-text-xs); line-height: 1.4; color: var(--sev-attention-text); }
@@ -44,7 +45,7 @@
 .dn-dirty { font-weight: 600; color: var(--sev-attention-text); }
 
 /* ressources */
-.dn-res { padding: 0 16px; }
+.dn-res { padding: 0 16px 4px; }
 .dn-res summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 32px; list-style: none; cursor: pointer; }
 .dn-res summary::-webkit-details-marker { display: none; }
 .dn-res summary .dn-h { margin: 0; }
@@ -62,7 +63,7 @@
 .dn-inspector select { min-height: 28px; padding: 0 4px; border: 1px solid var(--tr-line); border-radius: var(--r-sm); background: var(--tr-surface); font: var(--tr-text-xs) var(--tr-font); color: var(--tr-ink); }
 
 /* légende : zones et feux en deux colonnes, mention de simulation et attribution toujours visibles */
-.dn-legend { display: grid; grid-template-columns: auto auto; column-gap: 16px; padding: 8px 16px; border-top: 1px solid var(--tr-line); }
+.dn-legend { display: grid; grid-template-columns: auto auto; column-gap: 16px; padding: 8px 16px 12px; }
 .dn-legend > p { grid-column: 1 / -1; }
 .dn-legend-row { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; font-size: var(--tr-text-xs); color: var(--tr-ink); }
 .dn-legend li { display: flex; align-items: center; gap: 8px; white-space: nowrap; }

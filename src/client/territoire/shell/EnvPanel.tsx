@@ -3,6 +3,10 @@
  * Cadre commun du panneau d'un environnement (couches et opérations), en haut à gauche : nom et
  * mention de ce qui est réel ou simulé, opérations toujours visibles, corps repliable (replié par
  * défaut sur un écran étroit). Chaque module y met son contenu.
+ *
+ * L'en-tête et le pied (`footer`, ex. la légende et ses mentions de simulation et d'attribution)
+ * restent fixes ; seul le milieu (opérations et corps) défile quand la hauteur manque : le pied reste
+ * visible quel que soit l'état du contenu (météo indisponible, avertissement, ressources ouvertes).
  */
 import { useEffect, useId, useState, type ReactNode } from "react";
 import { ENVS, type EnvId } from "@/lib/territoire/envs";
@@ -18,9 +22,11 @@ interface Props {
   collapsedHint?: ReactNode;
   className?: string;
   children?: ReactNode;
+  /** pied fixe, hors de la zone qui défile, replié avec le corps */
+  footer?: ReactNode;
 }
 
-export function EnvPanel({ env, subtitle, operations, collapsedHint, className, children }: Props) {
+export function EnvPanel({ env, subtitle, operations, collapsedHint, className, children, footer }: Props) {
   const [open, setOpen] = useState(true);
   const bodyId = useId();
   useEffect(() => {
@@ -40,16 +46,23 @@ export function EnvPanel({ env, subtitle, operations, collapsedHint, className, 
             {!open && collapsedHint}
           </span>
         </span>
-        {children && (
+        {(children || footer) && (
           <button type="button" className="tr-envpanel-toggle" aria-expanded={open} aria-controls={bodyId} aria-label={open ? "Replier le panneau" : "Déplier le panneau"} onClick={() => setOpen(!open)}>
             <span className="aq-caret" aria-hidden="true" />
           </button>
         )}
       </header>
-      {operations && <div className="tr-envpanel-ops">{operations}</div>}
-      {children && open && (
-        <div id={bodyId} className="tr-envpanel-body">
-          {children}
+      <div className="tr-envpanel-scroll">
+        {operations && <div className="tr-envpanel-ops">{operations}</div>}
+        {children && open && (
+          <div id={bodyId} className="tr-envpanel-body">
+            {children}
+          </div>
+        )}
+      </div>
+      {footer && open && (
+        <div id={children ? undefined : bodyId} className="tr-envpanel-foot">
+          {footer}
         </div>
       )}
     </section>

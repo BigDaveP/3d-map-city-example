@@ -6,7 +6,7 @@
  * réelle : les heures affichées suivent l'heure réelle (`now`), pas l'horloge simulée.
  */
 import { hourLabel } from "@/lib/territoire/home";
-import { isNightAt, METEO_ATTRIBUTION, SNOW_THRESHOLD_CM, snowTonightCm, type Forecast } from "@/lib/territoire/meteo";
+import { isNightAt, METEO_ATTRIBUTION, SNOW_THRESHOLD_CM, snowTonightCm, warningTitle, type Forecast } from "@/lib/territoire/meteo";
 import { snowSource } from "@/lib/territoire/neige";
 import { isNightCode, weatherCondition } from "@/lib/territoire/weatherIcon";
 import { WeatherIcon } from "./WeatherIcon";
@@ -23,9 +23,6 @@ function brief(summary: string): string {
   const temps = sentences.find((s) => /^(Maximum|Minimum|Températures?)/.test(s));
   return [sentences[0], temps && temps !== sentences[0] ? temps : null].filter(Boolean).join(" · ");
 }
-
-/** Titre d'avertissement d'ECCC (en capitales) en casse de phrase : « Bulletin météorologique spécial ». */
-const sentenceCase = (s: string) => (s === s.toUpperCase() ? s.charAt(0) + s.slice(1).toLocaleLowerCase("fr-CA") : s);
 
 const cm = (x: number) => `${Math.round(x * 10) / 10}`.replace(".", ",");
 const HOUR = 3_600_000;
@@ -88,7 +85,7 @@ export function WeatherSummary({ forecast, now = Date.now() }: { forecast: Forec
           </p>
           {forecast.warnings.map((w) => (
             <p key={w.title} className="tr-weather-warn">
-              {sentenceCase(w.title)}
+              {warningTitle(w.title)}
             </p>
           ))}
           {source.kind === "simulation" && (

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { parseCityPage, snowTonightCm, snowWarning, SNOW_THRESHOLD_CM, type Forecast } from "../src/lib/territoire/meteo";
+import { parseCityPage, snowTonightCm, snowWarning, SNOW_THRESHOLD_CM, warningTitle, type Forecast } from "../src/lib/territoire/meteo";
 import { getForecast } from "../src/server/territoire/meteo";
 
 const load = (n: string): unknown => JSON.parse(readFileSync(new URL(`./fixtures/${n}.json`, import.meta.url), "utf8"));
@@ -22,6 +22,12 @@ test("parseCityPage : Trois-Rivières", () => {
 test("snowTonightCm : 0 sans neige, 1 cm dans la fixture de neige", () => {
   assert.equal(snowTonightCm(parseCityPage(qc130)!), 0);
   assert.equal(snowTonightCm(parseCityPage(snow)!), 1);
+});
+
+test("warningTitle : titre en capitales d'ECCC en casse de phrase, autre titre tel quel", () => {
+  assert.equal(warningTitle("AVERTISSEMENT DE NEIGE"), "Avertissement de neige");
+  assert.equal(warningTitle("BULLETIN MÉTÉOROLOGIQUE SPÉCIAL"), "Bulletin météorologique spécial");
+  assert.equal(warningTitle("Avis de neige"), "Avis de neige");
 });
 
 test("parseCityPage : format inattendu → null", () => {

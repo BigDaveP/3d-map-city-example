@@ -119,3 +119,8 @@ export function isNightAt(f: Pick<Forecast, "sun">, t: number): boolean {
   const since = (((t - f.sun.rise) % DAY_MS) + DAY_MS) % DAY_MS;
   return since >= f.sun.set - f.sun.rise;
 }
+
+/** Titre d'avertissement d'ECCC (publié en capitales) en casse de phrase : « Bulletin météorologique spécial ». */
+export function warningTitle(title: string): string {
+  return title === title.toUpperCase() ? title.charAt(0) + title.slice(1).toLocaleLowerCase("fr-CA") : title;
+}
