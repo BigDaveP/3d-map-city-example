@@ -43,12 +43,26 @@ test("après la décision du visiteur : cases = décision, rien de non enregistr
   assert.equal(v.status, "Décidée par vous à 8 h 00");
 });
 
-test("R11 : après 15:00, le bouton reste « Décider pour ce soir » avec une mise en garde, jamais « Trop tard »", () => {
+test("R11 : après 15:00, le bouton reste « Décider pour ce soir », jamais « Trop tard » ; mise en garde seulement pendant une décision", () => {
+  // décision par défaut en vigueur, rien de changé : rien n'est en train de se décider, pas de mise en garde
   const v = decisionView(at("16:00"), [], null);
   assert.equal(v.button, "Décider pour ce soir");
-  assert.equal(v.caution, "Décision tardive : les résidents auront moins de temps pour déplacer leur véhicule.");
+  assert.equal(v.dirty, false);
+  assert.equal(v.caution, null);
   assert.equal(v.status, "Décidée à 10 h 00 par la direction (simulé)");
   assert.doesNotMatch(JSON.stringify(v), /trop tard/i);
+  // un choix non enregistré : la décision tardive se prend, la mise en garde s'affiche (sans bloquer)
+  const w = decisionView(at("16:00"), [], { base: v.base, zones: ["B"] });
+  assert.equal(w.dirty, true);
+  assert.equal(w.button, "Décider pour ce soir");
+  assert.equal(w.caution, "Décision tardive : les résidents auront moins de temps pour déplacer leur véhicule.");
+  assert.doesNotMatch(JSON.stringify(w), /trop tard/i);
+  // une fois décidée (16:00), plus de mise en garde à côté de « Décidée par vous à 16 h 00 »
+  const after = decisionView(at("16:05"), [ban("16:00", ["B"])], null);
+  assert.equal(after.status, "Décidée par vous à 16 h 00");
+  assert.equal(after.caution, null);
+  // la décision de la direction remplacée par « aucune zone » le matin, puis rien coché l'après-midi : pas de choix en cours
+  assert.equal(decisionView(at("16:00"), [ban("09:00", [])], null).caution, null);
 });
 
 test("R11 : la nuit, le bouton change la nuit en cours ; « En vigueur jusqu'à 6 h »", () => {

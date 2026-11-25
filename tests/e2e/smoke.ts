@@ -1442,20 +1442,36 @@ async function deneigement(b: Browser, mode: "hic" | "classic") {
   await setClock(p2, atHour(SCENARIO_DAY, "16:00"));
   await p2.waitForTimeout(1200);
   const btn = p2.getByRole("button", { name: "Décider pour ce soir" });
-  const reasonId = (await btn.getAttribute("aria-describedby")) ?? "";
-  const reason = reasonId ? await p2.locator(`[id="${reasonId}"]`).innerText().catch(() => "") : "";
+  const describedBy = async () => {
+    const id = (await btn.getAttribute("aria-describedby")) ?? "";
+    return id ? await p2.locator(`[id="${id}"]`).innerText().catch(() => "") : "";
+  };
   check("16:00 : décision par défaut gardée (A, B, C programmées par la direction), cases cochées en conséquence", (await snowPlans(p2)) === "A:programmee B:programmee C:programmee" && (await p2.locator(".dn-zone-opt input:checked").count()) === 3);
+  const idle = await describedBy();
+  const idlePanel = await p2.locator(".dn-decide").innerText();
   check(
-    "R11, 16:00 : « Décider pour ce soir » actif, mise en garde « Décision tardive : les résidents auront moins de temps pour déplacer leur véhicule. » (aria-describedby)",
-    (await btn.isEnabled()) && reason === "Décision tardive : les résidents auront moins de temps pour déplacer leur véhicule.",
-    reason,
+    "16:00, rien de changé : « Décider pour ce soir » actif, aucune mise en garde « Décision tardive » à côté de « Décidée à 10 h 00 par la direction (simulé) »",
+    (await btn.isEnabled()) && idle === "" && !/tardive/i.test(idlePanel) && idlePanel.includes("Décidée à 10 h 00 par la direction (simulé)"),
+    `${idle} · ${idlePanel.replace(/\n/g, " | ")}`,
   );
+  if (process.env.SHOT_DN_1600) {
+    await p2.waitForTimeout(800);
+    await p2.screenshot({ path: process.env.SHOT_DN_1600 });
+    console.log(`capture : ${process.env.SHOT_DN_1600}`);
+  }
   const box2 = (z: string) => p2.locator(".dn-zone-opt", { hasText: `Zone ${z}` }).locator("input");
   await box2("A").uncheck();
   await box2("C").uncheck();
+  const reason = await describedBy();
+  check(
+    "R11, 16:00, choix en cours : bouton actif, mise en garde « Décision tardive : les résidents auront moins de temps pour déplacer leur véhicule. » (aria-describedby)",
+    (await btn.isEnabled()) && reason === "Décision tardive : les résidents auront moins de temps pour déplacer leur véhicule.",
+    reason,
+  );
   await btn.click();
   await p2.waitForTimeout(300);
   check("R11, 16:00 : la décision (B seule) est acceptée et programme l'interdiction du soir", (await snowPlans(p2)) === "A:aucune B:programmee C:aucune" && (await p2.locator(".dn-decided").innerText()).includes("Décidée par vous à 16 h 00"), `${await snowPlans(p2)} · ${await p2.locator(".dn-decided").innerText()}`);
+  check("16:00, une fois décidée : plus de mise en garde tardive", !/tardive/i.test(await p2.locator(".dn-decide").innerText()));
   const page16 = (await p2.locator("body").innerText()) + (await bellText(p2));
   check("16:00 : aucun « Trop tard » dans la page ni dans la cloche", !/trop tard/i.test(page16));
   check("aucune erreur console (16:00)", errors2.length === 0, errors2.join(" | "));

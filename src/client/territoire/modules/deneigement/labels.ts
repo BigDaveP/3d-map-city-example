@@ -53,7 +53,7 @@ export interface DecisionView {
   button: string;
   /** ce que fait le bouton quand aucune zone n'est cochée, sinon null */
   empty: string | null;
-  /** mise en garde selon l'heure, jamais bloquante (R11), sinon null */
+  /** mise en garde selon l'heure, jamais bloquante (R11) ; la tardive seulement pendant une décision ; sinon null */
   caution: string | null;
   /** décision en vigueur en une ligne */
   status: string;
@@ -66,7 +66,8 @@ const sameZones = (a: readonly ZoneId[], b: readonly ZoneId[]) => a.length === b
  * vigueur (visiteur ou direction) tant que le visiteur ne les change pas ; un choix non enregistré
  * est signalé, et oublié si la décision en vigueur change entre-temps (10:00, autre journée). Le
  * bouton n'est jamais désactivé (R11) : sans zone cochée, il dit « Aucune interdiction ce soir » et
- * une ligne explique l'effet ; après 15:00 et la nuit, une mise en garde, sans rien refuser.
+ * une ligne explique l'effet ; après 15:00, une mise en garde quand un choix est en cours ou
+ * qu'aucune décision n'existe, et la nuit une note, sans rien refuser.
  */
 export function decisionView(t: number, actions: readonly EnvAction[], picked: Picked | null): DecisionView {
   const decision = banDecision(t, actions);
@@ -78,14 +79,18 @@ export function decisionView(t: number, actions: readonly EnvAction[], picked: P
   const status = decision
     ? `${decisionLine({ decidedBy: decision.by, decidedAt: decision.at })}${inForce.length === 0 ? " : aucune zone" : ""}`
     : "Aucune décision pour ce soir";
+  const dirty = !sameZones(checked, inForce);
+  // mise en garde tardive seulement quand une décision tardive est en train de se prendre : un choix
+  // non enregistré, ou aucune décision encore ; pas à côté d'une décision déjà en vigueur (R11, R13)
+  const deciding = dirty || decision === null;
   return {
     base,
     checked,
-    dirty: !sameZones(checked, inForce),
+    dirty,
     button: checked.length > 0 ? (night ? "Appliquer à la nuit en cours" : "Décider pour ce soir") : night ? "Lever l'interdiction cette nuit" : "Aucune interdiction ce soir",
     empty: checked.length > 0 ? null : night ? "Aucune zone cochée : les feux s'éteignent tout de suite." : "Aucune zone cochée : pas d'interdiction ce soir, les feux restent éteints.",
     caution:
-      timing === "tardive" ? "Décision tardive : les résidents auront moins de temps pour déplacer leur véhicule."
+      timing === "tardive" ? (deciding ? "Décision tardive : les résidents auront moins de temps pour déplacer leur véhicule." : null)
       : night ? `${inForce.length > 0 ? "En vigueur jusqu'à 6 h. " : ""}De nuit, une décision change les feux tout de suite.`
       : timing === "avant-prevision" ? "La prévision du jour arrive à 7 h 30."
       : null,
