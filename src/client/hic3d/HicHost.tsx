@@ -266,6 +266,7 @@ export function HicHost({ ml, map, metrics, surfaces, layerOptions, onFallback, 
       canvas.removeAttribute("content");
       canvas.removeAttribute("layoutsubtree");
       metrics.gpuBytes = 0;
+      if ((w.__hicMap as { layer?: unknown } | undefined)?.layer === layer) delete w.__hicMap;
       setReady(false);
     };
   }, [ml, map, canvas, metrics]);

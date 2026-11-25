@@ -126,6 +126,8 @@ function compile(gl: WebGL2RenderingContext) {
   gl.attachShader(p, mk(gl.FRAGMENT_SHADER, FS));
   gl.linkProgram(p);
   if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p) ?? "link");
+  // les shaders liés suivent le programme (libérés avec lui)
+  for (const sh of gl.getAttachedShaders(p) ?? []) gl.deleteShader(sh);
   return p;
 }
 
@@ -153,6 +155,7 @@ export class PanelLayer implements CustomLayerInterface {
   private gl!: WebGL2RenderingContext;
   private prog!: WebGLProgram;
   private vao!: WebGLVertexArrayObject;
+  private quad!: WebGLBuffer;
   private u = new Map<string, WebGLUniformLocation | null>();
   constructor(private ml: ML, private opt: PanelLayerOptions) {
     if (!opt.place && !opt.anchor) throw new Error("PanelLayer : `place` ou `anchor` requis");
@@ -164,7 +167,7 @@ export class PanelLayer implements CustomLayerInterface {
     this.prog = compile(gl);
     this.vao = gl.createVertexArray()!;
     gl.bindVertexArray(this.vao);
-    const b = gl.createBuffer()!;
+    const b = (this.quad = gl.createBuffer()!);
     gl.bindBuffer(gl.ARRAY_BUFFER, b);
     gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0, 0, 1, 0, 0, 1, 0, 1, 1, 0, 1, 1]), gl.STATIC_DRAW);
     gl.enableVertexAttribArray(0);
@@ -178,6 +181,10 @@ export class PanelLayer implements CustomLayerInterface {
       if (p.query) gl.deleteQuery(p.query);
     }
     this.panels.clear();
+    // la carte survit à la couche (changement d'environnement ou de mode) : rien ne doit rester
+    gl.deleteVertexArray(this.vao);
+    gl.deleteBuffer(this.quad);
+    gl.deleteProgram(this.prog);
   }
 
   private loc(name: string) {
