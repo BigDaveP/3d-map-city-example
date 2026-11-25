@@ -8,6 +8,8 @@ import type { Material, PipeClass, RawNetwork } from "../src/lib/aqueduc/network
 const URL_SOURCE =
   "https://www.donneesquebec.ca/recherche/dataset/7ad4ea4e-cfc5-417b-9eb8-6e7f379a8f6e/resource/d55f59ee-a9be-4f38-a78e-c13ebe3ca7b3/download/conduites-eau-potable-v3r.json";
 const PAGE = "https://www.donneesquebec.ca/recherche/dataset/7ad4ea4e-cfc5-417b-9eb8-6e7f379a8f6e";
+/** Début de la section de SOURCE.md qui n'est pas générée (sources des seuils). */
+const SECTION_SEUILS = "## Seuils affichés";
 
 const MATERIAUX: Record<string, Material> = {
   "Fonte grise": "fonte-grise",
@@ -89,6 +91,13 @@ async function main() {
   };
   mkdirSync("data/aqueduc", { recursive: true });
   writeFileSync("data/aqueduc/trois-rivieres.json", JSON.stringify(brut));
+  // la section des seuils (rédigée à la main) est conservée telle quelle
+  let seuils = "";
+  try {
+    const avant = readFileSync("data/aqueduc/SOURCE.md", "utf8");
+    const i = avant.indexOf(SECTION_SEUILS);
+    if (i >= 0) seuils = "\n" + avant.slice(i);
+  } catch {}
   writeFileSync(
     "data/aqueduc/SOURCE.md",
     `# Source des données d'aqueduc
@@ -101,7 +110,7 @@ async function main() {
 - **Champs conservés** : LABEL (identifiant du tronçon), START_NODE et STOP_NODE (nœuds), DIAMETER (mm), MATERIAL (normalisé en six valeurs), INSTALLATION_YEAR, CLASSE_FONCT (normalisée en quatre classes), LENGTH__SCALED_ (m), géométrie (WGS84, 6 décimales).
 - **Écartés** : ${ignores} tronçons de classe « -Inconnu- » ; tous les autres champs.
 - **Tronçons conservés** : ${segs.length}
-`,
+${seuils}`,
   );
   console.log(`${segs.length} tronçons, ${nodes.length} nœuds, ${ignores} ignorés, ${(statSync("data/aqueduc/trois-rivieres.json").size / 1e6).toFixed(2)} Mo`);
 }
