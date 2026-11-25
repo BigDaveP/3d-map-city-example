@@ -91,7 +91,8 @@ ouvertes et des simulations.
 | Rôles d'évaluation foncière du Québec 2026 | MAMH | CC-BY 4.0, annuel ; renseignements personnels caviardés, réidentification interdite | Géoréférencé pour tout le Québec (GPKG 573 Mo) ; XML par municipalité (`RL37067_2026.xml`, 97 Mo, code 37067 = Trois-Rivières) |
 
 - Pas de collecte automatisée massive des tuiles OpenFreeMap. Les jeux ouverts sont prétraités
-  une fois par script, versionnés en fichiers compacts, sans appel en direct aux portails.
+  une fois par script, versionnés en fichiers compacts, sans appel en direct aux portails. Seule
+  exception : la météo d'Environnement Canada, appelée en direct par le serveur (voir 5.2).
 
 ## 4. Approches envisagées
 
@@ -174,6 +175,29 @@ Journée scénarisée (validée par David, corrigée selon ses précisions) :
 23 h    interdiction en vigueur, feux allumés, équipes de déneigement sur le terrain (nuit)
 06 h    levée automatique (cycle suivant)
 ```
+
+**Vraie météo (demande de David) : GéoMet d'Environnement et Changement climatique Canada**
+(`https://api.weather.gc.ca`, Licence du gouvernement ouvert – Canada, gratuite, sans clé,
+usage commercial permis). Deux collections OGC API, vérifiées le 25 nov. 2026 :
+- `citypageweather-realtime/items/qc-130` (Trois-Rivières, marquée « expérimentale » par le
+  SMC) : conditions actuelles, prévisions par période (`forecastGroup.forecasts[]`, avec
+  `precipitation.accumulation` : quantité en cm et type `snow`/neige, et `precipPeriods`),
+  prévisions horaires (`hourlyForecastGroup.hourlyForecasts[]` : condition, température,
+  probabilité de précipitations `lop`), et avertissements en cours (`warnings[]`, par exemple
+  « Bulletin météorologique spécial »).
+- `weather-alerts/items?bbox=…` : alertes officielles et leurs polygones.
+
+Appel côté serveur seulement, mis en cache 15 à 30 minutes, avec un repli propre si
+l'API ne répond pas (« Météo indisponible », la démo continue avec la neige simulée).
+Attribution : « Météo : Environnement et Changement climatique Canada (Licence du
+gouvernement ouvert – Canada) ».
+
+**Vraie neige d'abord, neige simulée en renfort (option 1, proposée et non contredite).** La
+prévision réelle est toujours affichée (accueil et environnement Déneigement). Si elle annonce
+de la neige pour la nuit qui vient au-delà d'un seuil (par défaut 5 cm), ou si un
+avertissement de neige est en cours, c'est elle qui déclenche l'alerte « Décider
+l'interdiction », avec ses vraies quantités. Sinon, la journée scénarisée garde sa neige
+simulée, marquée « Simulation : la prévision réelle n'annonce pas de neige ».
 
 Les heures exactes (décision par défaut, limite de décision, début de l'interdiction) sont des
 constantes de démo, ajustables par le constructeur, documentées dans « À propos ».
