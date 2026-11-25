@@ -26,8 +26,11 @@ mkdirSync(OUT, { recursive: true });
 const results: Record<string, unknown> = {};
 
 type Mode = "classic" | "hic";
-/** Centre-ville vu du sud-est, bas sur l'horizon : des bâtiments passent devant son marquage au sol. */
-const CAM_OCCLUSION = { center: [-72.5427, 46.3437], zoom: 17.1, pitch: 68, bearing: -40 };
+/**
+ * Centre-ville vu du nord-nord-est, bas sur l'horizon : des bâtiments passent devant son marquage au
+ * sol et une tour coupe l'étiquette du capteur P-01 (vérifié à l'œil, 1440 × 860).
+ */
+const CAM_OCCLUSION = { center: [-72.543, 46.344], zoom: 17.3, pitch: 70, bearing: 200 };
 /** Vue large inclinée : marquages de secteurs posés au sol, en perspective. */
 const CAM_GROUND = { center: [-72.548, 46.348], zoom: 15.0, pitch: 60, bearing: -25 };
 
@@ -137,9 +140,11 @@ async function clickAt(p: Page, pt: { x: number; y: number }) {
 
 /** Tab depuis le haut de la page jusqu'à une étiquette de capteur ; Entrée ouvre sa fiche. */
 async function keyboardFocus(p: Page, mode: Mode) {
-  await p.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
-  await p.mouse.click(VIEW.width - 5, 70).catch(() => {});
-  await p.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  // départ du haut du document, sans clic (un clic sur la carte sélectionnerait une conduite)
+  await p.evaluate(() => {
+    (document.activeElement as HTMLElement | null)?.blur();
+    (window as any).__aqueduc.store.setState({ selection: null });
+  });
   for (let i = 1; i <= 80; i++) {
     await p.keyboard.press("Tab");
     const f = await p.evaluate(() => {
@@ -171,9 +176,10 @@ async function exportVideo(ctx: BrowserContext, mode: Mode) {
   const msg = await p.locator(".aq-story-export .aq-note").innerText().catch(() => "");
   const r: Record<string, unknown> = { file, octets: statSync(file).size, message: msg, wallMs: Date.now() - t, errors };
   try {
-    // durée lue dans le fichier (MediaRecorder n'écrit pas toujours la durée dans l'en-tête : -count_packets)
-    const probe = execFileSync("ffprobe", ["-v", "error", "-select_streams", "v:0", "-count_packets", "-show_entries", "stream=width,height,nb_read_packets:format=duration", "-of", "json", file]).toString();
-    r.ffprobe = JSON.parse(probe);
+    // MediaRecorder n'écrit pas la durée dans l'en-tête : instant de la dernière image, et nombre d'images
+    const pts = execFileSync("ffprobe", ["-v", "error", "-select_streams", "v:0", "-show_entries", "packet=pts_time", "-of", "csv=p=0", file]).toString().split("\n").map((l) => parseFloat(l)).filter(Number.isFinite);
+    const dim = execFileSync("ffprobe", ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height,codec_name", "-of", "csv=p=0", file]).toString().trim();
+    r.ffprobe = { stream: dim, frames: pts.length, lastFrameS: Math.max(...pts) };
     execFileSync("ffmpeg", ["-v", "error", "-y", "-ss", "5", "-i", file, "-frames:v", "1", `${OUT}/video-${mode}-image-5s.png`]);
     r.image5s = `${OUT}/video-${mode}-image-5s.png`;
   } catch (e) {
@@ -201,7 +207,7 @@ async function main() {
     } else {
       // l'étiquette DOM du Centre-ville reçoit le clic même là où un bâtiment se dresse devant le lieu
       const pt = await p.evaluate(() => {
-        const el = [...document.querySelectorAll<HTMLElement>(".aq-flat-sector")].find((e) => /Centre-ville/.test(e.textContent ?? ""));
+        const el = [...document.querySelectorAll<HTMLElement>(".aq-flat-sector")].find((e) => /centre-ville/i.test(e.textContent ?? ""));
         if (!el) return null;
         const b = el.getBoundingClientRect();
         const { map } = (window as any).__aqueduc;
@@ -263,7 +269,7 @@ async function main() {
   for (const mode of ["classic", "hic"] as const) {
     const { p } = await open(ctx, mode);
     const aria = await p.locator("body").ariaSnapshot();
-    results[`aria_${mode}`] = aria.split("\n").filter((l) => /(Pression|Débit|Réservoir|Point de mesure).*\(simulation\)|Centre-ville/.test(l)).slice(0, 8).map((l) => l.trim());
+    results[`aria_${mode}`] = aria.split("\n").filter((l) => /(pression|débit|réservoir|point de mesure).*\(simulation\)|centre-ville/i.test(l) && !/status:/.test(l)).slice(0, 8).map((l) => l.trim());
     results[`focus_${mode}`] = await keyboardFocus(p, mode);
     await p.close();
   }

@@ -79,8 +79,9 @@ function AqueducResults({ rows, meta }: { rows: AqueducRow[]; meta: Record<strin
       )}
       {meta && !meta.gpu && (
         <p className="warn">
-          Sans GPU (WebGL logiciel) : au repos, les deux modes plafonnent près de 57 images/s ; la rotation, qui redessine tout à chaque image, les départage. Le temps JS
-          par image cache le message du flux (une fois par seconde) : il est mesuré à part, par mise à jour de données (p95 et maximum).
+          Sans GPU (WebGL logiciel), chaque redessin de la carte coûte du CPU : pendant la rotation, qui redessine tout à chaque image, les deux modes tombent au même
+          plancher ; immobile, l&apos;écart vient des captures des étiquettes (horloge ×60 : une nouvelle valeur par seconde). Le temps JS par image cache le message du
+          flux (une fois par seconde) : il est mesuré à part, par mise à jour de données (p95 et maximum).
         </p>
       )}
       <Legend series={SERIES} />
