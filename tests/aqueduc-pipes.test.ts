@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createPropertyExpression, latest } from "@maplibre/maplibre-gl-style-spec";
 import { NO_DATA, PIPE_STOPS, pipeColor } from "../src/client/aqueduc/pipes";
-import { aqueducStore, seek, setSpeed, simNow } from "../src/client/aqueduc/store";
+import { seek, setSpeed, simNow, territoireStore } from "../src/client/territoire/store";
 import { dayStart, sectorStatus } from "../src/client/aqueduc/format";
 import { FLUSHING_2026, localHour } from "../src/lib/aqueduc/sim";
 
@@ -55,23 +55,23 @@ test("pipeColor : chaque couche produit une expression valide et suit PIPE_STOPS
 
 test("simNow : à ×60, l'horloge simulée avance de 60 s par seconde réelle", () => {
   const t0 = Date.UTC(2026, 10, 24, 12, 42);
-  aqueducStore.setState({ clock: { t0, speed: 60, startedAt: 1_000_000 } });
+  territoireStore.setState({ clock: { t0, speed: 60, startedAt: 1_000_000 } });
   assert.equal(simNow(1_000_000), t0);
   assert.equal(simNow(1_001_000), t0 + 60_000);
   assert.equal(simNow(1_010_000), t0 + 600_000);
-  aqueducStore.setState({ clock: { t0, speed: 1, startedAt: 1_000_000 } });
+  territoireStore.setState({ clock: { t0, speed: 1, startedAt: 1_000_000 } });
   assert.equal(simNow(1_001_000), t0 + 1000);
 });
 
 test("setSpeed et seek : repartent de l'heure simulée courante, sans saut", () => {
   const t0 = Date.UTC(2026, 10, 24, 12, 0);
-  aqueducStore.setState({ clock: { t0, speed: 1, startedAt: 2_000_000 } });
+  territoireStore.setState({ clock: { t0, speed: 1, startedAt: 2_000_000 } });
   setSpeed(60, 2_010_000);
-  assert.deepEqual(aqueducStore.getState().clock, { t0: t0 + 10_000, speed: 60, startedAt: 2_010_000 });
+  assert.deepEqual(territoireStore.getState().clock, { t0: t0 + 10_000, speed: 60, startedAt: 2_010_000 });
   assert.equal(simNow(2_011_000), t0 + 70_000);
   seek(t0 - 3_600_000, 2_020_000);
   assert.equal(simNow(2_020_000), t0 - 3_600_000);
-  assert.equal(aqueducStore.getState().clock.speed, 60);
+  assert.equal(territoireStore.getState().clock.speed, 60);
 });
 
 test("dayStart : minuit local de la journée simulée", () => {

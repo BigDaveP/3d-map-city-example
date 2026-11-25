@@ -70,7 +70,7 @@ async function settle(p: Page, extra = 2500) {
 const shot = (p: Page, name: string) => p.screenshot({ path: `${OUT}/${name}.png` });
 const state = (p: Page) =>
   p.evaluate(() => {
-    const s = (window as any).__aqueduc.store.getState();
+    const s = (window as any).__aqueduc.territoire.getState();
     return { mode: s.mode, api: s.api, fallback: s.fallback };
   });
 

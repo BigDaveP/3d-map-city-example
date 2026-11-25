@@ -1,21 +1,22 @@
 /**
  * État client de la démo réseau d'eau, propre à chaque visiteur (Zustand, sans React : le hook est
- * dans `useAq.ts`). L'horloge simulée se déduit de `clock` à tout instant : un onglet masqué ou un flux
- * coupé reprend juste, car l'état du réseau ne dépend que de l'heure simulée.
+ * dans `useAq.ts`). L'horloge, le mode et les décisions du visiteur sont communs à la ville
+ * (`territoire/store.ts`) ; l'incident en découle (`currentIncident`) : un onglet masqué ou un flux
+ * coupé reprend juste, car l'état du réseau ne dépend que de l'heure simulée et des actions.
  */
 import { createStore } from "zustand/vanilla";
 import type { SectorStat } from "@/lib/aqueduc/sim";
-import type { StepId } from "@/lib/aqueduc/scenario";
+import { dayIncident, type StepId } from "@/lib/aqueduc/scenario";
+import { actionsUpTo, type EnvAction } from "@/lib/territoire/day";
+import type { Speed } from "../territoire/store";
 // type seulement : le module serveur n'est jamais importé côté client
 import type { Notice } from "@/server/aqueduc";
 
 export type { Notice };
 export type LayerId = "pression" | "qualite" | "age" | "rincage" | "incidents";
 export type Selection = { kind: "segment" | "sensor" | "sector" | "incident"; id: string } | null;
-export type Mode = "classic" | "hic";
-export type Speed = 1 | 60;
 
-/** Incident transmis au flux (toujours sur CITY.breakSegment) ; rempli par le scénario. */
+/** Incident transmis au flux (toujours sur CITY.breakSegment). */
 export interface IncidentParams {
   /** ms sim */
   startedAt: number;
@@ -24,15 +25,14 @@ export interface IncidentParams {
 }
 
 export interface AqState {
-  mode: Mode;
   layer: LayerId;
   underground: boolean;
   undergroundAll: boolean;
   selection: Selection;
-  clock: { t0: number; speed: Speed; startedAt: number };
   /**
-   * Scénario guidé (piloté par `scenarioController.ts`) : il remplace l'horloge vivante et fixe
-   * `incident` à chaque étape. `resumeAt`, `resumeSpeed`, `resumeLayer`, `resumeUnderground` :
+   * Scénario guidé (piloté par `scenarioController.ts`) : il mène l'horloge commune d'étape en étape.
+   * `valvesClosed` : le visiteur a isolé le tronçon (action déjà posée à l'heure de l'étape).
+   * `resumeAt`, `resumeSpeed`, `resumeLayer`, `resumeUnderground` :
    * réseau vivant quitté (la vue souterraine est coupée pendant le scénario : les couches, qui portent
    * sa mention, sont masquées).
    * `valvesTurned` : vannes manœuvrées dans la coupe, en attente de la confirmation du serveur.
@@ -48,7 +48,10 @@ export interface AqState {
     valvesTurned: number[];
     error: string;
   };
-  /** incident en cours pour le flux SSE et les courbes ; null en exploration libre */
+  /**
+   * Incident à l'heure simulée pour le flux SSE et les courbes, dérivé de l'horloge commune et des
+   * actions (`currentIncident`, tenu à jour par `syncIncident`) ; null avant le bris de 14:00.
+   */
   incident: IncidentParams | null;
   live: {
     /** heure simulée de la dernière lecture (0 : rien reçu) */
@@ -71,51 +74,33 @@ export interface AqState {
    * (R13). null : usage normal.
    */
   benchTags: number | null;
-  api: "absente" | "détectée" | "active";
-  fallback: string;
   /** vue souterraine indisponible (shaders des tubes refusés par le pilote) ; vide si tout va bien */
   undergroundError: string;
 }
 
 const initial = (): AqState => ({
-  mode: "classic",
   layer: "pression",
   underground: false,
   undergroundAll: false,
   selection: null,
-  clock: { t0: Date.now(), speed: 1, startedAt: Date.now() },
   scenario: { active: false, step: "detection", valvesClosed: false, resumeAt: null, resumeSpeed: 1, resumeLayer: "pression", resumeUnderground: false, valvesTurned: [], error: "" },
   incident: null,
   live: { t: 0, readings: [], pressure: new Float32Array(0), chlorine: new Float32Array(0), sectors: [], extra: [], receivedAt: 0 },
   notices: [],
   benchTags: null,
-  api: "absente",
-  fallback: "",
   undergroundError: "",
 });
 
 export const aqueducStore = createStore<AqState>()(initial);
 
-/** Heure simulée courante (ms) d'après `clock`. */
-export function simNow(now = Date.now(), clock = aqueducStore.getState().clock): number {
-  return clock.t0 + (now - clock.startedAt) * clock.speed;
+/** Heure de la dernière isolation (`isolate`) du visiteur déjà posée à t, dans la journée de t ; null sinon. */
+export function isolatedAt(actions: readonly EnvAction[], t: number): number | null {
+  return actionsUpTo(actions, t).findLast((a) => a.kind === "isolate")?.at ?? null;
 }
 
-/** Change la vitesse sans saut : l'horloge repart de l'heure simulée courante. */
-export function setSpeed(speed: Speed, now = Date.now()) {
-  const t0 = simNow(now);
-  aqueducStore.setState({ clock: { t0, speed, startedAt: now } });
-}
-
-/** Place l'horloge simulée à t (curseur de la frise), à la même vitesse. */
-export function seek(t: number, now = Date.now()) {
-  const { speed } = aqueducStore.getState().clock;
-  aqueducStore.setState({ clock: { t0: t, speed, startedAt: now } });
-}
-
-/** Revient au temps réel (×1, heure actuelle). */
-export function backToNow(now = Date.now()) {
-  aqueducStore.setState({ clock: { t0: now, speed: 1, startedAt: now } });
+/** Incident de l'aqueduc à l'heure t : bris de 14:00, vannes fermées par le visiteur ou par l'équipe. */
+export function currentIncident(t: number, actions: readonly EnvAction[], valves: readonly number[]): IncidentParams | null {
+  return dayIncident(t, isolatedAt(actions, t), valves);
 }
 
 export function select(selection: Selection) {

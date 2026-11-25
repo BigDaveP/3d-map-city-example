@@ -28,6 +28,9 @@ function collectErrors(p: Page) {
   return errors;
 }
 
+/** Heure locale « HH:MM » (America/Toronto) de l'instant t. */
+const localTime = (t: number) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Toronto", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(t);
+
 /** Rectangles qui se recouvrent (px CSS). */
 const overlaps = (a: { left: number; right: number; top: number; bottom: number }, b: { left: number; right: number; top: number; bottom: number }) =>
   a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
@@ -133,7 +136,7 @@ async function defaultMode(b: Browser) {
   await p.waitForFunction(() => (window as any).__aqueduc, null, { timeout: 45_000 });
   await p.waitForFunction(() => (window as any).__hicMap?.layer, null, { timeout: 15_000 }).catch(() => {});
   const st = await p.evaluate(() => {
-    const s = (window as any).__aqueduc.store.getState();
+    const s = (window as any).__aqueduc.territoire.getState();
     return { mode: s.mode, api: s.api, fallback: s.fallback, hic: !!(window as any).__hicMap?.layer, url: location.search };
   });
   check("/ sans ?mode : mode HTML-in-Canvas, API détectée", st.mode === "hic" && st.api !== "absente" && st.hic && st.fallback === "", JSON.stringify(st));
@@ -188,7 +191,7 @@ async function classic(b: Browser) {
   await p.goto(`${BASE}/?mode=classic`);
   await p.waitForFunction(() => (window as any).__aqueduc, null, { timeout: 45_000 });
   check("vue SSR masquée une fois l'application montée", !(await p.locator(".aq-ssr").isVisible()));
-  const st = await p.evaluate(() => (window as any).__aqueduc.store.getState().mode);
+  const st = await p.evaluate(() => (window as any).__aqueduc.territoire.getState().mode);
   check("mode classique", st === "classic", st);
   await p.waitForFunction(() => (window as any).__aqueduc.store.getState().live.t > 0, null, { timeout: 15_000 });
   const live = await p.evaluate(() => {
@@ -270,7 +273,7 @@ async function homeHic(b: Browser) {
     .catch(() => false);
   const r = await p.evaluate(() => {
     const w = window as any;
-    const st = w.__aqueduc.store.getState();
+    const st = w.__aqueduc.territoire.getState();
     const stats = w.__hicMap.stats();
     const keys: string[] = [...w.__hicMap.layer.panels.keys()];
     const values = [...document.querySelectorAll('.maplibregl-canvas > [data-panel^="sensor:"]')].map((e) => e.querySelectorAll(".aq-num").length);
@@ -464,7 +467,7 @@ async function undergroundHic(b: Browser) {
   await p.waitForTimeout(500);
   const off = await state();
   check("retour à la vue normale : tubes retirés, opacités et conduites rendues", !off.on && !off.layer && off.instances === 0 && off.buildings === 0.78 && off.pipes === 1 && off.casing === "visible" && off.note === "", JSON.stringify(off));
-  const fallback = await p.evaluate(() => (window as any).__aqueduc.store.getState().fallback);
+  const fallback = await p.evaluate(() => (window as any).__aqueduc.territoire.getState().fallback);
   check("pas de repli en mode classique", !fallback, fallback);
   check("aucune erreur console", errors.length === 0, errors.join(" | "));
   await ctx.close();
@@ -473,8 +476,8 @@ async function undergroundHic(b: Browser) {
 /** Lance le scénario par la barre et passe à l'étape d'isolation ; renvoie l'heure simulée quittée. */
 async function toIsolation(p: Page) {
   const before = await p.evaluate(() => {
-    const st = (window as any).__aqueduc.store.getState();
-    return { t0: st.clock.t0, startedAt: st.clock.startedAt, speed: st.clock.speed };
+    const { clock } = (window as any).__aqueduc.territoire.getState();
+    return { t0: clock.t0, startedAt: clock.startedAt, speed: clock.speed };
   });
   await p.getByRole("button", { name: "Lancer le scénario de bris" }).click();
   const story = p.locator("[data-testid=story]");
@@ -501,9 +504,11 @@ async function leaveScenario(p: Page, resumeAt: number) {
   const r = await p.evaluate(() => {
     const w = window as any;
     const st = w.__aqueduc.store.getState();
-    return { active: st.scenario.active, t0: st.clock.t0, incident: st.incident, cut: w.__hicMap?.layer ? [...w.__hicMap.layer.panels.keys()].some((k: string) => k.startsWith("cut:")) : false };
+    return { active: st.scenario.active, t0: w.__aqueduc.territoire.getState().clock.t0, incident: st.incident, cut: w.__hicMap?.layer ? [...w.__hicMap.layer.panels.keys()].some((k: string) => k.startsWith("cut:")) : false };
   });
-  check("« Explorer librement » : scénario vidé, incident retiré", !r.active && r.incident === null);
+  // l'incident découle de l'horloge commune : celui de l'heure quittée (bris de 14:00 de la journée)
+  const afterBreak = localTime(resumeAt) >= "14:00";
+  check("« Explorer librement » : scénario vidé, incident de l'heure quittée", !r.active && (r.incident !== null) === afterBreak, `${localTime(resumeAt)}, incident ${r.incident ? "présent" : "absent"}`);
   check("horloge revenue à l'heure quittée", r.t0 === resumeAt, `${r.t0} / ${resumeAt}`);
   check("récit et coupe démontés, couches revenues", (await p.locator("[data-testid=story]").count()) === 0 && !r.cut && (await p.locator(".aq-layers").count()) === 1);
 }
@@ -530,7 +535,7 @@ async function scenarioHic(b: Browser) {
     const keys: string[] = [...w.__hicMap.layer.panels.keys()];
     const cut = document.querySelector('.maplibregl-canvas > [data-panel="cut:13C1949"]');
     const panels = [...document.querySelectorAll<HTMLElement>(".aq-panel")].filter((e) => e.offsetParent !== null).map((e) => e.className);
-    return { keys, valves: cut ? [...cut.querySelectorAll("button.aq-valve")].map((e) => e.textContent) : [], panels, fallback: w.__aqueduc.store.getState().fallback };
+    return { keys, valves: cut ? [...cut.querySelectorAll("button.aq-valve")].map((e) => e.textContent) : [], panels, fallback: w.__aqueduc.territoire.getState().fallback };
   });
   check("coupe cut:13C1949 montée dans la scène, capturée", cutOk && r.keys.includes("cut:13C1949"), r.keys.join(" "));
   check("le marquage de l'incident laisse la place à la coupe", !r.keys.includes("incident:13C1949"));
@@ -675,7 +680,7 @@ async function withoutApi() {
     // 1) sans fichier vidéo : bandeau, pas de bouton vidéo
     let { ctx, p, errors } = await open(false);
     const st = await p.evaluate(() => {
-      const s = (window as any).__aqueduc.store.getState();
+      const s = (window as any).__aqueduc.territoire.getState();
       return { mode: s.mode, api: s.api, hic: (window as any).__hicMap?.layer ?? null };
     });
     check("sans l'API : mode classique, API absente", st.mode === "classic" && st.api === "absente" && st.hic === null, `${st.mode} / ${st.api}`);
@@ -746,7 +751,7 @@ async function withoutApi() {
 
     // 3) ?mode=hic sans l'API : repli expliqué
     ({ ctx, p, errors } = await open(false, "/?mode=hic"));
-    const fb = await p.evaluate(() => { const s = (window as any).__aqueduc.store.getState(); return { mode: s.mode, fallback: s.fallback }; });
+    const fb = await p.evaluate(() => { const s = (window as any).__aqueduc.territoire.getState(); return { mode: s.mode, fallback: s.fallback }; });
     check("/?mode=hic sans l'API : repli classique expliqué", fb.mode === "classic" && /API HTML-in-Canvas absente/.test(fb.fallback), fb.fallback);
     check("bouton « HTML-in-Canvas » désactivé", await p.getByRole("button", { name: "HTML-in-Canvas", exact: true }).isDisabled());
     await ctx.close();
@@ -773,7 +778,7 @@ async function fallbackNote(b: Browser) {
   await p.waitForFunction(() => (window as any).__aqueduc && (window as any).__hicMap?.layer, null, { timeout: 45_000 });
   check("API présente : pas de bandeau avant le repli", (await p.locator("[data-testid=noapi]").count()) === 0);
   // même écriture que `onFallback` de la scène (texture vide, aucun paint…)
-  await p.evaluate(() => (window as any).__aqueduc.store.setState({ mode: "classic", fallback: "Mode classique activé automatiquement : texture vide (test)." }));
+  await p.evaluate(() => (window as any).__aqueduc.territoire.setState({ mode: "classic", fallback: "Mode classique activé automatiquement : texture vide (test)." }));
   const note = p.locator("[data-testid=noapi-lost]");
   await note.waitFor({ timeout: 5_000 }).catch(() => {});
   const text = (await note.count()) ? await note.innerText() : "";
@@ -782,12 +787,12 @@ async function fallbackNote(b: Browser) {
   // M5 : un retour manuel à HTML-in-Canvas efface la raison ; revenir ensuite en classique ne la ressort pas
   await p.getByRole("button", { name: "HTML-in-Canvas", exact: true }).click();
   await p.waitForTimeout(500);
-  const back = await p.evaluate(() => { const s = (window as any).__aqueduc.store.getState(); return { mode: s.mode, fallback: s.fallback }; });
+  const back = await p.evaluate(() => { const s = (window as any).__aqueduc.territoire.getState(); return { mode: s.mode, fallback: s.fallback }; });
   check("retour manuel à HTML-in-Canvas : raison du repli effacée", back.mode === "hic" && back.fallback === "", JSON.stringify(back));
   await p.getByRole("button", { name: "Classique", exact: true }).click();
   await p.waitForTimeout(500);
   check("puis Classique : pas de note périmée « s'est désactivé pendant l'affichage »", (await p.locator("[data-testid=noapi]").count()) === 0);
-  await p.evaluate(() => (window as any).__aqueduc.store.setState({ mode: "classic", fallback: "Mode classique activé automatiquement : texture vide (test)." }));
+  await p.evaluate(() => (window as any).__aqueduc.territoire.setState({ mode: "classic", fallback: "Mode classique activé automatiquement : texture vide (test)." }));
   await note.waitFor({ timeout: 5_000 }).catch(() => {});
   await p.getByRole("button", { name: "Fermer le bandeau" }).click();
   check("note refermable", (await p.locator("[data-testid=noapi]").count()) === 0);

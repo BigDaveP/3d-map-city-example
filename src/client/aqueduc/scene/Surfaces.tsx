@@ -17,6 +17,7 @@ import { TRANSITION_MS } from "../../hic3d/panelLayer";
 import { HicHost, type HicHostProps, type SurfaceSpec } from "../../hic3d/HicHost";
 import type { Metrics } from "../../hic3d/metrics";
 import { lineCenter, segment, type NetIndex } from "../net";
+import { territoireStore } from "../../territoire/store";
 import { aqueducStore } from "../store";
 import { useAq } from "../useAq";
 import { cutLayout, cutView } from "./cut";
@@ -162,9 +163,9 @@ function layerOptions(ml: ML, map: MlMap, net: NetIndex): HicHostProps["layerOpt
   };
 }
 
-const onFallback = (reason: string) => aqueducStore.setState({ mode: "classic", fallback: `Mode classique activé automatiquement : ${reason}` });
+const onFallback = (reason: string) => territoireStore.setState({ mode: "classic", fallback: `Mode classique activé automatiquement : ${reason}` });
 const onActive = () => {
-  if (aqueducStore.getState().api !== "active") aqueducStore.setState({ api: "active" });
+  if (territoireStore.getState().api !== "active") territoireStore.setState({ api: "active" });
 };
 
 export function SceneSurfaces({ ml, map, metrics, net }: { ml: ML; map: MlMap; metrics: Metrics; net: NetIndex }) {

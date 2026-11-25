@@ -1,19 +1,20 @@
 "use client";
 /**
  * Frise de 24 h : courbe du réseau, du secteur ou de l'élément sélectionné pour la journée simulée,
- * évènements, curseur déplaçable (souris, tactile, clavier) et vitesse ×1 / ×60. Pendant le scénario,
- * la frise suit sa ligne de temps : l'heure visée choisit l'étape (`seekTo`).
+ * évènements, curseur déplaçable (souris, tactile, clavier) et vitesse ×1 / ×60 de l'horloge commune.
+ * Pendant le scénario, l'heure visée choisit l'étape (`seekTo`).
  */
-import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import { CITY } from "@/lib/aqueduc/city";
-import { SCENARIO_DAY, scenarioSteps } from "@/lib/aqueduc/scenario";
+import { scenarioSteps } from "@/lib/aqueduc/scenario";
+import { backToNow, setSpeed, simNow } from "../../territoire/store";
+import { useSimNow, useTerritoire } from "../../territoire/useTerritoire";
 import { clockTime, dayStart, num } from "../format";
 import { seekTo } from "../scenarioController";
-import { backToNow, incidentQuery, selectionKey, setSpeed, simNow } from "../store";
-import { useAq, useSimNow } from "../useAq";
+import { incidentQuery, selectionKey } from "../store";
+import { useAq } from "../useAq";
 
 const DAY = 86_400_000;
-const SCENARIO_STEPS = scenarioSteps(SCENARIO_DAY);
 const KEY_STEP = 15 * 60_000;
 
 interface Series {
@@ -26,7 +27,7 @@ interface Series {
 
 /**
  * Courbe de la journée, recalculée quand la sélection, le jour ou l'incident changent ; pendant le
- * scénario, sans sélection, la pression du tronçon brisé (la chute de 06:57 se lit sur la frise).
+ * scénario, sans sélection, la pression du tronçon brisé (la chute de 14:00 se lit sur la frise).
  */
 function useSeries(day: number): Series | null {
   const sel = useAq((s) => selectionKey(s.selection ?? (s.scenario.active ? { kind: "segment", id: CITY.breakSegment } : null)));
@@ -58,11 +59,12 @@ function path(s: Series, lo: number, hi: number, i0: number, i1: number) {
 
 export function Timeline() {
   const now = useSimNow();
-  const speed = useAq((s) => s.clock.speed);
+  const speed = useTerritoire((s) => s.clock.speed);
   const incident = useAq((s) => s.incident);
   const scenario = useAq((s) => (s.scenario.active ? s.scenario.step : null));
   const day = dayStart(now);
   const series = useSeries(day);
+  const steps = useMemo(() => scenarioSteps(day), [day]);
   const plot = useRef<HTMLDivElement>(null);
   // position en cours de glissement ou de réglage au clavier (validée au relâchement)
   const [preview, setPreview] = useState<number | null>(null);
@@ -98,9 +100,9 @@ export function Timeline() {
     commit.current = setTimeout(() => (seekTo(next!), setPreview(null)), 400);
   };
 
-  // « Maintenant » n'a pas de sens pendant le scénario, qui a sa propre ligne de temps
+  // pas de « Maintenant » pendant le scénario, qui mène l'horloge d'étape en étape
   const live = scenario !== null || (speed === 1 && Math.abs(now - Date.now()) < 120_000);
-  const k = scenario ? SCENARIO_STEPS.findIndex((x) => x.id === scenario) : -1;
+  const k = scenario ? steps.findIndex((x) => x.id === scenario) : -1;
   let lo = 0;
   let hi = 1;
   if (series) {
@@ -124,7 +126,7 @@ export function Timeline() {
       <div className="aq-tl-l">
         {scenario && (
           <span className="aq-tl-scenario">
-            Scénario · étape {k + 1} sur {SCENARIO_STEPS.length}
+            Scénario · étape {k + 1} sur {steps.length}
           </span>
         )}
         <span className="aq-tl-title">{series?.label ?? "Chargement de la courbe…"}</span>

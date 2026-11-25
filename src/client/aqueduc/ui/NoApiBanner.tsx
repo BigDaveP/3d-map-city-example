@@ -7,7 +7,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { CITY, SIM_CREDIT } from "@/lib/aqueduc/city";
-import { useAq } from "../useAq";
+import { useTerritoire } from "../../territoire/useTerritoire";
 
 export const VIDEO_URL = "/aqueduc/scenario-hic.webm";
 const DISMISS_KEY = "aq-noapi-dismissed";
@@ -21,9 +21,9 @@ function readDismissed(): boolean {
 }
 
 export function NoApiBanner() {
-  const api = useAq((s) => s.api);
-  const fallback = useAq((s) => s.fallback);
-  const mode = useAq((s) => s.mode);
+  const api = useTerritoire((s) => s.api);
+  const fallback = useTerritoire((s) => s.fallback);
+  const mode = useTerritoire((s) => s.mode);
   // API présente mais désactivée pendant l'affichage (vérification, GPU) : même bandeau, autre texte
   const lost = api !== "absente" && fallback !== "" && mode === "classic";
   const show = api === "absente" || lost;

@@ -8,7 +8,8 @@ import { atHour } from "../src/lib/territoire/day";
 import { indexNetwork } from "../src/client/aqueduc/net";
 import type { NetworkData } from "../src/client/aqueduc/pipes";
 import { cutLayout, valveLabel, VALVE_AT } from "../src/client/aqueduc/scene/cut";
-import { aqueducStore, simNow } from "../src/client/aqueduc/store";
+import { aqueducStore, currentIncident } from "../src/client/aqueduc/store";
+import { simNow, territoireStore } from "../src/client/territoire/store";
 import {
   attachScenario,
   closeValves,
@@ -186,38 +187,42 @@ test("cutLayout : coupe de vanne à vanne, vannes à 15 % et 85 % de la largeur,
   assert.ok(c.points.slice(1, -1).every((p) => p.x >= xs[0] - 1e-9 && p.x <= xs[1] + 1e-9));
 });
 
-// ---- contrôleur (sans React) : le scénario pilote `clock`, `scenario`, `incident` et la sélection
+// ---- contrôleur (sans React) : le scénario mène l'horloge commune ; `incident` en découle
 const views: string[] = [];
 const detach = attachScenario({ valves: data.scenario.valves, camera: (v) => views.push(v) });
 const NOW = Date.UTC(2026, 10, 24, 20, 0);
-const reset = () =>
+/** incident de l'heure simulée t, sans décision du visiteur */
+const incidentAt = (t: number) => currentIncident(t, [], iso.valves);
+const reset = () => {
   aqueducStore.setState({
-    mode: "hic",
     layer: "age",
     underground: false,
     selection: null,
-    clock: { t0: Date.UTC(2026, 10, 24, 19, 30), speed: 60, startedAt: NOW - 60_000 },
     scenario: { active: false, step: "detection", valvesClosed: false, resumeAt: null, resumeSpeed: 1, resumeLayer: "pression", resumeUnderground: false, valvesTurned: [], error: "" },
-    incident: null,
   });
+  // 14:30 heure locale, ×60
+  territoireStore.setState({ mode: "hic", actions: [], clock: { t0: Date.UTC(2026, 10, 24, 19, 30), speed: 60, startedAt: NOW - 60_000 } });
+};
 
-test("startScenario : horloge du scénario, incident de l'étape, couche Pression, heure quittée retenue", () => {
+test("startScenario : horloge à la détection de la journée simulée, incident qui en découle, couche Pression, heure quittée retenue", () => {
   reset();
   views.length = 0;
   const left = simNow(NOW);
   startScenario(NOW);
   const s = aqueducStore.getState();
+  const { clock } = territoireStore.getState();
   assert.equal(s.scenario.active, true);
   assert.equal(s.scenario.step, "detection");
   assert.equal(s.scenario.resumeAt, left);
   assert.equal(s.scenario.resumeSpeed, 60);
   assert.equal(s.scenario.resumeLayer, "age");
   assert.equal(s.layer, "pression");
-  assert.equal(s.clock.t0, step("detection").at);
-  assert.equal(s.clock.startedAt, NOW);
+  assert.equal(clock.t0, step("detection").at);
+  assert.equal(clock.startedAt, NOW);
   // la ligne de temps du scénario avance en temps réel, quelle que soit la vitesse quittée (×60)
-  assert.equal(s.clock.speed, 1);
-  assert.deepEqual(s.incident, scenarioIncidentParams("detection", false, iso.valves, SCENARIO_DAY));
+  assert.equal(clock.speed, 1);
+  assert.deepEqual(s.incident, incidentAt(step("detection").at));
+  assert.deepEqual(s.incident!.closedValves, []);
   assert.deepEqual(views, ["start", "detection"]);
   // relancer pendant le scénario garde l'heure quittée
   goToStep("rapport", NOW + 5_000);
@@ -245,7 +250,7 @@ test("vue souterraine : coupée pendant le scénario (couches masquées, sans me
   assert.equal(aqueducStore.getState().underground, false);
 });
 
-test("goToStep : incident reconstruit à chaque étape, caméra de l'étape, coupe seule en HIC", () => {
+test("goToStep : horloge à l'heure de l'étape, incident qui en découle, caméra de l'étape, coupe seule en HIC", () => {
   reset();
   startScenario(NOW);
   views.length = 0;
@@ -253,8 +258,10 @@ test("goToStep : incident reconstruit à chaque étape, caméra de l'étape, cou
     goToStep(id, NOW + 1000);
     const s = aqueducStore.getState();
     assert.equal(s.scenario.step, id);
-    assert.equal(s.clock.t0, step(id).at);
-    assert.deepEqual(s.incident, scenarioIncidentParams(id, false, iso.valves, SCENARIO_DAY));
+    assert.equal(territoireStore.getState().clock.t0, step(id).at);
+    assert.deepEqual(s.incident, incidentAt(step(id).at));
+    // sans le visiteur, l'équipe ferme les vannes à l'intervention
+    assert.equal(s.incident!.closedValves.length > 0, step(id).at >= step("intervention").at);
     // en HIC, la coupe est dans la scène : pas de fiche ouverte d'office
     assert.equal(s.selection, null);
   }
@@ -262,13 +269,13 @@ test("goToStep : incident reconstruit à chaque étape, caméra de l'étape, cou
   for (const id of STEPS) assert.ok(STEP_VIEW[id].zoom > 0);
   assert.equal(STEP_VIEW.isolation.pitch, 70);
   // en mode classique, la coupe est dans la fiche : l'isolation ouvre la fiche de l'incident
-  aqueducStore.setState({ mode: "classic" });
+  territoireStore.setState({ mode: "classic" });
   goToStep("isolation", NOW + 2000);
   assert.deepEqual(aqueducStore.getState().selection, { kind: "incident", id: CITY.breakSegment });
   // changer de mode pendant l'isolation suit la même règle
-  aqueducStore.setState({ mode: "hic" });
+  territoireStore.setState({ mode: "hic" });
   assert.equal(aqueducStore.getState().selection, null);
-  aqueducStore.setState({ mode: "classic" });
+  territoireStore.setState({ mode: "classic" });
   assert.deepEqual(aqueducStore.getState().selection, { kind: "incident", id: CITY.breakSegment });
   nextStep(NOW + 3000);
   assert.equal(aqueducStore.getState().scenario.step, "intervention");
@@ -279,22 +286,21 @@ test("goToStep : incident reconstruit à chaque étape, caméra de l'étape, cou
   assert.equal(aqueducStore.getState().scenario.step, "detection");
 });
 
-test("exploreFreely après l'isolation : réseau vivant à l'heure quittée, scénario vidé", () => {
+test("exploreFreely après l'isolation : réseau vivant à l'heure quittée, incident de cette heure, scénario vidé", () => {
   reset();
   const left = simNow(NOW);
   startScenario(NOW);
   goToStep("isolation", NOW + 1000);
-  assert.equal(aqueducStore.getState().clock.speed, 1);
+  assert.equal(territoireStore.getState().clock.speed, 1);
   aqueducStore.setState({ selection: { kind: "incident", id: CITY.breakSegment } });
   views.length = 0;
   exploreFreely(NOW + 90_000);
   const s = aqueducStore.getState();
   assert.equal(s.scenario.active, false);
   assert.equal(s.scenario.resumeAt, null);
-  assert.equal(s.clock.t0, left);
-  assert.equal(s.clock.speed, 60);
-  assert.equal(s.clock.startedAt, NOW + 90_000);
-  assert.equal(s.incident, null);
+  assert.deepEqual(territoireStore.getState().clock, { t0: left, speed: 60, startedAt: NOW + 90_000 });
+  // 15:30 : le bris de 14:00 est toujours là, vannes fermées par l'équipe ; sa fiche est refermée
+  assert.deepEqual(s.incident, incidentAt(left));
   assert.equal(s.selection, null);
   assert.equal(s.layer, "age");
   assert.deepEqual(views, ["exit"]);
@@ -302,30 +308,30 @@ test("exploreFreely après l'isolation : réseau vivant à l'heure quittée, sc�
   exploreFreely(NOW + 100_000);
   goToStep("rapport", NOW + 100_000);
   assert.equal(aqueducStore.getState().scenario.active, false);
-  assert.equal(aqueducStore.getState().incident, null);
+  assert.deepEqual(aqueducStore.getState().incident, incidentAt(left));
 });
 
-test("seekTo pendant le scénario : étape de l'heure visée, incident reconstruit (jamais un incident figé)", () => {
+test("seekTo pendant le scénario : étape de l'heure visée, incident de cette heure (jamais un incident figé)", () => {
   reset();
   startScenario(NOW);
   goToStep("intervention", NOW);
   seekTo(step("isolation").at + 5 * 60_000, NOW + 1000);
   let s = aqueducStore.getState();
   assert.equal(s.scenario.step, "isolation");
-  assert.equal(s.clock.t0, step("isolation").at + 5 * 60_000);
+  assert.equal(territoireStore.getState().clock.t0, step("isolation").at + 5 * 60_000);
   assert.deepEqual(s.incident!.closedValves, []);
   seekTo(step("retablissement").at + 60_000, NOW + 2000);
   s = aqueducStore.getState();
   assert.equal(s.scenario.step, "retablissement");
   assert.equal(s.incident!.restoredAt, step("retablissement").at);
   exploreFreely(NOW + 3000);
-  // hors scénario : simple déplacement de l'horloge
-  seekTo(NOW - 3_600_000, NOW + 4000);
-  assert.equal(aqueducStore.getState().clock.t0, NOW - 3_600_000);
+  // hors scénario : simple déplacement de l'horloge ; avant le bris de 14:00, pas d'incident
+  seekTo(atHour(SCENARIO_DAY, "10:00"), NOW + 4000);
+  assert.equal(territoireStore.getState().clock.t0, atHour(SCENARIO_DAY, "10:00"));
   assert.equal(aqueducStore.getState().incident, null);
 });
 
-test("vannes de la coupe : les deux fermées → action serveur, incident « sans eau », fiche ouverte", async () => {
+test("vannes de la coupe : les deux fermées → action serveur, isolation datée, incident « sans eau », fiche ouverte", async () => {
   reset();
   startScenario(NOW);
   goToStep("isolation", NOW);
@@ -342,17 +348,45 @@ test("vannes de la coupe : les deux fermées → action serveur, incident « san
   await turnValve(a, action);
   assert.deepEqual(aqueducStore.getState().scenario.valvesTurned, []);
   await turnValve(a, action);
-  const r = await turnValve(b, action);
+  const r = await turnValve(b, action, NOW + 30_000);
   assert.deepEqual(r, { ok: true });
   assert.deepEqual(calls, [[CITY.breakSegment, [a, b]]]);
   const s = aqueducStore.getState();
   assert.equal(s.scenario.valvesClosed, true);
-  assert.deepEqual(s.incident, scenarioIncidentParams("isolation", true, iso.valves, SCENARIO_DAY));
+  // décision du visiteur, à l'heure simulée de la réponse du serveur
+  assert.deepEqual(territoireStore.getState().actions, [{ at: step("isolation").at + 30_000, kind: "isolate" }]);
+  assert.deepEqual(s.incident, currentIncident(step("isolation").at + 30_000, territoireStore.getState().actions, iso.valves));
+  assert.deepEqual(s.incident!.closedValves, iso.valves);
   assert.deepEqual(s.selection, { kind: "incident", id: CITY.breakSegment });
   // l'incident fermé prive d'eau le tronçon isolé (même calcul que le serveur)
   const imp = incidentImpact(m, step("isolation").at, { segment: brk, ...s.incident! });
   assert.equal(imp.withoutWaterAddresses, data.scenario.impact.withoutWater);
   assert.equal(imp.lowPressureAddresses, 0);
+});
+
+test("rejouer le scénario : la séquence repart vannes ouvertes ; quitter garde l'isolation du visiteur", async () => {
+  reset();
+  startScenario(NOW);
+  goToStep("isolation", NOW);
+  const [a, b] = data.scenario.valves;
+  await turnValve(a, undefined, NOW + 10_000);
+  await turnValve(b, undefined, NOW + 10_000);
+  assert.equal(territoireStore.getState().actions.length, 1);
+  // revenir à l'isolation (14:23:00) : vannes ouvertes jusqu'à l'heure de la décision (14:23:10)
+  goToStep("detection", NOW + 20_000);
+  goToStep("isolation", NOW + 30_000);
+  assert.equal(aqueducStore.getState().scenario.valvesClosed, false);
+  seekTo(step("isolation").at + 15_000, NOW + 30_000);
+  assert.equal(aqueducStore.getState().scenario.valvesClosed, true);
+  startScenario(NOW + 40_000);
+  assert.deepEqual(territoireStore.getState().actions, []);
+  goToStep("isolation", NOW + 50_000);
+  assert.equal(aqueducStore.getState().scenario.valvesClosed, false);
+  assert.deepEqual(aqueducStore.getState().incident!.closedValves, []);
+  await turnValve(a, undefined, NOW + 60_000);
+  await turnValve(b, undefined, NOW + 60_000);
+  exploreFreely(NOW + 70_000);
+  assert.deepEqual(territoireStore.getState().actions, [{ at: step("isolation").at + 10_000, kind: "isolate" }]);
 });
 
 test("vannes : refus ou erreur du serveur → vannes rouvertes, message, incident inchangé", async () => {

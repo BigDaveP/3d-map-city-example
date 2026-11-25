@@ -22,11 +22,13 @@ import {
   setSensorStatus,
   type NetworkData,
 } from "./pipes";
-import { attachScenario, closeValves, exploreFreely, faceBearing, goToStep, startScenario, STEP_VIEW, stepSelection, type CameraTarget, type StepId } from "./scenarioController";
+import { territoireStore, type Mode } from "../territoire/store";
+import { useTerritoire } from "../territoire/useTerritoire";
+import { attachScenario, closeValves, exploreFreely, faceBearing, goToStep, startScenario, STEP_VIEW, stepSelection, syncIncident, type CameraTarget, type StepId } from "./scenarioController";
 import { cutLayout } from "./scene/cut";
 import { attachUnderground, type TubeLayer } from "./scene/tubes";
 import { SceneSurfaces } from "./scene/Surfaces";
-import { aqueducStore, select, type AqState, type Mode, type Selection } from "./store";
+import { aqueducStore, select, type AqState, type Selection } from "./store";
 import { setTagWorkSink } from "./tagWork";
 import { AppBar } from "./ui/AppBar";
 import { Inspector } from "./ui/Inspector";
@@ -34,7 +36,6 @@ import { Layers } from "./ui/Layers";
 import { NoApiBanner } from "./ui/NoApiBanner";
 import { Story } from "./ui/Story";
 import { Timeline } from "./ui/Timeline";
-import { useAq } from "./useAq";
 import { useAqueducStream } from "./useAqueducStream";
 
 type ML = typeof import("maplibre-gl");
@@ -70,8 +71,8 @@ function scenarioCamera(map: MlMap, net: NetIndex) {
       return;
     }
     const v = STEP_VIEW[target];
-    const { mode, scenario } = aqueducStore.getState();
-    const card = stepSelection(target, mode, scenario.valvesClosed) !== null;
+    const { mode } = territoireStore.getState();
+    const card = stepSelection(target, mode, aqueducStore.getState().scenario.valvesClosed) !== null;
     const onCut = v.on === "cut" && cut !== null;
     const center: [number, number] = onCut ? [(cut.from[0] + cut.to[0]) / 2, (cut.from[1] + cut.to[1]) / 2] : brk;
     map.easeTo({
@@ -129,7 +130,7 @@ export default function AqueducApp({ initialMode }: { initialMode?: Mode }) {
   const [ctx, setCtx] = useState<{ ml: ML; map: MlMap; metrics: Metrics; net: NetIndex } | null>(null);
   const [error, setError] = useState("");
   const [tubes, setTubes] = useState<TubeLayer | null>(null);
-  const mode = useAq((s) => s.mode);
+  const mode = useTerritoire((s) => s.mode);
 
   // la vue SSR (résumé lisible sans JavaScript) laisse la place à l'application, sauf si la carte
   // ne peut pas démarrer (MapLibre, WebGL2, réseau) : le résumé reste alors lisible
@@ -147,7 +148,7 @@ export default function AqueducApp({ initialMode }: { initialMode?: Mode }) {
     // sans ?mode : HTML-in-Canvas si l'API est là ; la vérification des pixels
     // (Surfaces) rebascule en classique si elle ne transmet rien
     const wanted: Mode = initialMode ?? (api.present ? "hic" : "classic");
-    aqueducStore.setState({
+    territoireStore.setState({
       api: api.present ? "détectée" : "absente",
       mode: api.present ? wanted : "classic",
       fallback: wanted === "hic" && !api.present ? `Mode classique : API HTML-in-Canvas absente (${api.detail}).` : "",
@@ -242,10 +243,16 @@ export default function AqueducApp({ initialMode }: { initialMode?: Mode }) {
     };
   }, [ctx]);
 
-  // --- scénario de bris : vannes du plan d'isolation (serveur) et caméra
+  // --- scénario de bris : vannes du plan d'isolation (serveur) et caméra ; l'incident suit l'horloge
+  // commune et les actions, et le passage du temps (bris de 14:00, vannes fermées par l'équipe…)
   useEffect(() => {
     if (!ctx) return;
-    return attachScenario({ valves: ctx.net.data.scenario.valves, camera: scenarioCamera(ctx.map, ctx.net) });
+    const detach = attachScenario({ valves: ctx.net.data.scenario.valves, camera: scenarioCamera(ctx.map, ctx.net) });
+    const tick = setInterval(() => syncIncident(), 1000);
+    return () => {
+      clearInterval(tick);
+      detach();
+    };
   }, [ctx]);
 
   // --- API de pilotage (vérifications de bout en bout, banc)
@@ -256,6 +263,8 @@ export default function AqueducApp({ initialMode }: { initialMode?: Mode }) {
       map: ctx.map,
       metrics: ctx.metrics,
       store: aqueducStore,
+      /** état commun de la ville : horloge, mode, API, actions */
+      territoire: territoireStore,
       net: ctx.net,
       tubes,
       scenario: { start: startScenario, goTo: goToStep, explore: exploreFreely },

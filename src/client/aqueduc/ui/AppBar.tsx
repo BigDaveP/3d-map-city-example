@@ -11,9 +11,11 @@ import DemoNav from "../../shell/DemoNav";
 import type { Metrics } from "../../hic3d/metrics";
 import { clockDay, clockTime } from "../format";
 import { fold, lineCenter, segment, type NetIndex } from "../net";
+import { territoireStore, type Mode } from "../../territoire/store";
+import { useSimNow, useTerritoire } from "../../territoire/useTerritoire";
 import { startScenario } from "../scenarioController";
-import { aqueducStore, select, type Mode } from "../store";
-import { useAq, useSimNow } from "../useAq";
+import { select } from "../store";
+import { useAq } from "../useAq";
 import { PerfChip } from "./PerfChip";
 
 interface Hit {
@@ -36,10 +38,10 @@ function streetHits(map: MlMap | null, q: string): { name: string; at: [number, 
   return [...out].map(([name, at]) => ({ name, at }));
 }
 
-/** Horloge simulée : seul ce composant se rafraîchit chaque seconde. */
+/** Horloge simulée commune : seul ce composant se rafraîchit chaque seconde. */
 function Clock() {
   const t = useSimNow();
-  const speed = useAq((s) => s.clock.speed);
+  const speed = useTerritoire((s) => s.clock.speed);
   const scenario = useAq((s) => s.scenario.active);
   return (
     <span className="aq-clock" role="timer" aria-label={`Heure simulée ${clockTime(t)}${speed === 60 ? ", accélérée 60 fois" : ""}`}>
@@ -51,8 +53,8 @@ function Clock() {
 }
 
 export function AppBar({ map, net, metrics, tubes }: { map: MlMap | null; net: NetIndex | null; metrics: Metrics | null; tubes?: { instances: number } | null }) {
-  const mode = useAq((s) => s.mode);
-  const api = useAq((s) => s.api);
+  const mode = useTerritoire((s) => s.mode);
+  const api = useTerritoire((s) => s.api);
   const scenario = useAq((s) => s.scenario.active);
   const [q, setQ] = useState("");
   const [msg, setMsg] = useState("");
@@ -94,7 +96,7 @@ export function AppBar({ map, net, metrics, tubes }: { map: MlMap | null; net: N
 
   // retour manuel à HTML-in-Canvas : la raison d'un repli précédent ne vaut plus (un nouveau repli
   // en écrirait une autre)
-  const setMode = (m: Mode) => aqueducStore.setState(m === "hic" ? { mode: m, fallback: "" } : { mode: m });
+  const setMode = (m: Mode) => territoireStore.setState(m === "hic" ? { mode: m, fallback: "" } : { mode: m });
   return (
     <header className="aq-bar">
       <DemoNav current="aqueduc" />

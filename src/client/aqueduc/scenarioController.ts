@@ -1,19 +1,20 @@
 /**
  * Scénario de bris guidé (Simulation), sans React : testé sous Node.
  *
- * Le scénario a sa propre ligne de temps (14:01 → rapport) qui remplace l'horloge vivante pendant
- * sa lecture. À chaque étape (ou heure visée sur la frise), il reconstruit l'incident du flux à
- * partir de l'étape et de l'état des vannes (`scenarioIncidentParams`) : jamais un incident figé
- * qu'on ferait défiler, puisque l'incident n'a pas d'heure de fermeture des vannes.
- * Les vannes à fermer viennent du serveur (plan d'isolation du réseau, `attachScenario`) ; leur
- * fermeture passe par `closeValvesAction`, qui les valide. « Explorer librement » rend le réseau
- * vivant à l'heure, la vitesse, la couche et la vue (souterraine ou non) quittées.
+ * Le scénario se joue sur la journée de l'horloge commune (`territoire/store.ts`) : il la mène
+ * d'étape en étape (14:01 → rapport de 20:48) et l'incident en découle (`currentIncident`), comme
+ * hors scénario. Les vannes à fermer viennent du serveur (plan d'isolation du réseau,
+ * `attachScenario`) ; leur fermeture passe par `closeValvesAction`, qui les valide, puis devient une
+ * décision du visiteur (`act({ kind: "isolate" })`) qui reste dans la ville après le scénario.
+ * « Explorer librement » rend le réseau vivant à l'heure, la vitesse, la couche et la vue (souterraine
+ * ou non) quittées.
  */
 import { closeValvesAction } from "@/app/aqueduc-actions";
 import { CITY } from "@/lib/aqueduc/city";
-import { SCENARIO_DAY, scenarioIncidentParams, scenarioSteps, stepAtTime, type StepId } from "@/lib/aqueduc/scenario";
+import { scenarioSteps, stepAtTime, type StepId } from "@/lib/aqueduc/scenario";
 import { dayStartOf } from "@/lib/territoire/day";
-import { aqueducStore, seek, simNow, type AqState, type Mode, type Selection } from "./store";
+import { act, seek, setSpeed, simNow, territoireStore, type Mode } from "../territoire/store";
+import { aqueducStore, currentIncident, incidentQuery, isolatedAt, type AqState, type Selection } from "./store";
 
 export type { StepId };
 export type CameraTarget = StepId | "start" | "exit";
@@ -53,10 +54,10 @@ export function faceBearing(from: readonly [number, number], to: readonly [numbe
 }
 export const STEP_MS = 1500;
 
-// l'horloge de l'aqueduc reste propre au client jusqu'à l'horloge commune : le scénario part de la journée de référence
-const STEPS = scenarioSteps(SCENARIO_DAY);
-const ORDER: StepId[] = STEPS.map((s) => s.id);
-const timeOf = (id: StepId) => STEPS.find((s) => s.id === id)!.at;
+/** Heure d'une étape dans la journée `day` (minuit local). */
+const timeOf = (id: StepId, day: number) => scenarioSteps(day).find((s) => s.id === id)!.at;
+/** Journée simulée à l'instant réel `now` : le scénario se joue le jour affiché par l'horloge. */
+const simDay = (now: number) => dayStartOf(simNow(now));
 const INCIDENT: Selection = { kind: "incident", id: CITY.breakSegment };
 
 let env: ScenarioEnv = { valves: [] };
@@ -70,13 +71,31 @@ export function stepSelection(step: StepId, mode: Mode, valvesClosed: boolean): 
   return step === "isolation" && (mode === "classic" || valvesClosed) ? INCIDENT : null;
 }
 
-/** Branche le contrôleur sur le réseau chargé ; renvoie la fonction qui le débranche. */
+/**
+ * Reporte sur `aqueducStore.incident` l'incident de l'heure simulée `t` (par défaut, l'heure
+ * courante) ; sans effet s'il ne change pas, pour ne pas rouvrir le flux pour rien.
+ */
+export function syncIncident(t = simNow()) {
+  const inc = currentIncident(t, territoireStore.getState().actions, env.valves);
+  if (incidentQuery(inc) !== incidentQuery(aqueducStore.getState().incident)) aqueducStore.setState({ incident: inc });
+}
+
+/**
+ * Branche le contrôleur sur le réseau chargé : l'incident suit l'horloge commune et les actions
+ * (le passage du temps, lui, est suivi par l'appelant, qui rappelle `syncIncident`). Renvoie la
+ * fonction qui le débranche.
+ */
 export function attachScenario(e: ScenarioEnv): () => void {
   env = e;
-  // changer de mode pendant l'isolation : la coupe passe de la scène à la fiche (et inversement)
-  const unsub = aqueducStore.subscribe((s, prev) => {
-    if (s.mode === prev.mode || !s.scenario.active || s.scenario.step !== "isolation") return;
-    aqueducStore.setState({ selection: stepSelection("isolation", s.mode, s.scenario.valvesClosed) });
+  syncIncident();
+  const unsub = territoireStore.subscribe((s, prev) => {
+    // un changement d'horloge la repart de t0 : c'est l'heure simulée de cet instant
+    if (s.clock !== prev.clock) syncIncident(s.clock.t0);
+    else if (s.actions !== prev.actions) syncIncident();
+    // changer de mode pendant l'isolation : la coupe passe de la scène à la fiche (et inversement)
+    const { scenario } = aqueducStore.getState();
+    if (s.mode === prev.mode || !scenario.active || scenario.step !== "isolation") return;
+    aqueducStore.setState({ selection: stepSelection("isolation", s.mode, scenario.valvesClosed) });
   });
   return () => {
     unsub();
@@ -84,77 +103,83 @@ export function attachScenario(e: ScenarioEnv): () => void {
   };
 }
 
-/** Applique une étape à l'heure simulée t : horloge, incident reconstruit, fiche. */
+/** Retire les isolations du visiteur de la journée `day` : la séquence repart vannes ouvertes. */
+function reopenValves(day: number) {
+  const { actions } = territoireStore.getState();
+  const kept = actions.filter((a) => a.kind !== "isolate" || dayStartOf(a.at) !== day);
+  if (kept.length !== actions.length) territoireStore.setState({ actions: kept });
+}
+
+/** Applique une étape à l'heure simulée t : horloge commune (l'incident en découle), étape, fiche. */
 function apply(step: StepId, t: number, now: number, patch: Partial<AqState["scenario"]> = {}, select = true) {
+  seek(t, now);
   const s = aqueducStore.getState();
-  const scenario = { ...s.scenario, ...patch, active: true, step };
-  aqueducStore.setState({
-    clock: { t0: t, speed: s.clock.speed, startedAt: now },
-    scenario,
-    incident: scenarioIncidentParams(step, scenario.valvesClosed, env.valves, dayStartOf(t)),
-    ...(select ? { selection: stepSelection(step, s.mode, scenario.valvesClosed) } : {}),
-  });
+  const valvesClosed = isolatedAt(territoireStore.getState().actions, t) !== null;
+  const scenario = { ...s.scenario, valvesClosed, ...patch, active: true, step };
+  const { mode } = territoireStore.getState();
+  aqueducStore.setState({ scenario, ...(select ? { selection: stepSelection(step, mode, scenario.valvesClosed) } : {}) });
 }
 
 /**
- * Lance (ou relance) le scénario à la détection ; l'heure, la vitesse, la couche et la vue quittées
- * restent celles du premier lancement. La vue souterraine est coupée : les couches, qui portent sa
- * mention « Diamètres exagérés ×12 », sont masquées pendant le scénario. Le scénario repart en temps réel (×1) : à ×60, l'horloge dépasserait
+ * Lance (ou relance) le scénario à la détection (14:01) de la journée simulée, vannes ouvertes ;
+ * l'heure, la vitesse, la couche et la vue quittées restent celles du premier lancement. La vue
+ * souterraine est coupée : les couches, qui portent sa mention « Diamètres exagérés ×12 », sont
+ * masquées pendant le scénario. Le scénario repart en temps réel (×1) : à ×60, l'horloge dépasserait
  * l'heure des étapes suivantes pendant la lecture d'une seule étape.
  */
 export function startScenario(now = Date.now()) {
   const s = aqueducStore.getState();
+  const { clock } = territoireStore.getState();
   const fresh = !s.scenario.active;
-  const resume = fresh ? { resumeAt: simNow(now), resumeSpeed: s.clock.speed, resumeLayer: s.layer, resumeUnderground: s.underground } : {};
+  const day = simDay(now);
+  const resume = fresh ? { resumeAt: simNow(now), resumeSpeed: clock.speed, resumeLayer: s.layer, resumeUnderground: s.underground } : {};
+  reopenValves(day);
+  setSpeed(1, now);
   aqueducStore.setState({
-    clock: { ...s.clock, speed: 1 },
     layer: "pression",
     underground: false,
-    scenario: {
-      ...s.scenario,
-      valvesClosed: false,
-      valvesTurned: [],
-      error: "",
-      ...resume,
-    },
+    scenario: { ...s.scenario, valvesTurned: [], error: "", ...resume },
   });
   if (fresh) env.camera?.("start", 0);
-  apply("detection", timeOf("detection"), now);
+  apply("detection", timeOf("detection", day), now);
   env.camera?.("detection", STEP_MS);
 }
 
-/** Va à une étape (horloge à son heure, incident reconstruit, caméra) ; sans effet hors scénario. */
+/** Va à une étape (horloge à son heure, incident qui en découle, caméra) ; sans effet hors scénario. */
 export function goToStep(step: StepId, now = Date.now(), durationMs = STEP_MS) {
   if (!aqueducStore.getState().scenario.active) return;
-  apply(step, timeOf(step), now, { error: "" });
+  apply(step, timeOf(step, simDay(now)), now, { error: "" });
   env.camera?.(step, durationMs);
 }
 
-const offset = (k: number) => {
-  const { scenario } = aqueducStore.getState();
-  return ORDER[Math.min(ORDER.length - 1, Math.max(0, ORDER.indexOf(scenario.step) + k))];
+const offset = (k: number, now: number) => {
+  const order = scenarioSteps(simDay(now)).map((s) => s.id);
+  const { step } = aqueducStore.getState().scenario;
+  return order[Math.min(order.length - 1, Math.max(0, order.indexOf(step) + k))];
 };
-export const nextStep = (now = Date.now()) => goToStep(offset(1), now);
-export const prevStep = (now = Date.now()) => goToStep(offset(-1), now);
+export const nextStep = (now = Date.now()) => goToStep(offset(1, now), now);
+export const prevStep = (now = Date.now()) => goToStep(offset(-1, now), now);
 
-/** Rend la main : réseau vivant à l'heure, la vitesse, la couche et la vue quittées ; récit et coupe démontés. */
+/**
+ * Rend la main : réseau vivant à l'heure, la vitesse, la couche et la vue quittées ; récit, coupe et
+ * fiche de l'incident démontés. L'isolation décidée pendant le scénario reste une décision du visiteur.
+ */
 export function exploreFreely(now = Date.now()) {
   const s = aqueducStore.getState();
   if (!s.scenario.active) return;
+  territoireStore.setState({ clock: { t0: s.scenario.resumeAt ?? now, speed: s.scenario.resumeSpeed, startedAt: now } });
   aqueducStore.setState({
-    clock: { t0: s.scenario.resumeAt ?? now, speed: s.scenario.resumeSpeed, startedAt: now },
     layer: s.scenario.resumeLayer,
     underground: s.scenario.resumeUnderground,
     scenario: { active: false, step: "detection", valvesClosed: false, resumeAt: null, resumeSpeed: 1, resumeLayer: "pression", resumeUnderground: false, valvesTurned: [], error: "" },
-    incident: null,
     selection: s.selection?.kind === "incident" ? null : s.selection,
   });
   env.camera?.("exit", STEP_MS);
 }
 
 /**
- * Curseur de la frise : pendant le scénario, l'heure visée choisit l'étape et l'incident est
- * reconstruit pour elle (la caméra ne bouge pas) ; sinon, simple déplacement de l'horloge.
+ * Curseur de la frise : pendant le scénario, l'heure visée choisit l'étape (la caméra ne bouge pas) ;
+ * sinon, simple déplacement de l'horloge. L'incident suit l'horloge dans les deux cas.
  */
 export function seekTo(t: number, now = Date.now()) {
   const s = aqueducStore.getState();
@@ -166,8 +191,17 @@ export function seekTo(t: number, now = Date.now()) {
 export type CloseOutcome = { ok: true } | { ok: false; reason: string };
 type CloseAction = (segmentId: string, nodes: number[]) => ReturnType<typeof closeValvesAction>;
 
-/** Ferme les vannes du plan : validées par le serveur, puis incident « sans eau » et fiche ouverte. */
-export async function closeValves(action: CloseAction = closeValvesAction): Promise<CloseOutcome> {
+/** Le visiteur isole le tronçon à l'heure simulée : décision datée, incident « sans eau » aussitôt. */
+function isolateNow(now: number) {
+  act({ kind: "isolate" }, now);
+  syncIncident(simNow(now));
+}
+
+/**
+ * Ferme les vannes du plan : validées par le serveur, puis isolation enregistrée à l'heure simulée de
+ * la réponse (`act`), incident « sans eau » et fiche ouverte. `now` : instant de la réponse (tests).
+ */
+export async function closeValves(action: CloseAction = closeValvesAction, now?: number): Promise<CloseOutcome> {
   const s = aqueducStore.getState();
   if (!s.scenario.active || s.scenario.step !== "isolation") return { ok: false, reason: "Les vannes se ferment à l'étape d'isolation." };
   const fail = (reason: string): CloseOutcome => {
@@ -186,10 +220,10 @@ export async function closeValves(action: CloseAction = closeValvesAction): Prom
   const cur = aqueducStore.getState();
   // le visiteur a pu quitter l'étape pendant l'appel
   if (!cur.scenario.active || cur.scenario.step !== "isolation") return { ok: false, reason: "Étape quittée avant la réponse du serveur." };
+  isolateNow(now ?? Date.now());
   aqueducStore.setState({
     scenario: { ...cur.scenario, valvesClosed: true, valvesTurned: [...r.isolation.valves], error: "" },
-    incident: scenarioIncidentParams("isolation", true, r.isolation.valves, SCENARIO_DAY),
-    selection: stepSelection("isolation", cur.mode, true),
+    selection: stepSelection("isolation", territoireStore.getState().mode, true),
   });
   return { ok: true };
 }
@@ -198,13 +232,13 @@ export async function closeValves(action: CloseAction = closeValvesAction): Prom
  * Clic sur une vanne de la coupe : la marque fermée (un second clic la rouvre). Quand toutes les
  * vannes du plan le sont, la fermeture part au serveur ; renvoie null tant qu'il en reste.
  */
-export async function turnValve(node: number, action: CloseAction = closeValvesAction): Promise<CloseOutcome | null> {
+export async function turnValve(node: number, action: CloseAction = closeValvesAction, now?: number): Promise<CloseOutcome | null> {
   const s = aqueducStore.getState();
   if (!s.scenario.active || s.scenario.step !== "isolation" || s.scenario.valvesClosed || !env.valves.includes(node)) return null;
   const turned = s.scenario.valvesTurned.includes(node) ? s.scenario.valvesTurned.filter((v) => v !== node) : [...s.scenario.valvesTurned, node];
   aqueducStore.setState({ scenario: { ...s.scenario, valvesTurned: turned, error: "" } });
   if (!env.valves.every((v) => turned.includes(v))) return null;
-  return closeValves(action);
+  return closeValves(action, now);
 }
 
 /** Séquence rejouée pendant l'export vidéo (ms depuis le début) ; « close » ferme les vannes. */
@@ -225,11 +259,19 @@ export const REPLAY: [StepId | "close", number][] = [
 export function replayForVideo(): () => void {
   const timers = REPLAY.map(([what, at]) =>
     setTimeout(() => {
-      if (!aqueducStore.getState().scenario.active) return;
-      if (what === "close") return apply("isolation", simNow(), Date.now(), { valvesClosed: true, valvesTurned: [...env.valves] }, false);
+      const s = aqueducStore.getState();
+      if (!s.scenario.active) return;
+      const now = Date.now();
+      if (what === "close") {
+        isolateNow(now);
+        return aqueducStore.setState({ scenario: { ...s.scenario, valvesClosed: true, valvesTurned: [...env.valves] } });
+      }
       // la séquence repart vannes ouvertes, même si le visiteur les a fermées avant
-      if (what === "detection") apply("detection", timeOf("detection"), Date.now(), { valvesClosed: false, valvesTurned: [] });
-      goToStep(what, Date.now(), 1100);
+      if (what === "detection") {
+        reopenValves(simDay(now));
+        aqueducStore.setState({ scenario: { ...s.scenario, valvesTurned: [] } });
+      }
+      goToStep(what, now, 1100);
     }, at),
   );
   return () => timers.forEach(clearTimeout);

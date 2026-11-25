@@ -1,8 +1,9 @@
 "use client";
 /**
- * Flux SSE des capteurs, une connexion par visiteur. À chaque changement d'horloge ou d'incident, et
- * après une coupure, on rouvre avec l'heure simulée courante comme `t0` : la reconnexion automatique
- * d'EventSource renverrait l'ancienne URL, donc l'ancienne heure, et l'état reculerait.
+ * Flux SSE des capteurs, une connexion par visiteur. À chaque changement de l'horloge commune ou de
+ * l'incident qui en découle (`incidentQuery`), et après une coupure, on rouvre avec l'heure simulée
+ * courante comme `t0` : la reconnexion automatique d'EventSource renverrait l'ancienne URL, donc
+ * l'ancienne heure, et l'état reculerait.
  *
  * Mesures : chaque message est une mise à jour (`Metrics.beginUpdate`/`endUpdate`) qui va de la
  * réception au rendu React synchrone qu'il déclenche (couches de la carte, `setFeatureState` des
@@ -12,9 +13,10 @@
 import { useEffect } from "react";
 import { EXTRA_TAGS_MAX } from "@/lib/aqueduc/city";
 import type { Metrics } from "../hic3d/metrics";
-import { aqueducStore, incidentQuery, simNow, type AqState } from "./store";
+import { simNow, territoireStore } from "../territoire/store";
+import { useTerritoire } from "../territoire/useTerritoire";
+import { aqueducStore, incidentQuery, type AqState } from "./store";
 import { useAq } from "./useAq";
-
 
 interface Message {
   t: number;
@@ -27,8 +29,8 @@ interface Message {
 }
 
 export function useAqueducStream(metrics: Metrics | null) {
-  const clock = useAq((s) => s.clock);
-  const incident = useAq((s) => s.incident);
+  const clock = useTerritoire((s) => s.clock);
+  const iq = useAq((s) => incidentQuery(s.incident));
   const bench = useAq((s) => s.benchTags);
   useEffect(() => {
     if (!metrics) return;
@@ -36,10 +38,9 @@ export function useAqueducStream(metrics: Metrics | null) {
     let retry: ReturnType<typeof setTimeout> | undefined;
     let disposed = false;
     const open = () => {
-      const { clock, incident } = aqueducStore.getState();
-      const iq = incidentQuery(incident);
+      const { speed } = territoireStore.getState().clock;
       const extra = bench === null ? 0 : Math.min(EXTRA_TAGS_MAX, Math.max(0, bench));
-      es = new EventSource(`/api/aqueduc/stream?t0=${Math.round(simNow())}&speed=${clock.speed}${iq ? `&${iq}` : ""}${extra ? `&extra=${extra}` : ""}`);
+      es = new EventSource(`/api/aqueduc/stream?t0=${Math.round(simNow())}&speed=${speed}${iq ? `&${iq}` : ""}${extra ? `&extra=${extra}` : ""}`);
       es.addEventListener("r", (ev) => {
         const received = performance.now();
         metrics.beginUpdate();
@@ -62,5 +63,5 @@ export function useAqueducStream(metrics: Metrics | null) {
       clearTimeout(retry);
       es?.close();
     };
-  }, [metrics, clock, incident, bench]);
+  }, [metrics, clock, iq, bench]);
 }

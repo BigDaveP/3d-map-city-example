@@ -138,7 +138,7 @@ async function runOne(ctx: BrowserContext, c: Config, rep: number, errors: strin
   await p.waitForTimeout(WARMUP_MS);
   const st = await p.evaluate(() => {
     const w = window as any;
-    const s = w.__aqueduc.store.getState();
+    const s = w.__aqueduc.territoire.getState();
     const tags = w.__hicMap?.layer ? [...w.__hicMap.layer.panels.keys()].filter((k: string) => k.startsWith("sensor:")).length : document.querySelectorAll(".aq-pin [data-sensor]").length;
     return { mode: s.mode, fallback: s.fallback, tags };
   });
@@ -167,10 +167,10 @@ async function runOne(ctx: BrowserContext, c: Config, rep: number, errors: strin
       rows.push(
         await phase(p, ph, async () => {
           await p.evaluate(() => {
-            const { store } = (window as any).__aqueduc;
-            const { clock } = store.getState();
+            const { territoire } = (window as any).__aqueduc;
+            const { clock } = territoire.getState();
             const now = Date.now();
-            store.setState({ clock: { t0: clock.t0 + (now - clock.startedAt) * clock.speed, speed: 60, startedAt: now } });
+            territoire.setState({ clock: { t0: clock.t0 + (now - clock.startedAt) * clock.speed, speed: 60, startedAt: now } });
           });
           await p.waitForTimeout(IMMOBILE_MS);
         }),
@@ -209,7 +209,7 @@ async function runOne(ctx: BrowserContext, c: Config, rep: number, errors: strin
         }),
       );
   }
-  const end = await p.evaluate(() => (window as any).__aqueduc.store.getState().mode);
+  const end = await p.evaluate(() => (window as any).__aqueduc.territoire.getState().mode);
   if (end !== c.mode) errors.push(`${c.mode}/${c.tags}: repli en cours de mesure (${end})`);
   await p.close();
   // occlusion (HTML-in-Canvas) mesurée entre les phases 2 et 3, caméra immobile : rapportée sur la ligne 2-immobile seulement
