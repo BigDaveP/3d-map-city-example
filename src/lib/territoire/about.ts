@@ -15,6 +15,12 @@ export const NON_OFFICIAL =
 export const ZONES_ATTRIBUTION = "Zones de stationnement de nuit : Ville de Trois-Rivières, Données Québec, CC-BY 4.0";
 export const BASEMAP_ATTRIBUTION = "Fond de carte : OpenFreeMap / OpenMapTiles / OpenStreetMap";
 
+/**
+ * Crédits des vignettes de l'accueil : ce sont de vraies captures du fond de carte, des conduites et
+ * des zones de stationnement de nuit, donc leurs attributions s'affichent sous les cartes.
+ */
+export const THUMBS_CREDIT = `Vignettes : ${BASEMAP_ATTRIBUTION} · Conduites et zones : Ville de Trois-Rivières, Données Québec, CC-BY 4.0`;
+
 /** Les quatre lignes d'attribution affichées là où les données apparaissent. */
 export const ATTRIBUTIONS = [CITY.attribution.split(" · ")[0], ZONES_ATTRIBUTION, METEO_ATTRIBUTION, BASEMAP_ATTRIBUTION] as const;
 

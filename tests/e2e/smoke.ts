@@ -1040,6 +1040,14 @@ async function homeWithoutJs(b: Browser) {
     ]),
     JSON.stringify(cards),
   );
+  const credit = (await p.locator(".tr-home-envs .tr-envcards-credit").innerText().catch(() => "")) || "";
+  const creditBox = await p.locator(".tr-envcards-credit").boundingBox();
+  const lastCard = await p.locator(".tr-envcard").last().boundingBox();
+  check(
+    "vignettes : crédit visible sous les cartes (fond de carte OpenFreeMap / OpenMapTiles / OpenStreetMap ; conduites et zones, Ville de Trois-Rivières, CC-BY 4.0)",
+    credit.includes("Fond de carte : OpenFreeMap / OpenMapTiles / OpenStreetMap") && credit.includes("Conduites et zones : Ville de Trois-Rivières, Données Québec, CC-BY 4.0") && !!creditBox && creditBox.height > 0 && !!lastCard && creditBox.y >= lastCard.y + lastCard.height,
+    credit,
+  );
   check("« À venir » : 3 prochains événements", (await p.locator(".tr-next-list li").count()) === 3);
   check("météo (ou « Météo indisponible ») avec son attribution", /Météo : Environnement et Changement climatique Canada/.test(text) && (/°C/.test(text) || text.includes("Météo indisponible")));
   check("pied : « Démo non officielle · données ouvertes CC-BY 4.0 · À propos »", (await p.locator(".tr-home-foot").innerText()).includes("Démo non officielle · données ouvertes CC-BY 4.0 · À propos") && (await p.locator('.tr-home-foot a[href="/a-propos"]').count()) === 1);

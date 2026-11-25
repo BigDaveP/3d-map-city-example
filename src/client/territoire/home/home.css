@@ -99,6 +99,7 @@ html:has(.tr-home) body {
 .tr-home-envs { margin-top: 40px; }
 .tr-home-envs > h2 { margin: 0 0 16px; font-size: var(--tr-text-lg); font-weight: 600; }
 /* rythme : les deux environnements ouverts en grand, ceux du lot 2 plus petits, sur une ligne */
+.tr-envcards-credit { margin: 12px 0 0; font-size: var(--tr-text-xs); color: var(--tr-ink-2); }
 .tr-envcards { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 16px; margin: 0; padding: 0; list-style: none; }
 .tr-envcard { position: relative; grid-column: span 3; display: flex; flex-direction: column; overflow: hidden; background: var(--tr-surface); border: 1px solid var(--tr-line); border-radius: var(--r-lg); box-shadow: var(--shadow-1); transition: border-color var(--tr-fast) var(--tr-ease); }
 .tr-envcard[data-soon] { grid-column: span 2; background: var(--tr-surface-2); box-shadow: none; }

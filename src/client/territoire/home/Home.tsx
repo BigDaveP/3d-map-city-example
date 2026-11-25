@@ -11,6 +11,7 @@
  */
 import Link from "next/link";
 import { useEffect, type ReactNode } from "react";
+import { THUMBS_CREDIT } from "@/lib/territoire/about";
 import { ENVS } from "@/lib/territoire/envs";
 import { homeSnapshot, type HomeSnapshot, type Mode } from "@/lib/territoire/home";
 import type { Forecast } from "@/lib/territoire/meteo";
@@ -123,6 +124,8 @@ export function Home({ snapshot, forecast, mode, weather }: { snapshot: HomeSnap
               <EnvCard key={e.id} env={e} eager={i < 2} />
             ))}
           </ul>
+          {/* les vignettes sont de vraies captures : leurs sources sont créditées ici, sans JavaScript */}
+          <p className="tr-envcards-credit">{THUMBS_CREDIT}</p>
         </section>
       </main>
       <footer className="tr-home-foot">
