@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { benchTags, convexOverlap, impactBySector, inBox, isExtraTag, LAYER_KINDS, pickTags, sectorFigure, TAG_MAX } from "../src/client/aqueduc/scene/marks";
-import { CITY } from "../src/lib/aqueduc/city";
+import { CITY, extraTagId } from "../src/lib/aqueduc/city";
 import { isolate } from "../src/lib/aqueduc/graph";
 import { segmentsInBox } from "../src/lib/aqueduc/network";
 import { buildModel, extraTagNodes, incidentImpact, segmentValues, THRESHOLDS, type IncidentInput } from "../src/lib/aqueduc/sim";
@@ -132,7 +132,7 @@ test("benchTags (R7) : n étiquettes, capteurs réels de la zone d'abord, puis p
     const k = s.a === node ? 0 : s.coords.length - 2;
     return [s.coords[k], s.coords[k + 1]] as [number, number];
   };
-  const extra = extraTagNodes(m, 120).map((node, k) => ({ id: `X-${String(k + 1).padStart(3, "0")}`, at: pos(node) }));
+  const extra = extraTagNodes(m, 120).map((node, k) => ({ id: extraTagId(k), at: pos(node) }));
   const inside = m.sensors.filter((s) => inBox(s.at, CITY.demoBox)).length;
   for (const k of [20, 60, 120]) {
     const ids = benchTags(m.sensors, extra, k, CITY.center, CITY.demoBox);

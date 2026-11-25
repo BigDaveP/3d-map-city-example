@@ -2,15 +2,12 @@
 import "server-only";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { CITY } from "@/lib/aqueduc/city";
+import { CITY, EXTRA_TAGS_MAX } from "@/lib/aqueduc/city";
 import { isolate, type Isolation } from "@/lib/aqueduc/graph";
 import { decodeNetwork, segmentsInBox, type RawNetwork } from "@/lib/aqueduc/network";
 import { buildModel, extraTagNodes, type IncidentInput, type Model } from "@/lib/aqueduc/sim";
 
 const g = globalThis as unknown as { __aqueducModel?: Model; __aqueducDemo?: number[]; __aqueducExtra?: number[] };
-
-/** Points de mesure supplémentaires du banc (R7), au plus : `setTags(n)` en montre n − capteurs réels. */
-export const EXTRA_TAGS_MAX = 120;
 
 export function getModel(): Model {
   if (!g.__aqueducModel) {

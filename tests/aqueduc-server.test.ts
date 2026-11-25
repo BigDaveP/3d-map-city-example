@@ -7,7 +7,8 @@ import { CITY } from "../src/lib/aqueduc/city";
 import { isolate } from "../src/lib/aqueduc/graph";
 import { breakHistory } from "../src/lib/aqueduc/sim";
 import { segmentsInBox } from "../src/lib/aqueduc/network";
-import { EXTRA_TAGS_MAX, getExtraTagNodes, getModel } from "../src/server/aqueduc";
+import { EXTRA_TAGS_MAX } from "../src/lib/aqueduc/city";
+import { getExtraTagNodes, getModel } from "../src/server/aqueduc";
 
 const T0 = Date.UTC(2026, 10, 24, 15, 15);
 

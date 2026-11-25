@@ -10,12 +10,11 @@
  * (`SensorTag.onShown`), dans chaque mode, à l'image qui affiche la valeur.
  */
 import { useEffect } from "react";
+import { EXTRA_TAGS_MAX } from "@/lib/aqueduc/city";
 import type { Metrics } from "../metrics";
 import { aqueducStore, incidentQuery, simNow, type AqState } from "./store";
 import { useAq } from "./useAq";
 
-/** Points supplémentaires que le flux accepte (`EXTRA_TAGS_MAX` côté serveur). */
-const EXTRA_MAX = 120;
 
 interface Message {
   t: number;
@@ -39,7 +38,7 @@ export function useAqueducStream(metrics: Metrics | null) {
     const open = () => {
       const { clock, incident } = aqueducStore.getState();
       const iq = incidentQuery(incident);
-      const extra = bench === null ? 0 : Math.min(EXTRA_MAX, Math.max(0, bench));
+      const extra = bench === null ? 0 : Math.min(EXTRA_TAGS_MAX, Math.max(0, bench));
       es = new EventSource(`/api/aqueduc/stream?t0=${Math.round(simNow())}&speed=${clock.speed}${iq ? `&${iq}` : ""}${extra ? `&extra=${extra}` : ""}`);
       es.addEventListener("r", (ev) => {
         const received = performance.now();

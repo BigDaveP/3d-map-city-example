@@ -34,3 +34,12 @@ export const CITY: CityConfig = {
     { id: "saint-louis-de-france", name: "Saint-Louis-de-France", at: [-72.53, 46.415] },
   ],
 };
+
+/**
+ * Banc de mesures (R7) : points de mesure supplémentaires simulés que le réseau et le flux exposent,
+ * au plus `EXTRA_TAGS_MAX` ; identifiants « X-001 », « X-002 »… Partagé par le serveur et le client.
+ */
+export const EXTRA_TAGS_MAX = 120;
+export const EXTRA_TAG_PREFIX = "X-";
+/** Identifiant du k-ième point supplémentaire (k à partir de 0). */
+export const extraTagId = (k: number) => `${EXTRA_TAG_PREFIX}${String(k + 1).padStart(3, "0")}`;

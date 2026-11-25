@@ -7,7 +7,8 @@
  * L'état de l'incident est reconstruit à chaque connexion depuis les paramètres : rien n'est mémorisé.
  */
 import { pointReadings, readingsAt, sectorStats, segmentValues } from "@/lib/aqueduc/sim";
-import { EXTRA_TAGS_MAX, getDemoSegments, getExtraTagNodes, getModel, incidentFromQuery, numParam } from "@/server/aqueduc";
+import { EXTRA_TAGS_MAX } from "@/lib/aqueduc/city";
+import { getDemoSegments, getExtraTagNodes, getModel, incidentFromQuery, numParam } from "@/server/aqueduc";
 
 export const dynamic = "force-dynamic";
 

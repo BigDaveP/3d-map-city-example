@@ -2,6 +2,7 @@
  * Contenu des inscriptions dans la scène (module pur, sans React ni navigateur : testé sous Node).
  * Les mêmes informations servent aux surfaces HTML-in-Canvas et aux étiquettes DOM du mode classique.
  */
+import { EXTRA_TAG_PREFIX } from "@/lib/aqueduc/city";
 import type { PipeClass } from "@/lib/aqueduc/network";
 import type { SensorKind } from "@/lib/aqueduc/sim";
 import type { LayerId } from "../store";
@@ -127,7 +128,7 @@ export function pickTags(
 }
 
 /** Point supplémentaire du banc (identifiant « X-001 »), pas un capteur du réseau. */
-export const isExtraTag = (id: string) => id.startsWith("X-");
+export const isExtraTag = (id: string) => id.startsWith(EXTRA_TAG_PREFIX);
 
 /**
  * Banc (R7) : n étiquettes, les capteurs réels de `box` d'abord, puis les points supplémentaires
