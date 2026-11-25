@@ -138,6 +138,7 @@ html:has(.aq-fatal) .aq-ssr { padding-bottom: 96px; }
 .aq-under-all { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; cursor: pointer; }
 /* mention de la vue souterraine, dans le panneau des couches (budget d'interface) */
 .aq-under-note { flex: 1 1 100%; margin: 0; font-size: 11.5px; color: var(--aq-ink-2); }
+.aq-under-note[data-tone="bad"] { color: #8f1d14; }
 .aq-under-x { font-style: normal; text-transform: none; letter-spacing: 0; color: var(--aq-ink); }
 .aq-legend { padding: 6px 14px 12px; }
 .aq-ramp { height: 6px; border-radius: 3px; }

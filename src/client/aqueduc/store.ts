@@ -73,6 +73,8 @@ export interface AqState {
   benchTags: number | null;
   api: "absente" | "détectée" | "active";
   fallback: string;
+  /** vue souterraine indisponible (shaders des tubes refusés par le pilote) ; vide si tout va bien */
+  undergroundError: string;
 }
 
 const initial = (): AqState => ({
@@ -89,6 +91,7 @@ const initial = (): AqState => ({
   benchTags: null,
   api: "absente",
   fallback: "",
+  undergroundError: "",
 });
 
 export const aqueducStore = createStore<AqState>()(initial);

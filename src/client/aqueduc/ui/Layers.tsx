@@ -89,6 +89,7 @@ export function Layers() {
   const layer = useAq((s) => s.layer);
   const underground = useAq((s) => s.underground);
   const all = useAq((s) => s.undergroundAll);
+  const tubesError = useAq((s) => s.undergroundError);
   const incidents = useAq((s) => (s.incident ? 1 : 0));
   const [open, setOpen] = useState(true);
   const bodyId = useId();
@@ -105,7 +106,7 @@ export function Layers() {
         <span>
           Couches
           {/* panneau replié : la vue souterraine garde son facteur d'exagération à l'écran */}
-          {underground && !open && <em className="aq-under-x"> · souterrain ×{TUBE_EXAGGERATION}</em>}
+          {underground && !open && !tubesError && <em className="aq-under-x"> · souterrain ×{TUBE_EXAGGERATION}</em>}
         </span>
         <span className="aq-caret" aria-hidden="true" />
       </button>
@@ -126,15 +127,17 @@ export function Layers() {
             <button type="button" className="aq-btn aq-under-btn" aria-pressed={underground} onClick={() => aqueducStore.setState({ underground: !underground })}>
               Vue souterraine
             </button>
-            {underground && (
+            {underground && !tubesError && (
               <label className="aq-under-all">
                 <input type="checkbox" checked={all} onChange={(e) => aqueducStore.setState({ undergroundAll: e.target.checked })} />
                 Tout le réseau
               </label>
             )}
             {underground && (
-              <p className="aq-under-note" role="status">
-                Diamètres exagérés ×{TUBE_EXAGGERATION} · axe à {TUBE_DEPTH_M}&nbsp;m, plus bas pour les grosses conduites
+              <p className="aq-under-note" role="status" data-tone={tubesError ? "bad" : undefined} title={tubesError || undefined}>
+                {tubesError
+                  ? "Vue souterraine indisponible : ce navigateur refuse les tubes 3D (WebGL). Les conduites restent tracées au sol."
+                  : <>Diamètres exagérés ×{TUBE_EXAGGERATION} · axe à {TUBE_DEPTH_M}&nbsp;m, plus bas pour les grosses conduites</>}
               </p>
             )}
           </div>

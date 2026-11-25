@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { PIPE_STOPS, rampColor, rampHex } from "../src/client/aqueduc/pipes";
-import { buildTubeInstances, TUBE_DEPTH_M, TUBE_EXAGGERATION, TUBE_FLOATS, tubeSegments } from "../src/client/aqueduc/scene/tubes";
+import { attachUnderground, buildTubeInstances, compile, createTubeLayer, TUBE_DEPTH_M, TUBE_EXAGGERATION, TUBE_FLOATS, TUBE_LAYER_ID, tubeSegments } from "../src/client/aqueduc/scene/tubes";
+import { aqueducStore } from "../src/client/aqueduc/store";
 
 /** Mercator de MapLibre (rayon terrestre 6 371 008,8 m), calculé ici indépendamment du module. */
 const EARTH = 2 * Math.PI * 6371008.8;
@@ -118,4 +119,78 @@ test("rampColor : mêmes paliers que pipeColor, en RGB 0–255", () => {
       const n = parseInt(hex.slice(1), 16);
       assert.deepEqual(rampColor(layer, v), [(n >> 16) & 255, (n >> 8) & 255, n & 255], `${layer} ${v}`);
     }
+});
+
+/** Contexte WebGL2 factice dont le pilote refuse les shaders (compilation ou édition des liens). */
+function refusingGl(stage: "compile" | "link") {
+  const deleted = { shaders: 0, programs: 0 };
+  const gl = {
+    VERTEX_SHADER: 1,
+    FRAGMENT_SHADER: 2,
+    COMPILE_STATUS: 3,
+    LINK_STATUS: 4,
+    createShader: () => ({}),
+    shaderSource() {},
+    compileShader() {},
+    getShaderParameter: () => stage !== "compile",
+    getShaderInfoLog: () => "ERROR: 0:1: syntax error",
+    createProgram: () => ({}),
+    attachShader() {},
+    linkProgram() {},
+    getProgramParameter: () => false,
+    getProgramInfoLog: () => "link failed",
+    deleteShader: () => void deleted.shaders++,
+    deleteProgram: () => void deleted.programs++,
+  };
+  return { gl, deleted };
+}
+
+test("M6 : shaders refusés → onAdd ne lève pas, la couche reste inerte avec la raison", () => {
+  for (const stage of ["compile", "link"] as const) {
+    const { gl, deleted } = refusingGl(stage);
+    assert.throws(() => compile(gl as never), stage === "compile" ? /compilation du shader/ : /édition des liens/);
+    assert.equal(deleted.programs, 1, "programme libéré");
+    assert.ok(deleted.shaders >= 1, "shaders libérés");
+    const layer = createTubeLayer([0.3, 0.35]);
+    assert.doesNotThrow(() => layer.onAdd!({} as never, gl as never));
+    assert.match(layer.error, stage === "compile" ? /syntax error/ : /link failed/);
+    // rendu et retrait sans rien toucher au contexte
+    assert.doesNotThrow(() => layer.render({} as never, {} as never));
+    assert.doesNotThrow(() => layer.onRemove!({} as never, {} as never));
+  }
+});
+
+test("M6 : vue souterraine sans tubes → conduites gardées au sol, message pour le panneau des couches", () => {
+  const { gl } = refusingGl("compile");
+  const layers = new Map<string, unknown>([["aq-pipes", {}], ["aq-pipes-casing", {}], ["building-3d", {}]]);
+  const layout: string[] = [];
+  const paint: string[] = [];
+  const map = {
+    getLayer: (id: string) => layers.get(id),
+    addLayer(l: { id: string; onAdd(m: unknown, g: unknown): void }) {
+      layers.set(l.id, l);
+      l.onAdd(map, gl);
+    },
+    removeLayer: (id: string) => void layers.delete(id),
+    setLayoutProperty: (id: string, p: string, v: string) => void layout.push(`${id}.${p}=${v}`),
+    setPaintProperty: (id: string, p: string, v: number) => void paint.push(`${id}.${p}=${v}`),
+    getPaintProperty: () => 1,
+    getStyle: () => ({ layers: [{ id: "aq-pipes", type: "line" }, { id: "water", type: "fill" }] }),
+    triggerRepaint() {},
+  };
+  const net = { data: { segments: { features: [] }, demoSegments: [] }, segById: new Map(), demoPos: new Map() };
+  aqueducStore.setState({ underground: false, undergroundError: "" });
+  const u = attachUnderground(map as never, net as never);
+  assert.doesNotThrow(() => aqueducStore.setState({ underground: true }));
+  const s = aqueducStore.getState();
+  assert.match(s.undergroundError, /syntax error/);
+  assert.equal(layers.has(TUBE_LAYER_ID), false, "couche des tubes retirée");
+  assert.ok(!paint.includes("aq-pipes.line-opacity=0"), "les conduites au sol restent visibles");
+  assert.ok(!layout.includes("aq-pipes-casing.visibility=none"));
+  // pas de nouvel essai : le même pilote refuserait encore
+  aqueducStore.setState({ underground: false });
+  aqueducStore.setState({ underground: true });
+  assert.equal(layers.has(TUBE_LAYER_ID), false);
+  u.detach();
+  aqueducStore.setState({ underground: false, undergroundError: "" });
 });

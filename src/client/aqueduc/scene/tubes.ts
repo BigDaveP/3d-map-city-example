@@ -132,20 +132,30 @@ void main() {
 
 const SIDES = 8;
 
-function compile(gl: WebGL2RenderingContext) {
+/** Compile et lie le programme des tubes ; en cas d'échec, libère ce qui a été créé et lève une exception. */
+export function compile(gl: WebGL2RenderingContext) {
+  const made: WebGLShader[] = [];
   const mk = (t: number, s: string) => {
     const sh = gl.createShader(t)!;
+    made.push(sh);
     gl.shaderSource(sh, s);
     gl.compileShader(sh);
-    if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(sh) ?? "shader");
+    if (!gl.getShaderParameter(sh, gl.COMPILE_STATUS)) throw new Error(`compilation du shader : ${gl.getShaderInfoLog(sh) || "refusée"}`);
     return sh;
   };
   const p = gl.createProgram()!;
-  gl.attachShader(p, mk(gl.VERTEX_SHADER, VS));
-  gl.attachShader(p, mk(gl.FRAGMENT_SHADER, FS));
-  gl.linkProgram(p);
-  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(p) ?? "link");
-  return p;
+  try {
+    gl.attachShader(p, mk(gl.VERTEX_SHADER, VS));
+    gl.attachShader(p, mk(gl.FRAGMENT_SHADER, FS));
+    gl.linkProgram(p);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error(`édition des liens : ${gl.getProgramInfoLog(p) || "refusée"}`);
+    return p;
+  } catch (e) {
+    gl.deleteProgram(p);
+    throw e;
+  } finally {
+    for (const sh of made) gl.deleteShader(sh);
+  }
 }
 
 /** Cylindre ouvert : 2 sommets par angle (début, fin), 2 triangles par face. */
@@ -164,6 +174,8 @@ function cylinder() {
 export type TubeLayer = CustomLayerInterface & {
   /** origine locale des instances (Mercator) */
   origin: [number, number];
+  /** raison de l'échec de `onAdd` (compilation ou édition des liens des shaders) ; vide sinon */
+  error: string;
   setInstances(a: Float32Array): void;
   /** RGB (0–255) par instance */
   setColors(c: Uint8Array): void;
@@ -186,15 +198,55 @@ export function createTubeLayer(origin: [number, number] = mercator(...CITY.cent
   let colors: Uint8Array = new Uint8Array(0);
   let dirtyInst = true;
   let dirtyColor = true;
+  let ready = false;
   const stats = { instances: 0 };
   const translate = new Float64Array([1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, origin[0], origin[1], 0, 1]);
   const repaint = () => map?.triggerRepaint();
-  return {
+  /** Programme, VAO et tampons ; lève une exception si le pilote refuse les shaders. */
+  const setup = (gl: WebGL2RenderingContext) => {
+    prog = compile(gl);
+    vao = gl.createVertexArray()!;
+    const prevVao = gl.getParameter(gl.VERTEX_ARRAY_BINDING);
+    const prevBuf = gl.getParameter(gl.ARRAY_BUFFER_BINDING);
+    gl.bindVertexArray(vao);
+    const { verts, idx } = cylinder();
+    const mesh = gl.createBuffer()!;
+    gl.bindBuffer(gl.ARRAY_BUFFER, mesh);
+    gl.bufferData(gl.ARRAY_BUFFER, verts, gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    const ib = gl.createBuffer()!;
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib);
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, idx, gl.STATIC_DRAW);
+    instBuf = gl.createBuffer()!;
+    gl.bindBuffer(gl.ARRAY_BUFFER, instBuf);
+    const stride = TUBE_FLOATS * 4;
+    for (const [loc, size, off] of [
+      [1, 3, 0],
+      [2, 3, 12],
+      [3, 1, 24],
+    ]) {
+      gl.enableVertexAttribArray(loc);
+      gl.vertexAttribPointer(loc, size, gl.FLOAT, false, stride, off);
+      gl.vertexAttribDivisor(loc, 1);
+    }
+    colorBuf = gl.createBuffer()!;
+    gl.bindBuffer(gl.ARRAY_BUFFER, colorBuf);
+    gl.enableVertexAttribArray(4);
+    gl.vertexAttribPointer(4, 3, gl.UNSIGNED_BYTE, true, 3, 0);
+    gl.vertexAttribDivisor(4, 1);
+    gl.bindVertexArray(prevVao);
+    gl.bindBuffer(gl.ARRAY_BUFFER, prevBuf);
+    meshBufs = [mesh, ib];
+    dirtyInst = dirtyColor = true;
+  };
+  const layer: TubeLayer = {
     id: TUBE_LAYER_ID,
     type: "custom",
     renderingMode: "3d",
     origin,
     stats,
+    error: "",
     setInstances(a) {
       instances = a;
       dirtyInst = true;
@@ -206,55 +258,34 @@ export function createTubeLayer(origin: [number, number] = mercator(...CITY.cent
       repaint();
     },
     onAdd(m, g) {
-      map = m;
-      gl = g as WebGL2RenderingContext;
-      prog = compile(gl);
-      vao = gl.createVertexArray()!;
-      const prevVao = gl.getParameter(gl.VERTEX_ARRAY_BINDING);
-      const prevBuf = gl.getParameter(gl.ARRAY_BUFFER_BINDING);
-      gl.bindVertexArray(vao);
-      const { verts, idx } = cylinder();
-      const mesh = gl.createBuffer()!;
-      gl.bindBuffer(gl.ARRAY_BUFFER, mesh);
-      gl.bufferData(gl.ARRAY_BUFFER, verts, gl.STATIC_DRAW);
-      gl.enableVertexAttribArray(0);
-      gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-      const ib = gl.createBuffer()!;
-      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib);
-      gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, idx, gl.STATIC_DRAW);
-      instBuf = gl.createBuffer()!;
-      gl.bindBuffer(gl.ARRAY_BUFFER, instBuf);
-      const stride = TUBE_FLOATS * 4;
-      for (const [loc, size, off] of [
-        [1, 3, 0],
-        [2, 3, 12],
-        [3, 1, 24],
-      ]) {
-        gl.enableVertexAttribArray(loc);
-        gl.vertexAttribPointer(loc, size, gl.FLOAT, false, stride, off);
-        gl.vertexAttribDivisor(loc, 1);
+      // onAdd est appelé par map.addLayer, depuis un abonné du store : une exception y casserait la
+      // mise à jour du store. Un pilote qui refuse les shaders laisse la couche inerte, avec la raison.
+      try {
+        setup(g as WebGL2RenderingContext);
+        map = m;
+        gl = g as WebGL2RenderingContext;
+        ready = true;
+        layer.error = "";
+      } catch (e) {
+        ready = false;
+        layer.error = (e as Error).message || "shaders refusés";
       }
-      colorBuf = gl.createBuffer()!;
-      gl.bindBuffer(gl.ARRAY_BUFFER, colorBuf);
-      gl.enableVertexAttribArray(4);
-      gl.vertexAttribPointer(4, 3, gl.UNSIGNED_BYTE, true, 3, 0);
-      gl.vertexAttribDivisor(4, 1);
-      gl.bindVertexArray(prevVao);
-      gl.bindBuffer(gl.ARRAY_BUFFER, prevBuf);
-      meshBufs = [mesh, ib];
-      dirtyInst = dirtyColor = true;
     },
     onRemove(_m, g) {
-      const c = g as WebGL2RenderingContext;
-      for (const b of [...meshBufs, instBuf, colorBuf]) c.deleteBuffer(b);
-      c.deleteVertexArray(vao);
-      c.deleteProgram(prog);
+      if (ready) {
+        const c = g as WebGL2RenderingContext;
+        for (const b of [...meshBufs, instBuf, colorBuf]) c.deleteBuffer(b);
+        c.deleteVertexArray(vao);
+        c.deleteProgram(prog);
+      }
+      ready = false;
       meshBufs = [];
       stats.instances = 0;
       map = null;
       gl = null;
     },
     render(g, o) {
+      if (!ready) return;
       const t0 = performance.now();
       const c = g as WebGL2RenderingContext;
       const n = Math.min(instances.length / TUBE_FLOATS, colors.length / 3);
@@ -301,6 +332,7 @@ export function createTubeLayer(origin: [number, number] = mercator(...CITY.cent
       onRender?.(performance.now() - t0);
     },
   };
+  return layer;
 }
 
 const SELECTED_RGB: [number, number, number] = [0x14, 0x21, 0x33];
@@ -376,11 +408,34 @@ export function attachUnderground(map: MlMap, net: NetIndex, onRender?: (ms: num
     layer.setColors(out);
   };
 
+  /**
+   * Tubes impossibles (shaders refusés, autre erreur de `addLayer`) : couche retirée, conduites
+   * gardées au sol et fond non estompé ; la raison va au panneau des couches.
+   */
+  const fail = (why: string) => {
+    try {
+      if (map.getLayer(TUBE_LAYER_ID)) map.removeLayer(TUBE_LAYER_ID);
+    } catch {}
+    setUnderground(map, false);
+    current = null;
+    last = new Uint8Array(0);
+    if (aqueducStore.getState().undergroundError !== why) aqueducStore.setState({ undergroundError: why });
+  };
+
   const sync = (s: AqState, prev: AqState | null) => {
     const on = s.underground;
+    // échec retenu : on ne réessaie pas (même pilote, même refus)
+    if (layer.error) return;
     if (!prev || on !== prev.underground) {
+      if (on && !map.getLayer(TUBE_LAYER_ID)) {
+        try {
+          map.addLayer(layer, map.getLayer(BEFORE) ? BEFORE : undefined);
+        } catch (e) {
+          layer.error ||= (e as Error).message || "couche refusée";
+        }
+        if (layer.error) return fail(layer.error);
+      }
       setUnderground(map, on);
-      if (on && !map.getLayer(TUBE_LAYER_ID)) map.addLayer(layer, map.getLayer(BEFORE) ? BEFORE : undefined);
       if (!on && map.getLayer(TUBE_LAYER_ID)) map.removeLayer(TUBE_LAYER_ID);
     }
     if (!on) {
