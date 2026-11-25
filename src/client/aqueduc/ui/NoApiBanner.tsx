@@ -47,14 +47,19 @@ export function NoApiBanner() {
     return () => void (gone = true);
   }, [show, dismissed]);
 
+  // <dialog> natif ouvert en modal : focus piégé et Échap gérés par le navigateur (comme « À propos »)
+  const dlg = useRef<HTMLDialogElement>(null);
   useEffect(() => {
-    if (!playing) return;
+    const d = dlg.current;
+    if (!playing || !d) return;
+    if (!d.open) d.showModal();
     closeBtn.current?.focus();
-    const key = (e: KeyboardEvent) =>
-      e.key === "Escape" && (setPlaying(false), opener.current?.focus());
-    document.addEventListener("keydown", key);
-    return () => document.removeEventListener("keydown", key);
   }, [playing]);
+  // fermé (bouton, Échap, clic hors de la vidéo) : démonté, et le focus revient au bouton d'ouverture
+  const onClose = () => {
+    setPlaying(false);
+    opener.current?.focus();
+  };
 
   if (!show || dismissed !== false) return null;
   const dismiss = () => {
@@ -122,12 +127,12 @@ export function NoApiBanner() {
         </p>
       )}
       {playing && (
-        <div
+        <dialog
+          ref={dlg}
           className="aq-noapi-video"
-          role="dialog"
-          aria-modal="true"
           aria-label="Version HTML-in-Canvas en vidéo"
-          onClick={(e) => e.target === e.currentTarget && setPlaying(false)}
+          onClose={onClose}
+          onClick={(e) => e.target === e.currentTarget && e.currentTarget.close()}
         >
           <div className="aq-noapi-frame">
             <video src={VIDEO_URL} controls autoPlay muted playsInline aria-describedby="aq-noapi-credits" />
@@ -138,12 +143,12 @@ export function NoApiBanner() {
               ref={closeBtn}
               type="button"
               className="aq-btn"
-              onClick={() => (setPlaying(false), opener.current?.focus())}
+              onClick={() => dlg.current?.close()}
             >
               Fermer la vidéo
             </button>
           </div>
-        </div>
+        </dialog>
       )}
     </section>
   );

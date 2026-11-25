@@ -727,8 +727,18 @@ async function withoutApi() {
       await v.waitFor({ timeout: 5_000 }).catch(() => {});
       const src = (await v.count()) ? await v.getAttribute("src") : "";
       check("le bouton ouvre un <video controls> sur scenario-hic.webm", /\/aqueduc\/scenario-hic\.webm$/.test(src ?? ""), String(src));
+      const dlg = await p.evaluate(() => {
+        const d = document.querySelector<HTMLDialogElement>("dialog.aq-noapi-video");
+        return { open: !!d?.open, modal: !!d?.matches(":modal"), focusIn: !!d?.contains(document.activeElement), caption: d?.querySelector(".aq-noapi-credits")?.textContent ?? "" };
+      });
+      check("vidéo dans un <dialog> modal natif, focus à l'intérieur", dlg.open && dlg.modal && dlg.focusIn, JSON.stringify(dlg));
+      check("légende de la vidéo : conduites, fond de carte, simulation", /Ville de Trois-Rivières, Données Québec, CC-BY 4\.0/.test(dlg.caption) && /OpenFreeMap, OpenMapTiles, OpenStreetMap/.test(dlg.caption) && /simulation/.test(dlg.caption), dlg.caption);
+      // Tab ne sort pas du dialogue (le navigateur rend la page inerte)
+      for (let i = 0; i < 4; i++) await p.keyboard.press("Tab");
+      check("Tab reste dans le dialogue", await p.evaluate(() => !!document.querySelector("dialog.aq-noapi-video")?.contains(document.activeElement)));
       await p.keyboard.press("Escape");
       check("Échap referme la vidéo", (await p.locator("video[controls]").count()) === 0);
+      check("le focus revient au bouton d'ouverture", await p.evaluate(() => document.activeElement?.textContent === "Voir la version HTML-in-Canvas en vidéo"));
     }
     await ctx.close();
 
