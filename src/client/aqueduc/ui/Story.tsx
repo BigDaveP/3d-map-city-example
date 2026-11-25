@@ -65,25 +65,39 @@ function StepFigure({ net, step, steps }: { net: NetIndex; step: StepId; steps: 
 function useVideoExport(map: MlMap) {
   const [state, setState] = useState<{ busy: boolean; msg: string }>({ busy: false, msg: "" });
   const url = useRef("");
+  // enregistrement en cours : interrompu si le récit se démonte (changement d'environnement, fin du scénario)
+  const recording = useRef<AbortController | null>(null);
   const [supported, setSupported] = useState(true);
   // le navigateur est interrogé après le montage (rien à lire côté serveur)
   useEffect(() => setSupported(canRecord()), []);
-  useEffect(() => () => void (url.current && URL.revokeObjectURL(url.current)), []);
+  useEffect(
+    () => () => {
+      recording.current?.abort();
+      if (url.current) URL.revokeObjectURL(url.current);
+      url.current = "";
+    },
+    [],
+  );
   const run = async () => {
     if (!canRecord()) return setState({ busy: false, msg: "Votre navigateur ne sait pas enregistrer la carte." });
     setState({ busy: true, msg: "Enregistrement de la séquence (10 s)…" });
+    const ctl = new AbortController();
+    recording.current = ctl;
     const stop = replayForVideo();
     try {
-      const r = await recordMap(map, VIDEO_CREDITS, VIDEO_MS);
+      const r = await recordMap(map, VIDEO_CREDITS, VIDEO_MS, undefined, ctl.signal);
       if (url.current) URL.revokeObjectURL(url.current);
       url.current = r.url;
       setState({ busy: false, msg: `Vidéo enregistrée : scenario-bris.webm, ${num(r.size / 1e6, 1)} Mo, ${num(r.ms / 1000, 1)} s.` });
       download(r.url, "scenario-bris.webm");
     } catch (e) {
-      setState({ busy: false, msg: `La vidéo n'a pas pu être enregistrée (${(e as Error).message}).` });
+      // interrompu au démontage : plus rien à afficher ni à télécharger
+      if (!ctl.signal.aborted) setState({ busy: false, msg: `La vidéo n'a pas pu être enregistrée (${(e as Error).message}).` });
     } finally {
       stop();
-      goToStep("rapport");
+      if (recording.current === ctl) recording.current = null;
+      // le récit démonté (autre environnement), le scénario est déjà terminé : on n'y revient pas
+      if (!ctl.signal.aborted) goToStep("rapport");
     }
   };
   return { ...state, supported, run };
