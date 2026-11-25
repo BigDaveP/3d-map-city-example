@@ -1,0 +1,208 @@
+{
+  "occlusion_classic": {
+    "state": {
+      "mode": "classic",
+      "api": "détectée",
+      "fallback": ""
+    },
+    "camera": {
+      "center": [
+        -72.543,
+        46.344
+      ],
+      "zoom": 17.3,
+      "pitch": 70,
+      "bearing": 200
+    },
+    "etiquetteCentreVille": {
+      "x": 720,
+      "y": 481.5,
+      "building": true
+    },
+    "clic": {
+      "point": {
+        "x": 720,
+        "y": 481.5,
+        "building": true
+      },
+      "elementFromPoint": "button",
+      "passThrough": 0,
+      "queries": 0,
+      "selection": {
+        "kind": "sector",
+        "id": "centre-ville"
+      }
+    },
+    "errors": []
+  },
+  "occlusion_hic": {
+    "state": {
+      "mode": "hic",
+      "api": "active",
+      "fallback": ""
+    },
+    "camera": {
+      "center": [
+        -72.543,
+        46.344
+      ],
+      "zoom": 17.3,
+      "pitch": 70,
+      "bearing": 200
+    },
+    "glyphes": {
+      "hidden": {
+        "x": 648.6696903912999,
+        "y": 496.9750275615557
+      },
+      "open": {
+        "x": 747.3269940188818,
+        "y": 462.03057769415614
+      }
+    },
+    "clicMasque": {
+      "point": {
+        "x": 648.6696903912999,
+        "y": 496.9750275615557
+      },
+      "elementFromPoint": "canvas",
+      "passThrough": 1,
+      "queries": 1,
+      "selection": null
+    },
+    "clicDegage": {
+      "point": {
+        "x": 747.3269940188818,
+        "y": 462.03057769415614
+      },
+      "elementFromPoint": "span@sector:centre-ville",
+      "passThrough": 0,
+      "queries": 1,
+      "selection": {
+        "kind": "sector",
+        "id": "centre-ville"
+      }
+    },
+    "errors": []
+  },
+  "sol_hic": {
+    "state": {
+      "mode": "hic",
+      "api": "active",
+      "fallback": ""
+    },
+    "surfaces": [
+      "sector:centre-ville",
+      "sector:sainte-cecile",
+      "sector:saint-philippe",
+      "sensor:P-01",
+      "sensor:D-10",
+      "sensor:P-27",
+      "sensor:P-24",
+      "sensor:D-04",
+      "sector:saint-sacrement",
+      "sector:notre-dame-des-sept-allegresses",
+      "sensor:P-28",
+      "sensor:P-21",
+      "sensor:P-23"
+    ]
+  },
+  "coupe_hic": {
+    "state": {
+      "mode": "hic",
+      "api": "active",
+      "fallback": ""
+    },
+    "cut": true,
+    "valves": [
+      "V-1878 · à fermer",
+      "V-3573 · à fermer"
+    ],
+    "errors": []
+  },
+  "souterrain_hic": {
+    "state": {
+      "mode": "hic",
+      "api": "active",
+      "fallback": ""
+    },
+    "instances": 12568,
+    "errors": []
+  },
+  "aria_classic": [
+    "- 'button \"Capteur de pression P-01 (simulation) : 4,4 bar, normal\"': 4,4 bar",
+    "- 'button \"Capteur de pression P-28 (simulation) : 4,7 bar, normal\"': 4,7 bar",
+    "- 'button \"Débitmètre D-10 (simulation) : 40,5 L/s, normal\"': 40,5 L/s",
+    "- 'button \"Capteur de pression P-27 (simulation) : 4,3 bar, normal\"': 4,3 bar",
+    "- 'button \"Capteur de pression P-24 (simulation) : 4,4 bar, normal\"': 4,4 bar",
+    "- 'button \"Débitmètre D-04 (simulation) : 92,6 L/s, normal\"': 92,6 L/s",
+    "- 'button \"Capteur de pression P-12 (simulation) : 5,0 bar, normal\"': 5,0 bar",
+    "- 'button \"Débitmètre D-03 (simulation) : 90,0 L/s, normal\"': 90,0 L/s"
+  ],
+  "focus_classic": {
+    "tabs": 9,
+    "sensor": "P-01",
+    "inCanvas": false,
+    "label": "Capteur de pression P-01 (simulation) : 4,4 bar, normal",
+    "enterOpensInspector": true,
+    "inspector": "× · P-01 · Capteur de pression · simulation · Centre-ville"
+  },
+  "aria_hic": [
+    "- 'button \"Secteur Centre-ville (simulé) : 2 417 adresses desservies\"': CENTRE-VILLE 2 417 adresses desservies",
+    "- 'button \"Capteur de pression P-01 (simulation) : 4,4 bar, normal\"': 4,4 bar",
+    "- 'button \"Débitmètre D-10 (simulation) : 41,2 L/s, normal\"': 41,2 L/s",
+    "- 'button \"Capteur de pression P-27 (simulation) : 4,2 bar, normal\"': 4,2 bar",
+    "- 'button \"Capteur de pression P-24 (simulation) : 4,4 bar, normal\"': 4,4 bar",
+    "- 'button \"Débitmètre D-04 (simulation) : 92,5 L/s, normal\"': 92,5 L/s",
+    "- 'button \"Capteur de pression P-12 (simulation) : 5,0 bar, normal\"': 5,0 bar",
+    "- 'button \"Débitmètre D-03 (simulation) : 90,0 L/s, normal\"': 90,0 L/s"
+  ],
+  "focus_hic": {
+    "tabs": 12,
+    "sensor": "P-01",
+    "inCanvas": true,
+    "label": "Capteur de pression P-01 (simulation) : 4,4 bar, normal",
+    "enterOpensInspector": true,
+    "inspector": "× · P-01 · Capteur de pression · simulation · Centre-ville"
+  },
+  "video_classic": {
+    "file": "docs/aqueduc/video-classic.webm",
+    "octets": 1412069,
+    "message": "Vidéo enregistrée : scenario-bris.webm, 1,4 Mo, 10,2 s.",
+    "wallMs": 10414,
+    "errors": [],
+    "ffprobe": {
+      "stream": "vp9,1440,808",
+      "frames": 81,
+      "lastFrameS": 9.871
+    },
+    "image5s": "docs/aqueduc/video-classic-image-5s.png"
+  },
+  "video_hic": {
+    "file": "docs/aqueduc/video-hic.webm",
+    "octets": 1643224,
+    "message": "Vidéo enregistrée : scenario-bris.webm, 1,6 Mo, 10,1 s.",
+    "wallMs": 10567,
+    "errors": [],
+    "ffprobe": {
+      "stream": "vp9,1440,808",
+      "frames": 80,
+      "lastFrameS": 9.712
+    },
+    "image5s": "docs/aqueduc/video-hic-image-5s.png"
+  },
+  "publicVideo": {
+    "file": "public/aqueduc/scenario-hic.webm",
+    "octets": 1643224
+  },
+  "sans_api": {
+    "state": {
+      "mode": "classic",
+      "api": "absente",
+      "fallback": "Mode classique : API HTML-in-Canvas absente (ni texElementSubImage2D ni texElementImage2D (activez chrome://flags/#canvas-draw-element))."
+    },
+    "hicLayer": null,
+    "bandeau": "Votre navigateur n'active pas HTML-in-Canvas : vous voyez la version classique.\n\nVoir la version HTML-in-Canvas en vidéo\nComment l'activer\n×",
+    "boutonVideo": 1
+  }
+}
