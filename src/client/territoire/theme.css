@@ -1,0 +1,113 @@
+/*
+ * Système visuel commun de l'outil de territoire (spec 5.3) : jetons de couleur (clair par défaut,
+ * sombre sur [data-theme="dark"]), gravités des alertes, états, environnements, typographie,
+ * espacements, rayons et ombres. Les feuilles des environnements (aqueduc.css…) et de l'interface
+ * commune (shell.css) les consomment ; aucune couleur de marque d'une ville.
+ */
+:root {
+  /* surfaces et texte */
+  --tr-chrome: #ffffff;
+  --tr-bg: #f3f5f8;
+  --tr-surface: #ffffff;
+  --tr-surface-2: #f6f8fa;
+  --tr-surface-glass: rgba(255, 255, 255, 0.96);
+  --tr-ink: #142133;
+  --tr-ink-2: #56647a;
+  --tr-ink-3: #8592a6;
+  --tr-line: #e1e6ed;
+  --tr-line-strong: #c5ced9;
+  --tr-accent: #0a5cc2;
+  --tr-accent-hover: #084c9f;
+  --tr-accent-soft: #e9f1fc;
+  --tr-on-accent: #ffffff;
+  --tr-focus: #0a5cc2;
+  --tr-scrim: rgba(20, 33, 51, 0.35);
+
+  /* gravités (alertes) : couleur pleine, fond doux, texte lisible sur blanc (≥ 4,5:1) */
+  --sev-critique: #d23b2b;
+  --sev-critique-soft: #fbe9e7;
+  --sev-critique-text: #a82a1c;
+  --sev-attention: #d98a12;
+  --sev-attention-soft: #fdf3e1;
+  --sev-attention-text: #9a5d07;
+  --sev-info: #2f7fd6;
+  --sev-info-soft: #e9f1fc;
+  --sev-info-text: #0a5cc2;
+
+  /* états (réseau, interdiction, feux, opérations) */
+  --state-ok: #1c8a4a;
+  --state-ok-soft: #e7f4ec;
+  --state-off: #a3adba;
+  --state-scheduled: #d98a12;
+  --state-active: #e8590c;
+  --state-progress: #0a5cc2;
+  --state-simulated: #8a5a00;
+  --state-simulated-soft: #fbf0d6;
+
+  /* environnements : pastilles du sélecteur, repères de la frise */
+  --env-aqueduc: #1f7fd0;
+  --env-deneigement: #5b6bd6;
+  --env-collecte: #2f9e6e;
+  --env-zonage: #b5762a;
+  --env-evaluation: #8a5cc2;
+
+  /* typographie (Inter et JetBrains Mono auto-hébergées) */
+  --tr-font: "Inter Variable", "Inter", "Segoe UI", system-ui, sans-serif;
+  --tr-font-num: "JetBrains Mono Variable", "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+  --tr-text-xs: 11px;
+  --tr-text-sm: 12px;
+  --tr-text-md: 13px;
+  --tr-text-lg: 15px;
+  --tr-text-xl: 18px;
+
+  /* espacements, rayons, ombres */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --r-sm: 6px;
+  --r-md: 8px;
+  --r-lg: 12px;
+  --r-pill: 999px;
+  --shadow-1: 0 1px 2px rgba(20, 33, 51, 0.08);
+  --shadow-2: 0 6px 20px rgba(20, 33, 51, 0.12);
+  --shadow-pop: 0 14px 36px rgba(20, 33, 51, 0.18), 0 2px 6px rgba(20, 33, 51, 0.08);
+}
+
+/* thème sombre, sur demande, pour les pages hors carte (les vues 3D sont conçues en clair) */
+[data-theme="dark"] {
+  --tr-chrome: #121821;
+  --tr-bg: #0b0f14;
+  --tr-surface: #151c26;
+  --tr-surface-2: #1b2430;
+  --tr-surface-glass: rgba(21, 28, 38, 0.95);
+  --tr-ink: #e6edf3;
+  --tr-ink-2: #a3b0c0;
+  --tr-ink-3: #7b8899;
+  --tr-line: #263041;
+  --tr-line-strong: #34425a;
+  --tr-accent: #58a6ff;
+  --tr-accent-hover: #79b8ff;
+  --tr-accent-soft: #14273f;
+  --tr-on-accent: #04121f;
+  --tr-focus: #79b8ff;
+  --tr-scrim: rgba(0, 0, 0, 0.55);
+  --sev-critique: #f0614f;
+  --sev-critique-soft: #3a1714;
+  --sev-critique-text: #ff8a7a;
+  --sev-attention: #e9a23b;
+  --sev-attention-soft: #3a2a0d;
+  --sev-attention-text: #f3c06b;
+  --sev-info: #58a6ff;
+  --sev-info-soft: #14273f;
+  --sev-info-text: #8cc2ff;
+  --state-ok: #3fb96f;
+  --state-ok-soft: #12301f;
+  --state-off: #6b7787;
+  --state-simulated: #f3c06b;
+  --state-simulated-soft: #3a2a0d;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 6px 20px rgba(0, 0, 0, 0.45);
+  --shadow-pop: 0 14px 36px rgba(0, 0, 0, 0.55);
+}

@@ -1,5 +1,5 @@
 /**
- * Preuves de la démo réseau d'eau (`/`) : captures d'écran, vidéos et résultats de tests, mêmes
+ * Preuves de l'environnement Aqueduc (`/carte/aqueduc`) : captures d'écran, vidéos et résultats de tests, mêmes
  * scènes dans les deux modes.
  *
  *   npm run build && npx next start -p 3300
@@ -10,12 +10,16 @@
  * proofs.json (clic sur une partie masquée, arbre ARIA, focus au clavier, vidéos). Copie ensuite
  * video-hic.webm vers public/aqueduc/scenario-hic.webm (proposée par le bandeau sans l'API).
  * Ici Chromium de Playwright, WebGL logiciel ; images extraites avec ffmpeg s'il est installé.
+ * L'horloge commune est épinglée à 12:00 de la journée de référence à l'ouverture de chaque page
+ * (`pin`) : les captures ne dépendent pas de l'heure du lancement.
  */
 import { execFileSync } from "node:child_process";
 import { copyFileSync, mkdirSync, statSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { chromium, type BrowserContext, type Page } from "playwright";
+import { SCENARIO_DAY } from "../src/lib/aqueduc/scenario";
+import { atHour } from "../src/lib/territoire/day";
 
 const BASE = process.env.BASE_URL ?? "http://localhost:3300";
 const OUT = process.env.OUT ?? "docs/aqueduc";
@@ -26,6 +30,14 @@ mkdirSync(OUT, { recursive: true });
 const results: Record<string, unknown> = {};
 
 type Mode = "classic" | "hic";
+/** Heure épinglée : 12:00 de la journée de référence (avant le bris de 14:00). */
+const NOON = atHour(SCENARIO_DAY, "12:00");
+
+/** Épingle l'horloge commune à 12:00 et attend une lecture du flux à cette heure. */
+async function pin(p: Page) {
+  await p.evaluate((t) => (window as any).__territoire.store.setState({ clock: { t0: t, speed: 1, startedAt: Date.now() } }), NOON);
+  await p.waitForFunction((t) => (window as any).__aqueduc.store.getState().live.t >= t, NOON, { timeout: 15_000 });
+}
 /**
  * Centre-ville vu du nord-nord-est, bas sur l'horizon : des bâtiments passent devant son marquage au
  * sol et une tour coupe l'étiquette du capteur P-01 (vérifié à l'œil, 1440 × 860).
@@ -39,8 +51,9 @@ async function open(ctx: BrowserContext, mode: Mode, cam?: object) {
   await p.addInitScript("window.__name = (f) => f");
   const errors: string[] = [];
   p.on("pageerror", (e) => errors.push(e.message));
-  await p.goto(`${BASE}/?mode=${mode}`);
+  await p.goto(`${BASE}/carte/aqueduc?mode=${mode}`);
   await p.waitForFunction(() => (window as any).__aqueduc?.store.getState().live.t > 0, null, { timeout: 60_000 });
+  await pin(p);
   if (mode === "hic") await p.waitForFunction(() => (window as any).__hicMap?.layer, null, { timeout: 20_000 });
   if (cam) await p.evaluate((c) => (window as any).__aqueduc.map.jumpTo(c), cam as never);
   await settle(p);
@@ -306,8 +319,9 @@ async function main() {
   const nb = await chromium.launch({ args: ["--disable-blink-features=CanvasDrawElement"] });
   {
     const p = await nb.newPage({ viewport: VIEW, deviceScaleFactor: 1 });
-    await p.goto(`${BASE}/?mode=hic`);
+    await p.goto(`${BASE}/carte/aqueduc?mode=hic`);
     await p.waitForFunction(() => (window as any).__aqueduc?.store.getState().live.t > 0, null, { timeout: 60_000 });
+    await pin(p);
     await p.locator("[data-testid=noapi]").waitFor({ timeout: 8_000 }).catch(() => {});
     await p.getByRole("button", { name: "Voir la version HTML-in-Canvas en vidéo" }).waitFor({ timeout: 8_000 }).catch(() => {});
     await settle(p, 2500);

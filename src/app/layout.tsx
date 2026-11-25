@@ -3,12 +3,15 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import "@fontsource-variable/inter";
 import "@fontsource-variable/jetbrains-mono";
 import "./globals.css";
+import "@/client/territoire/theme.css";
+import "@/client/territoire/shell/shell.css";
 import "@/client/aqueduc/aqueduc.css";
 import { originTrialMeta } from "@/lib/origin-trial";
 
 export const metadata: Metadata = {
-  title: "Réseau d'eau 3D · HTML-in-Canvas",
-  description: "Démo HTML-in-Canvas : le réseau d'aqueduc de Trois-Rivières en 3D, avec capteurs, secteurs et scénario de bris simulés, et son banc de mesures.",
+  title: "Territoire · Trois-Rivières (démo HTML-in-Canvas)",
+  description:
+    "Démo non officielle de gestion du territoire en 3D avec HTML-in-Canvas : réseau d'eau potable et déneigement de Trois-Rivières, données ouvertes et simulation.",
 };
 
 /** Le jeton Origin Trial est lu à la requête (variable d'environnement d'exécution). */

@@ -7,7 +7,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { CITY, SIM_CREDIT } from "@/lib/aqueduc/city";
-import { useTerritoire } from "../../territoire/useTerritoire";
+import { useTerritoire } from "../useTerritoire";
 
 export const VIDEO_URL = "/aqueduc/scenario-hic.webm";
 const DISMISS_KEY = "aq-noapi-dismissed";

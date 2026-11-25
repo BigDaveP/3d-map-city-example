@@ -5,14 +5,23 @@
  *   SHOT_HIC=chemin.png pour la même vue en mode HTML-in-Canvas ;
  *   SHOT_SCENARIO_HIC / SHOT_SCENARIO_CLASSIC=chemin.png : étape 2 du scénario (isolation, coupe) ;
  *   SHOT_UNDERGROUND=chemin.png : vue souterraine (HTML-in-Canvas) sur le tronçon 13C1949 ;
- *   SHOT_NOAPI / SHOT_BAR_1440 / SHOT_BAR_1024=chemin.png : bandeau sans l'API, barre à 1440 et 1024 px.
+ *   SHOT_NOAPI / SHOT_BAR_1440 / SHOT_BAR_1024=chemin.png : bandeau sans l'API, barre à 1440 et 1024 px ;
+ *   SHOT_SWITCHER=chemin.png : sélecteur d'environnement ouvert (HTML-in-Canvas).
+ * Chaque page de l'application a son horloge épinglée à 12:00 de la journée de référence
+ * (`pin`) : les vérifications ne dépendent pas de l'heure du lancement.
  * Sortie : une ligne OK/ÉCHEC par point de contrôle ; code de sortie 1 si un échec.
  * Les tuiles viennent d'OpenFreeMap : chargements courts, une seule vue par page.
  */
 import { stat } from "node:fs/promises";
 import { chromium, type Browser, type Page } from "playwright";
+import { SCENARIO_DAY } from "../../src/lib/aqueduc/scenario";
+import { atHour } from "../../src/lib/territoire/day";
 
 const BASE = process.env.BASE_URL ?? "http://localhost:3000";
+/** Vue 3D de l'aqueduc (la scène persistante de `/carte`). */
+const AQ = "/carte/aqueduc";
+/** Heure épinglée : 12:00 de la journée de référence, avant le bris de 14:00. */
+const NOON = atHour(SCENARIO_DAY, "12:00");
 let failures = 0;
 function check(name: string, ok: boolean, detail = "") {
   if (!ok) failures++;
@@ -28,6 +37,21 @@ function collectErrors(p: Page) {
   return errors;
 }
 
+/**
+ * Épingle l'horloge commune à `at` (×1) par `window.__territoire.store`, puis attend une lecture du
+ * flux à cette heure : les vérifications ne dépendent plus de l'heure réelle.
+ */
+async function pin(p: Page, at = NOON) {
+  await p.waitForFunction(() => (window as any).__territoire?.store, null, { timeout: 45_000 });
+  await p.evaluate((t) => (window as any).__territoire.store.setState({ clock: { t0: t, speed: 1, startedAt: Date.now() } }), at);
+  await p
+    .waitForFunction((t) => {
+      const lt = (window as any).__aqueduc?.store.getState().live.t ?? 0;
+      return lt >= t && lt < t + 3_600_000;
+    }, at, { timeout: 15_000 })
+    .catch(() => {});
+}
+
 /** Heure locale « HH:MM » (America/Toronto) de l'instant t. */
 const localTime = (t: number) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/Toronto", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(t);
 
@@ -41,7 +65,7 @@ async function attributionClear(p: Page, label: string) {
     const a = document.querySelector<HTMLElement>(".maplibregl-ctrl-attrib");
     if (!a) return null;
     const box = a.getBoundingClientRect();
-    const others = [...document.querySelectorAll<HTMLElement>(".aq-inspector, .aq-story, .aq-timeline, .aq-layers, .aq-noapi")].map((e) => ({ cls: e.className.split(" ")[0], r: e.getBoundingClientRect() }));
+    const others = [...document.querySelectorAll<HTMLElement>(".aq-inspector, .aq-story, .aq-timeline, .aq-layers, .aq-noapi, .tr-switcher")].map((e) => ({ cls: e.className.split(" ")[0], r: e.getBoundingClientRect() }));
     // sur chaque lien de l'attribution, l'élément du dessus doit être l'attribution elle-même
     const covered = [...a.querySelectorAll("a")].filter((l) => {
       const q = l.getBoundingClientRect();
@@ -69,18 +93,33 @@ async function barFits(p: Page, label: string, minSearch: number) {
 }
 
 async function ssrWithoutJs(b: Browser) {
-  console.log("\n== / sans JavaScript");
+  console.log(`\n== ${AQ} sans JavaScript`);
   const ctx = await b.newContext({ javaScriptEnabled: false, viewport: { width: 1280, height: 800 } });
   const p = await ctx.newPage();
-  const res = await p.goto(`${BASE}/`);
+  const res = await p.goto(`${BASE}${AQ}`);
   check("statut 200", res?.status() === 200, String(res?.status()));
   const text = await p.locator("body").innerText();
   check("« Ville de Trois-Rivières » (attribution)", text.includes("Ville de Trois-Rivières"));
   check("« Simulation »", text.includes("Simulation"));
-  check("titre de la page", (await p.title()).includes("Réseau d'eau potable"), await p.title());
+  check("titre de la page", (await p.title()).includes("Aqueduc"), await p.title());
+  check("titre et résumé : « Réseau d'eau potable de Trois-Rivières »", (await p.locator("h1").innerText()).includes("Réseau d'eau potable"));
   check("secteurs listés avec statut", (await p.locator(".aq-table tbody tr").count()) === 10);
-  check("lien vers le banc de mesures", (await p.locator('nav a[href="/bench"]').count()) === 1);
+  check("liens ordinaires : Déneigement et « À propos »", (await p.locator('nav a[href="/carte/deneigement"]').count()) === 1 && (await p.locator('nav a[href="/a-propos"]').count()) === 1);
+  const dn = await p.goto(`${BASE}/carte/deneigement`);
+  const dnText = await p.locator("body").innerText();
+  check("/carte/deneigement sans JavaScript : 200, titre et résumé", dn?.status() === 200 && (await p.locator("h1").innerText()).includes("Déneigement") && /Zones de stationnement de nuit/.test(dnText), String(dn?.status()));
   await ctx.close();
+}
+
+/** Routes : `/` mène à l'aqueduc (en attendant l'accueil), un environnement inconnu répond 404, un environnement du lot 2 renvoie à `/`. */
+async function routes() {
+  console.log("\n== routes de /carte");
+  const root = await fetch(`${BASE}/?mode=hic`, { redirect: "manual" });
+  check("/ → redirection temporaire vers /carte/aqueduc (mode gardé)", root.status === 307 && root.headers.get("location") === "/carte/aqueduc?mode=hic", `${root.status} ${root.headers.get("location")}`);
+  const unknown = await fetch(`${BASE}/carte/inconnu`, { redirect: "manual" });
+  check("/carte/inconnu → 404", unknown.status === 404, String(unknown.status));
+  const soon = await fetch(`${BASE}/carte/collecte`, { redirect: "manual" });
+  check("/carte/collecte (lot 2, « À venir ») → redirection vers /", soon.status === 307 && soon.headers.get("location") === "/", `${soon.status} ${soon.headers.get("location")}`);
 }
 
 async function narrow(b: Browser, js: boolean) {
@@ -88,9 +127,10 @@ async function narrow(b: Browser, js: boolean) {
   const ctx = await b.newContext({ javaScriptEnabled: js, viewport: { width: 390, height: 844 }, deviceScaleFactor: 1 });
   const p = await ctx.newPage();
   const errors = collectErrors(p);
-  await p.goto(`${BASE}/`);
+  await p.goto(`${BASE}${AQ}`);
   if (js) {
     await p.waitForFunction(() => (window as any).__aqueduc, null, { timeout: 30_000 });
+    await pin(p);
     await p.waitForTimeout(800);
   }
   const w = await p.evaluate(() => document.documentElement.scrollWidth);
@@ -107,11 +147,11 @@ async function narrow(b: Browser, js: boolean) {
 
 /** M3 : si la carte ne peut pas démarrer (ici, réseau en 500), le résumé du serveur reste visible. */
 async function startupError(b: Browser) {
-  console.log("\n== / carte indisponible : le résumé du serveur reste lisible");
+  console.log(`\n== ${AQ} carte indisponible : le résumé du serveur reste lisible`);
   const ctx = await b.newContext({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1 });
   await ctx.route("**/api/aqueduc/network", (r) => r.fulfill({ status: 500, body: "" }));
   const p = await ctx.newPage();
-  await p.goto(`${BASE}/?mode=classic`);
+  await p.goto(`${BASE}${AQ}?mode=classic`);
   const alert = p.locator(".aq-fatal[role=alert]");
   await alert.waitFor({ timeout: 45_000 }).catch(() => {});
   const text = (await alert.count()) ? await alert.innerText() : "";
@@ -128,21 +168,167 @@ async function startupError(b: Browser) {
 
 /** I2 : `/` sans ?mode s'ouvre en HTML-in-Canvas quand l'API est présente */
 async function defaultMode(b: Browser) {
-  console.log("\n== / sans ?mode, API présente");
+  console.log(`\n== ${AQ} sans ?mode, API présente`);
   const ctx = await b.newContext({ viewport: { width: 1440, height: 860 }, deviceScaleFactor: 1 });
   const p = await ctx.newPage();
   const errors = collectErrors(p);
-  await p.goto(`${BASE}/`);
+  await p.goto(`${BASE}${AQ}`);
   await p.waitForFunction(() => (window as any).__aqueduc, null, { timeout: 45_000 });
+  await pin(p);
   await p.waitForFunction(() => (window as any).__hicMap?.layer, null, { timeout: 15_000 }).catch(() => {});
   const st = await p.evaluate(() => {
     const s = (window as any).__aqueduc.territoire.getState();
     return { mode: s.mode, api: s.api, fallback: s.fallback, hic: !!(window as any).__hicMap?.layer, url: location.search };
   });
-  check("/ sans ?mode : mode HTML-in-Canvas, API détectée", st.mode === "hic" && st.api !== "absente" && st.hic && st.fallback === "", JSON.stringify(st));
+  check(`${AQ} sans ?mode : mode HTML-in-Canvas, API détectée`, st.mode === "hic" && st.api !== "absente" && st.hic && st.fallback === "", JSON.stringify(st));
   check("bouton « HTML-in-Canvas » enfoncé", (await p.getByRole("button", { name: "HTML-in-Canvas", exact: true }).getAttribute("aria-pressed")) === "true");
   check("URL inchangée (pas de ?mode ajouté)", st.url === "", st.url);
   check("aucune erreur console (/ sans ?mode)", errors.length === 0, errors.join(" | "));
+  await ctx.close();
+}
+
+/** État de la scène persistante : identité de la carte et du canvas, couches et surfaces de l'aqueduc. */
+async function sceneState(p: Page) {
+  return p.evaluate(() => {
+    const w = window as any;
+    const map = w.__territoire.map;
+    const canvas = map.getCanvas() as HTMLCanvasElement;
+    const style = map.getStyle();
+    return {
+      env: w.__territoire.env as string | null,
+      sameMap: map === w.__mapRef,
+      id: map.__id as number,
+      sameCanvas: canvas === w.__canvasRef,
+      canvases: document.querySelectorAll(".aq-map canvas").length,
+      aqLayers: style.layers.filter((l: { id: string }) => l.id.startsWith("aq-")).map((l: { id: string }) => l.id) as string[],
+      aqSources: Object.keys(style.sources).filter((k) => k.startsWith("aq-")),
+      pipes: !!map.getLayer("aq-pipes"),
+      hicLayer: !!map.getLayer("hic-panels"),
+      surfaces: canvas.querySelectorAll("[data-panel]").length,
+      layoutsubtree: canvas.hasAttribute("layoutsubtree"),
+      markers: document.querySelectorAll(".maplibregl-marker").length,
+      aqueducApi: !!w.__aqueduc,
+      noReload: w.__noReload === true,
+      streams: w.__openStreams ? w.__openStreams.size : -1,
+      hicGlobal: !!w.__hicMap,
+      attribution: document.querySelector(".maplibregl-ctrl-attrib")?.textContent ?? "",
+    };
+  });
+}
+
+/**
+ * Scène persistante : passer de l'aqueduc au déneigement par le sélecteur (clic) change l'URL sans
+ * recharger la page, garde la même carte et le même canvas, et démonte l'aqueduc sans fuite ; le
+ * retour remonte ses couches et ses surfaces.
+ */
+async function envSwitch(b: Browser) {
+  console.log(`\n== ${AQ}?mode=hic → Déneigement → Aqueduc (sélecteur, scène persistante)`);
+  const ctx = await b.newContext({ viewport: { width: 1440, height: 860 }, deviceScaleFactor: 1 });
+  // flux SSE ouverts (window.__openStreams) : le démontage de l'aqueduc doit les fermer
+  await ctx.addInitScript(`{
+    const ES = window.EventSource;
+    const open = new Set();
+    window.__openStreams = open;
+    window.EventSource = class extends ES {
+      constructor(u, o) { super(u, o); open.add(this); }
+      close() { open.delete(this); super.close(); }
+    };
+  }`);
+  const p = await ctx.newPage();
+  const errors = collectErrors(p);
+  await p.goto(`${BASE}${AQ}?mode=hic`);
+  await p.waitForFunction(() => (window as any).__aqueduc && (window as any).__hicMap?.layer, null, { timeout: 45_000 });
+  await pin(p);
+  const active = await p
+    .waitForFunction(() => (window as any).__territoire.store.getState().api === "active", null, { timeout: 25_000 })
+    .then(() => true)
+    .catch(() => false);
+  const st0 = await p.evaluate(() => {
+    const w = window as any;
+    w.__mapRef = w.__territoire.map;
+    w.__canvasRef = w.__territoire.map.getCanvas();
+    w.__noReload = true;
+    const s = w.__territoire.store.getState();
+    return { mode: s.mode, api: s.api, env: w.__territoire.env };
+  });
+  check("/carte/aqueduc?mode=hic : mode HTML-in-Canvas, API active, environnement « aqueduc »", active && st0.mode === "hic" && st0.api === "active" && st0.env === "aqueduc", JSON.stringify(st0));
+  const before = await sceneState(p);
+  check("aqueduc monté : couches aq-pipes et surfaces dans le canvas", before.pipes && before.hicLayer && before.surfaces > 0 && before.aqueducApi, `${before.aqLayers.length} couches, ${before.surfaces} surfaces`);
+
+  // sélecteur : fenêtre des 5 environnements, lot 2 « À venir » et inactif ; clavier
+  const opener = p.locator(".tr-switcher-btn");
+  await opener.click();
+  const dlg = p.getByRole("dialog", { name: "Changer d'environnement" });
+  await dlg.waitFor({ timeout: 5_000 }).catch(() => {});
+  const items = await dlg.locator(".tr-env").evaluateAll((els) => els.map((e) => ({ t: e.querySelector("b")?.textContent ?? "", off: e.getAttribute("aria-disabled") === "true", soon: e.textContent?.includes("À venir") ?? false, cur: e.getAttribute("aria-current") })));
+  check(
+    "sélecteur : 5 environnements, Aqueduc courant, Collecte, Zonage et Évaluation « À venir » et inactifs",
+    items.length === 5 && items[0].cur === "page" && items.filter((i) => i.off && i.soon).length === 3 && !items[1].off,
+    JSON.stringify(items),
+  );
+  if (process.env.SHOT_SWITCHER) {
+    await p.waitForTimeout(2500);
+    await p.screenshot({ path: process.env.SHOT_SWITCHER });
+    console.log(`capture : ${process.env.SHOT_SWITCHER}`);
+  }
+  check("focus sur l'environnement courant à l'ouverture", await p.evaluate(() => document.activeElement?.getAttribute("aria-current") === "page"));
+  await p.keyboard.press("ArrowDown");
+  check("flèche bas : focus sur Déneigement", (await p.evaluate(() => document.activeElement?.querySelector("b")?.textContent)) === "Déneigement");
+  await p.keyboard.press("Escape");
+  check("Échap : fenêtre refermée, focus rendu au bouton", (await dlg.count()) === 0 && (await p.evaluate(() => !!document.activeElement?.classList.contains("tr-switcher-btn"))));
+  // un environnement « À venir » ne mène nulle part
+  await opener.click();
+  await dlg.getByRole("button", { name: /Collecte/ }).click({ force: true });
+  check("clic sur « Collecte » (À venir) : l'URL ne change pas", new URL(p.url()).pathname === AQ, p.url());
+
+  // vers le déneigement, au clic
+  if ((await dlg.count()) === 0) await opener.click();
+  await dlg.getByRole("button", { name: /Déneigement/ }).click();
+  const moved = await p.waitForURL("**/carte/deneigement**", { timeout: 10_000 }).then(() => true).catch(() => false);
+  await p.waitForFunction(() => (window as any).__territoire.env === "deneigement", null, { timeout: 10_000 }).catch(() => {});
+  const panel = p.locator(".tr-envpanel h2", { hasText: "Déneigement" });
+  await panel.waitFor({ timeout: 10_000 }).catch(() => {});
+  const after = await sceneState(p);
+  check("URL /carte/deneigement, sans rechargement de la page", moved && after.noReload && new URL(p.url()).pathname === "/carte/deneigement", p.url());
+  check("même carte (même objet, même __id) et même canvas", after.sameMap && after.id === before.id && after.sameCanvas && after.canvases === 1, `__id ${before.id} → ${after.id}, ${after.canvases} canvas`);
+  check("couches de l'aqueduc retirées (aq-pipes absente, aucune couche ni source aq-*)", !after.pipes && after.aqLayers.length === 0 && after.aqSources.length === 0, `${after.aqLayers.join(" ")} ${after.aqSources.join(" ")}`);
+  check("surfaces HTML-in-Canvas démontées (couche, éléments, attributs du canvas), API de l'aqueduc retirée", !after.hicLayer && !after.hicGlobal && after.surfaces === 0 && !after.layoutsubtree && after.markers === 0 && !after.aqueducApi, JSON.stringify({ hic: after.hicLayer, global: after.hicGlobal, surfaces: after.surfaces, layoutsubtree: after.layoutsubtree, markers: after.markers, api: after.aqueducApi }));
+  check("flux des capteurs fermé (aucun EventSource ouvert)", before.streams === 1 && after.streams === 0, `${before.streams} → ${after.streams}`);
+  check("panneau « Déneigement », barre à jour", (await panel.count()) === 1 && (await p.locator(".tr-crumb").innerText()).includes("Déneigement"));
+  check("attribution du déneigement (zones), plus celle des conduites", /Zones de stationnement de nuit/.test(after.attribution) && !/Conduites/.test(after.attribution) && /OpenFreeMap/.test(after.attribution), after.attribution.slice(0, 120));
+  const cam = await p.evaluate(() => (window as any).__territoire.map.getZoom());
+  check("caméra au cadrage du déneigement (vue large)", cam < 13, `zoom ${cam.toFixed(2)}`);
+
+  // retour à l'aqueduc
+  await opener.click();
+  await dlg.getByRole("button", { name: /Aqueduc/ }).click();
+  await p.waitForURL(`**${AQ}**`, { timeout: 10_000 }).catch(() => {});
+  await p.waitForFunction(() => (window as any).__aqueduc && (window as any).__territoire.map.getLayer("aq-pipes"), null, { timeout: 20_000 }).catch(() => {});
+  const back = await p
+    .waitForFunction(() => {
+      const L = (window as any).__hicMap?.layer;
+      return L && [...L.panels.keys()].some((k: string) => k.startsWith("sector:"));
+    }, null, { timeout: 20_000 })
+    .then(() => true)
+    .catch(() => false);
+  const again = await sceneState(p);
+  check("retour à l'aqueduc : mêmes carte et canvas, couches, surfaces et flux revenus", again.sameMap && again.sameCanvas && again.pipes && again.hicLayer && back && again.aqueducApi && again.noReload && again.streams === 1, JSON.stringify({ pipes: again.pipes, hic: again.hicLayer, surfaces: again.surfaces, streams: again.streams }));
+
+  // recherche depuis un autre environnement : le résultat y ramène et ouvre sa fiche (focus)
+  await opener.click();
+  await dlg.getByRole("button", { name: /Déneigement/ }).click();
+  await p.waitForURL("**/carte/deneigement**", { timeout: 10_000 }).catch(() => {});
+  await p.locator(".tr-envpanel h2", { hasText: "Déneigement" }).waitFor({ timeout: 10_000 }).catch(() => {});
+  await p.locator(".aq-search input").fill("P-01");
+  const option = await p.locator(".tr-search-list [role=option]").first().innerText().catch(() => "");
+  check("recherche « P-01 » depuis le déneigement : capteur de l'aqueduc proposé", /P-01/.test(option) && /Aqueduc/.test(option), option.replace(/\n/g, " "));
+  await p.keyboard.press("ArrowDown");
+  await p.keyboard.press("Enter");
+  await p.waitForURL(`**${AQ}**`, { timeout: 10_000 }).catch(() => {});
+  const found = await p.locator("[data-testid=inspector]").innerText({ timeout: 15_000 }).catch(() => "");
+  const sel = await p.evaluate(() => ({ sel: (window as any).__aqueduc?.store.getState().selection, focus: (window as any).__territoire.store.getState().focus, same: (window as any).__territoire.map === (window as any).__mapRef }));
+  check("→ /carte/aqueduc, même carte, fiche du capteur P-01 ouverte, focus consommé", new URL(p.url()).pathname === AQ && sel.same && found.includes("P-01") && sel.sel?.id === "P-01" && sel.focus === null, `${p.url()} ${JSON.stringify(sel)}`);
+  check("aucune erreur console", errors.length === 0, errors.join(" | "));
   await ctx.close();
 }
 
@@ -184,12 +370,13 @@ async function pointOnPipe(p: Page, id: string) {
 }
 
 async function classic(b: Browser) {
-  console.log("\n== / avec JavaScript, mode classique");
+  console.log(`\n== ${AQ} avec JavaScript, mode classique`);
   const ctx = await b.newContext({ viewport: { width: 1440, height: 860 }, deviceScaleFactor: 1 });
   const p = await ctx.newPage();
   const errors = collectErrors(p);
-  await p.goto(`${BASE}/?mode=classic`);
+  await p.goto(`${BASE}${AQ}?mode=classic`);
   await p.waitForFunction(() => (window as any).__aqueduc, null, { timeout: 45_000 });
+  await pin(p);
   check("vue SSR masquée une fois l'application montée", !(await p.locator(".aq-ssr").isVisible()));
   const st = await p.evaluate(() => (window as any).__aqueduc.territoire.getState().mode);
   check("mode classique", st === "classic", st);
@@ -254,13 +441,13 @@ async function classic(b: Browser) {
 
 /** Page d'accueil en mode HTML-in-Canvas : secteurs et capteurs dans la scène, clics avec occlusion. */
 async function homeHic(b: Browser) {
-  console.log("\n== /?mode=hic (HTML-in-Canvas : secteurs et capteurs dans la scène)");
+  console.log(`\n== ${AQ}?mode=hic (HTML-in-Canvas : secteurs et capteurs dans la scène)`);
   const ctx = await b.newContext({ viewport: { width: 1440, height: 860 }, deviceScaleFactor: 1 });
   const p = await ctx.newPage();
   const errors = collectErrors(p);
-  await p.goto(`${BASE}/?mode=hic`);
+  await p.goto(`${BASE}${AQ}?mode=hic`);
   await p.waitForFunction(() => (window as any).__aqueduc && (window as any).__hicMap?.layer, null, { timeout: 45_000 });
-  await p.waitForFunction(() => (window as any).__aqueduc.store.getState().live.t > 0, null, { timeout: 15_000 });
+  await pin(p);
   // toutes les surfaces montées capturées au moins une fois (8 au plus par paint)
   const captured = await p
     .waitForFunction(() => {
@@ -406,13 +593,13 @@ async function homeHic(b: Browser) {
 
 /** Vue souterraine (HTML-in-Canvas) : tubes 3D sous la rue, fond estompé, puis retour à la vue normale. */
 async function undergroundHic(b: Browser) {
-  console.log("\n== /?mode=hic, vue souterraine (tubes 3D)");
+  console.log(`\n== ${AQ}?mode=hic, vue souterraine (tubes 3D)`);
   const ctx = await b.newContext({ viewport: { width: 1440, height: 860 }, deviceScaleFactor: 1 });
   const p = await ctx.newPage();
   const errors = collectErrors(p);
-  await p.goto(`${BASE}/?mode=hic`);
+  await p.goto(`${BASE}${AQ}?mode=hic`);
   await p.waitForFunction(() => (window as any).__aqueduc?.tubes && (window as any).__hicMap?.layer, null, { timeout: 45_000 });
-  await p.waitForFunction(() => (window as any).__aqueduc.store.getState().live.t > 0, null, { timeout: 15_000 });
+  await pin(p);
   // caméra sur le tronçon du scénario
   await p.evaluate(async () => {
     const { map, net } = (window as any).__aqueduc;
@@ -452,8 +639,8 @@ async function undergroundHic(b: Browser) {
   });
   check("ordre des couches : lignes < tubes < bâtiments < surfaces HTML", order.pipes < order.tubes && order.tubes < order.buildings && order.buildings < order.panels, JSON.stringify(order));
   const floating = await p.evaluate(() => [...document.querySelectorAll<HTMLElement>(".aq-panel")].filter((e) => e.offsetParent !== null).map((e) => e.className));
-  const extra = await p.evaluate(() => [...document.querySelectorAll<HTMLElement>(".aq-stage > *")].filter((e) => e.offsetParent !== null && !e.matches(".aq-map, .aq-panel")).map((e) => e.className));
-  check("rien d'autre ne flotte : couches et frise seulement", floating.length === 2 && floating.some((c) => c.includes("aq-layers")) && floating.some((c) => c.includes("aq-timeline")) && extra.length === 0, [...floating, ...extra].join(" | "));
+  const extra = await p.evaluate(() => [...document.querySelectorAll<HTMLElement>(".aq-stage > *")].filter((e) => e.offsetParent !== null && !e.matches(".aq-map, .aq-panel, .tr-switcher")).map((e) => e.className));
+  check("rien d'autre ne flotte : panneau, sélecteur et frise seulement", floating.length === 2 && floating.some((c) => c.includes("aq-layers")) && floating.some((c) => c.includes("aq-timeline")) && extra.length === 0, [...floating, ...extra].join(" | "));
   if (process.env.SHOT_UNDERGROUND) {
     await p.waitForTimeout(4000);
     await p.screenshot({ path: process.env.SHOT_UNDERGROUND });
@@ -515,13 +702,13 @@ async function leaveScenario(p: Page, resumeAt: number) {
 
 /** Scénario en mode HTML-in-Canvas : coupe sous la rue, vannes cliquées dans la scène, export vidéo. */
 async function scenarioHic(b: Browser) {
-  console.log("\n== /?mode=hic, scénario de bris (coupe sous la rue, vannes, vidéo)");
+  console.log(`\n== ${AQ}?mode=hic, scénario de bris (coupe sous la rue, vannes, vidéo)`);
   const ctx = await b.newContext({ viewport: { width: 1440, height: 860 }, deviceScaleFactor: 1, acceptDownloads: true });
   const p = await ctx.newPage();
   const errors = collectErrors(p);
-  await p.goto(`${BASE}/?mode=hic`);
+  await p.goto(`${BASE}${AQ}?mode=hic`);
   await p.waitForFunction(() => (window as any).__aqueduc && (window as any).__hicMap?.layer, null, { timeout: 45_000 });
-  await p.waitForFunction(() => (window as any).__aqueduc.store.getState().live.t > 0, null, { timeout: 15_000 });
+  await pin(p);
   const { resumeAt } = await toIsolation(p);
   const cutOk = await p
     .waitForFunction(() => {
@@ -540,7 +727,7 @@ async function scenarioHic(b: Browser) {
   check("coupe cut:13C1949 montée dans la scène, capturée", cutOk && r.keys.includes("cut:13C1949"), r.keys.join(" "));
   check("le marquage de l'incident laisse la place à la coupe", !r.keys.includes("incident:13C1949"));
   check("deux vannes, vrais boutons « V-xx · à fermer »", r.valves.length === 2 && r.valves.every((t) => /^V-\d+ · à fermer$/.test(t ?? "")), r.valves.join(" | "));
-  check("rien d'autre ne flotte : récit et frise seulement", r.panels.length === 2 && r.panels.some((c) => c.includes("aq-story")) && r.panels.some((c) => c.includes("aq-timeline")), r.panels.join(" | "));
+  check("rien d'autre ne flotte : récit et frise seulement (et le sélecteur)", r.panels.length === 2 && r.panels.some((c) => c.includes("aq-story")) && r.panels.some((c) => c.includes("aq-timeline")), r.panels.join(" | "));
   check("pas de repli en mode classique", !r.fallback, r.fallback);
   await attributionClear(p, "récit (HTML-in-Canvas)");
   if (process.env.SHOT_SCENARIO_HIC) {
@@ -605,13 +792,13 @@ async function scenarioHic(b: Browser) {
 
 /** Scénario en mode classique : la coupe est une illustration 2D dans la fiche, avec les mêmes vannes. */
 async function scenarioClassic(b: Browser) {
-  console.log("\n== /?mode=classic, scénario de bris (coupe dans la fiche)");
+  console.log(`\n== ${AQ}?mode=classic, scénario de bris (coupe dans la fiche)`);
   const ctx = await b.newContext({ viewport: { width: 1440, height: 860 }, deviceScaleFactor: 1 });
   const p = await ctx.newPage();
   const errors = collectErrors(p);
-  await p.goto(`${BASE}/?mode=classic`);
+  await p.goto(`${BASE}${AQ}?mode=classic`);
   await p.waitForFunction(() => (window as any).__aqueduc, null, { timeout: 45_000 });
-  await p.waitForFunction(() => (window as any).__aqueduc.store.getState().live.t > 0, null, { timeout: 15_000 });
+  await pin(p);
   const { resumeAt } = await toIsolation(p);
   const insp = p.locator("[data-testid=inspector]");
   await insp.waitFor({ timeout: 5_000 }).catch(() => {});
@@ -638,18 +825,20 @@ async function scenarioClassic(b: Browser) {
   await ctx.close();
 }
 
-/** R19-4 : la barre d'application à plusieurs largeurs (le bouton du scénario est dans la barre). */
+/** R19-4 : la barre d'application à plusieurs largeurs ; le bouton du scénario, dans le panneau, reste visible. */
 async function appBar(b: Browser) {
   console.log("\n== barre d'application, plusieurs largeurs");
   for (const [w, minSearch] of [[1440, 240], [1280, 200], [1024, 140], [768, 140], [390, 200]] as const) {
     const ctx = await b.newContext({ viewport: { width: w, height: 860 }, deviceScaleFactor: 1 });
     const p = await ctx.newPage();
-    await p.goto(`${BASE}/?mode=classic`);
+    await p.goto(`${BASE}${AQ}?mode=classic`);
     await p.waitForFunction(() => (window as any).__aqueduc, null, { timeout: 45_000 });
     await p.waitForTimeout(600);
     await barFits(p, `${w} px`, minSearch);
-    const launch = await p.locator(".aq-launch").isVisible();
-    check(`${w} px : bouton du scénario visible`, launch);
+    const launch = await p.locator(".aq-layers .aq-launch").isVisible();
+    check(`${w} px : bouton du scénario visible (panneau de l'aqueduc)`, launch);
+    const perf = await p.locator(".aq-perf").count();
+    check(`${w} px : pas d'indicateur de performance sans ?perf=1`, perf === 0, String(perf));
     if (w === 1440 && process.env.SHOT_BAR_1440) await p.screenshot({ path: process.env.SHOT_BAR_1440, clip: { x: 0, y: 0, width: w, height: 120 } });
     if (w === 1024 && process.env.SHOT_BAR_1024) await p.screenshot({ path: process.env.SHOT_BAR_1024, clip: { x: 0, y: 0, width: w, height: 120 } });
     await ctx.close();
@@ -662,10 +851,10 @@ async function appBar(b: Browser) {
  * explication « Comment l'activer », fermeture retenue pour la session.
  */
 async function withoutApi() {
-  console.log("\n== / sans l'API HTML-in-Canvas");
+  console.log(`\n== ${AQ} sans l'API HTML-in-Canvas`);
   const nb = await chromium.launch({ args: ["--disable-blink-features=CanvasDrawElement"] });
   try {
-    const open = async (video: boolean, path = "/", width = 1440) => {
+    const open = async (video: boolean, path = AQ, width = 1440) => {
       const ctx = await nb.newContext({ viewport: { width, height: 860 }, deviceScaleFactor: 1 });
       // le fichier est publié (tâche 12) : son absence est simulée par un 404, sa présence par un vrai 200
       if (!video) await ctx.route("**/aqueduc/scenario-hic.webm", (r) => r.fulfill({ status: 404, body: "" }));
@@ -673,6 +862,7 @@ async function withoutApi() {
       const errors = collectErrors(p);
       await p.goto(`${BASE}${path}`);
       await p.waitForFunction(() => (window as any).__aqueduc, null, { timeout: 45_000 });
+      await pin(p);
       return { ctx, p, errors };
     };
     const banner = (p: Page) => p.locator("[data-testid=noapi]");
@@ -750,14 +940,14 @@ async function withoutApi() {
     await ctx.close();
 
     // 3) ?mode=hic sans l'API : repli expliqué
-    ({ ctx, p, errors } = await open(false, "/?mode=hic"));
+    ({ ctx, p, errors } = await open(false, `${AQ}?mode=hic`));
     const fb = await p.evaluate(() => { const s = (window as any).__aqueduc.territoire.getState(); return { mode: s.mode, fallback: s.fallback }; });
-    check("/?mode=hic sans l'API : repli classique expliqué", fb.mode === "classic" && /API HTML-in-Canvas absente/.test(fb.fallback), fb.fallback);
+    check("?mode=hic sans l'API : repli classique expliqué", fb.mode === "classic" && /API HTML-in-Canvas absente/.test(fb.fallback), fb.fallback);
     check("bouton « HTML-in-Canvas » désactivé", await p.getByRole("button", { name: "HTML-in-Canvas", exact: true }).isDisabled());
     await ctx.close();
 
     // 4) mobile : aucun défilement horizontal avec le bandeau
-    ({ ctx, p, errors } = await open(false, "/", 390));
+    ({ ctx, p, errors } = await open(false, AQ, 390));
     await banner(p).waitFor({ timeout: 5_000 }).catch(() => {});
     await p.getByRole("button", { name: "Comment l'activer" }).click();
     const sw = await p.evaluate(() => ({ sw: document.documentElement.scrollWidth, h: document.querySelector("[data-testid=noapi]")?.getBoundingClientRect().height ?? 0 }));
@@ -770,12 +960,13 @@ async function withoutApi() {
 
 /** Repli après vérification (API présente) : la raison est affichée dans une note refermable. */
 async function fallbackNote(b: Browser) {
-  console.log("\n== / repli HTML-in-Canvas après vérification : note visible");
+  console.log(`\n== ${AQ} repli HTML-in-Canvas après vérification : note visible`);
   const ctx = await b.newContext({ viewport: { width: 1440, height: 860 }, deviceScaleFactor: 1 });
   const p = await ctx.newPage();
   const errors = collectErrors(p);
-  await p.goto(`${BASE}/?mode=hic`);
+  await p.goto(`${BASE}${AQ}?mode=hic`);
   await p.waitForFunction(() => (window as any).__aqueduc && (window as any).__hicMap?.layer, null, { timeout: 45_000 });
+  await pin(p);
   check("API présente : pas de bandeau avant le repli", (await p.locator("[data-testid=noapi]").count()) === 0);
   // même écriture que `onFallback` de la scène (texture vide, aucun paint…)
   await p.evaluate(() => (window as any).__aqueduc.territoire.setState({ mode: "classic", fallback: "Mode classique activé automatiquement : texture vide (test)." }));
@@ -813,6 +1004,8 @@ async function benchPage() {
 const b = await chromium.launch();
 try {
   await ssrWithoutJs(b);
+  await routes();
+  await envSwitch(b);
   await narrow(b, false);
   await narrow(b, true);
   await classic(b);

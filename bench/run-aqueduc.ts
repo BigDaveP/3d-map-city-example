@@ -1,5 +1,5 @@
 /**
- * Banc de la démo réseau d'eau (`/`) : mode classique vs HTML-in-Canvas, 20 / 60 / 120 étiquettes.
+ * Banc de l'environnement Aqueduc (`/carte/aqueduc`) : mode classique vs HTML-in-Canvas, 20 / 60 / 120 étiquettes.
  *
  *   npm run build && npx next start -p 3300
  *   BASE_URL=http://localhost:3300 npm run bench:aqueduc
@@ -15,6 +15,8 @@
  * de données (message du flux une fois par seconde : setFeatureState des conduites, rendus React,
  * captures) p50/p95/max, captures par minute, latence lecture → pixel (de la réception SSE à l'image
  * qui l'affiche, hors première capture d'une étiquette), occlusion au survol, instances de tubes.
+ * L'horloge commune est épinglée à 12:00 de la journée de référence au début de chaque
+ * configuration : les mesures ne dépendent pas de l'heure du lancement.
  * `SCALE` (défaut 1) multiplie les durées des phases ; les durées réelles sont dans le CSV et la méta.
  * Profil Chromium persistant (cache HTTP) : les tuiles OpenFreeMap ne sont téléchargées qu'une fois.
  * Sorties : bench/results/aqueduc.csv et bench/results/aqueduc-meta.json.
@@ -23,6 +25,8 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { chromium, type BrowserContext, type Page } from "playwright";
+import { SCENARIO_DAY } from "../src/lib/aqueduc/scenario";
+import { atHour } from "../src/lib/territoire/day";
 
 const BASE = process.env.BASE_URL ?? "http://localhost:3300";
 const OUT = process.env.OUT ?? "bench/results";
@@ -40,6 +44,8 @@ const ROTATION_MS = Math.round(8000 * SCALE);
 const IMMOBILE_MS = Math.round(12_000 * SCALE);
 const STEP_DWELL_MS = Math.round(3000 * SCALE);
 const WARMUP_MS = 4000;
+/** Heure épinglée de chaque configuration : 12:00 de la journée de référence (avant le bris de 14:00). */
+const NOON = atHour(SCENARIO_DAY, "12:00");
 
 type Mode = "classic" | "hic";
 type Tubes = "maitresses" | "tout";
@@ -110,8 +116,11 @@ async function runOne(ctx: BrowserContext, c: Config, rep: number, errors: strin
   // tsx (esbuild, keepNames) enveloppe les fonctions nommées des callbacks dans __name
   await p.addInitScript("window.__name = (f) => f");
   p.on("pageerror", (e) => errors.push(`${c.mode}/${c.tags}: ${e.message}`));
-  await p.goto(`${BASE}/?mode=${c.mode}`);
+  await p.goto(`${BASE}/carte/aqueduc?mode=${c.mode}`);
   await p.waitForFunction(() => (window as any).__aqueduc?.store.getState().live.t > 0, null, { timeout: 60_000 });
+  // horloge épinglée, puis une lecture du flux à cette heure
+  await p.evaluate((t) => (window as any).__territoire.store.setState({ clock: { t0: t, speed: 1, startedAt: Date.now() } }), NOON);
+  await p.waitForFunction((t) => (window as any).__aqueduc.store.getState().live.t >= t, NOON, { timeout: 15_000 });
   await p.evaluate(
     ([cam, c]) => {
       const a = (window as any).__aqueduc;

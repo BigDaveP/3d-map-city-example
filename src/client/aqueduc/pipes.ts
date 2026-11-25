@@ -1,7 +1,7 @@
 /**
  * Couches MapLibre des conduites, des capteurs et des secteurs, expressions de couleur par couche
- * et retouches du fond de carte. Aucun import de MapLibre à l'exécution (types seulement) : le module
- * se teste sous Node.
+ * et vue souterraine (le fond commun est retouché par `territoire/scene/basemap.ts`). Aucun import
+ * de MapLibre à l'exécution (types seulement) : le module se teste sous Node.
  */
 import type { FeatureCollection, LineString } from "geojson";
 import type { ExpressionSpecification, Map as MlMap } from "maplibre-gl";
@@ -238,6 +238,13 @@ export function applyPipeLayers(map: MlMap, data: NetworkData, layer: LayerId = 
   state.set(map, { demo: data.demoSegments, last: {}, sel: null, inc: null });
 }
 
+/** Retire couches et sources de `applyPipeLayers` (démontage de l'environnement) ; sans effet si absentes. */
+export function removePipeLayers(map: MlMap) {
+  for (const id of ["aq-sensors", "aq-pipes", "aq-pipes-casing"]) if (map.getLayer(id)) map.removeLayer(id);
+  for (const id of ["aq-sensors", "aq-net"]) if (map.getSource(id)) map.removeSource(id);
+  state.delete(map);
+}
+
 export function setPipeLayer(map: MlMap, layer: LayerId) {
   if (map.getLayer("aq-pipes")) map.setPaintProperty("aq-pipes", "line-color", pipeColor(layer));
 }
@@ -271,31 +278,6 @@ export function markSegment(map: MlMap, what: "sel" | "inc", idx: number | null)
   if (st[what] !== null) map.setFeatureState({ source: "aq-net", id: st[what]! }, { [what]: false });
   if (idx !== null) map.setFeatureState({ source: "aq-net", id: idx }, { [what]: true });
   st[what] = idx;
-}
-
-/** Symboles conservés : noms de rues et de lieux. */
-const KEEP_SYMBOLS = new Set(["transportation_name", "place"]);
-/**
- * Noms de lieux masqués : la ville (posée sur le marquage du secteur Centre-ville) et les quartiers,
- * dont les noms recoupent ceux des secteurs simulés, placés ailleurs (OpenFreeMap « liberty »).
- */
-const HIDE_PLACES = new Set(["label_city", "label_other"]);
-
-/**
- * Fond de carte sobre (valeurs des maquettes) : seuls les noms de rues et de lieux restent (sauf
- * la ville et les quartiers) ;
- * bâtiments #dde2e8 à 0,78 d'opacité.
- */
-export function restyleBasemap(map: MlMap) {
-  for (const l of map.getStyle().layers ?? []) {
-    if (l.type !== "symbol" || l.id.startsWith("aq-")) continue;
-    const sl = (l as { "source-layer"?: string })["source-layer"] ?? "";
-    if (!KEEP_SYMBOLS.has(sl) || l.id.includes("shield") || HIDE_PLACES.has(l.id)) map.setLayoutProperty(l.id, "visibility", "none");
-  }
-  if (map.getLayer(BEFORE)) {
-    map.setPaintProperty(BEFORE, "fill-extrusion-color", "#dde2e8");
-    map.setPaintProperty(BEFORE, "fill-extrusion-opacity", 0.78);
-  }
 }
 
 /** Opacités de la vue souterraine : sol, routes et eau estompés, bâtiments translucides. */

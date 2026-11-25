@@ -115,3 +115,28 @@ test("applyPipeLayers : couches valides selon la spécification de style, condui
   const ids = layers.map((l) => l.id);
   assert.ok(ids.indexOf("aq-pipes-casing") < ids.indexOf("aq-pipes") && ids.indexOf("aq-pipes") < ids.indexOf("building-3d"));
 });
+
+test("removePipeLayers : retire les couches et les sources de l'aqueduc, sans toucher au fond", async () => {
+  const { applyPipeLayers, removePipeLayers } = await import("../src/client/aqueduc/pipes");
+  const sources = new Map<string, unknown>([["openmaptiles", {}]]);
+  const layers: { id: string }[] = [{ id: "building-3d" }];
+  const map = {
+    getLayer: (id: string) => layers.find((l) => l.id === id),
+    getSource: (id: string) => sources.get(id),
+    addSource: (id: string, s: unknown) => void sources.set(id, s),
+    removeSource: (id: string) => {
+      assert.ok(!layers.some((l) => (l as { source?: string }).source === id), `source ${id} encore utilisée`);
+      sources.delete(id);
+    },
+    addLayer: (l: { id: string }) => void layers.push(l),
+    removeLayer: (id: string) => void layers.splice(layers.findIndex((l) => l.id === id), 1),
+  };
+  const data = { segments: { type: "FeatureCollection", features: [] }, sensors: [], sectors: [], valves: [], attribution: "", demoSegments: [] };
+  applyPipeLayers(map as never, data as never, "pression");
+  assert.ok(layers.length > 1 && sources.size > 1);
+  removePipeLayers(map as never);
+  assert.deepEqual(layers.map((l) => l.id), ["building-3d"]);
+  assert.deepEqual([...sources.keys()], ["openmaptiles"]);
+  // deux fois : sans erreur (démontage après un échec de chargement)
+  removePipeLayers(map as never);
+});
