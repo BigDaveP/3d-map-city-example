@@ -3,13 +3,12 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import "@fontsource-variable/inter";
 import "@fontsource-variable/jetbrains-mono";
 import "./globals.css";
-import "./carte/carte.css";
 import "@/client/aqueduc/aqueduc.css";
 import { originTrialMeta } from "@/lib/origin-trial";
 
 export const metadata: Metadata = {
   title: "Démos HTML-in-Canvas",
-  description: "Démos d'apprentissage HTML-in-Canvas : réseau d'eau 3D, mur de supervision, carte de livraison et banc de mesures. Données simulées.",
+  description: "Démos d'apprentissage HTML-in-Canvas : réseau d'eau 3D, mur de supervision et banc de mesures. Données simulées.",
 };
 
 /** Le jeton Origin Trial est lu à la requête (variable d'environnement d'exécution). */

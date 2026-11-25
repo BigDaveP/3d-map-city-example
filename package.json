@@ -14,8 +14,6 @@
     "db:seed": "tsx scripts/db-setup.ts seed",
     "db:setup": "tsx scripts/db-setup.ts all",
     "bench": "tsx bench/run-bench.ts",
-    "bench:carte": "tsx bench/run-carte.ts",
-    "proofs:carte": "tsx scripts/carte-proofs.ts",
     "bench:aqueduc": "tsx bench/run-aqueduc.ts",
     "proofs:aqueduc": "tsx scripts/aqueduc-proofs.ts",
     "aqueduc:data": "tsx scripts/aqueduc-data.ts"

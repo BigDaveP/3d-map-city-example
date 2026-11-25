@@ -144,7 +144,7 @@ export default function AqueducApp({ initialMode }: { initialMode?: Mode }) {
     let disposed = false;
     let map: MlMap | undefined;
     const api = detectApi();
-    // sans ?mode : HTML-in-Canvas si l'API est là (comme /carte et /mur) ; la vérification des pixels
+    // sans ?mode : HTML-in-Canvas si l'API est là ; la vérification des pixels
     // (Surfaces) rebascule en classique si elle ne transmet rien
     const wanted: Mode = initialMode ?? (api.present ? "hic" : "classic");
     aqueducStore.setState({

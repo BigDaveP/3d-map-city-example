@@ -14,8 +14,8 @@ test("originTrialMeta : renvoie la méta avec le jeton", () => {
   assert.deepEqual(originTrialMeta(env({ HIC_ORIGIN_TRIAL_TOKEN: "abc" })), { httpEquiv: "origin-trial", content: "abc" });
 });
 
-test("DEMOS : quatre démos dans l'ordre, avec une phrase chacune", () => {
-  assert.deepEqual(DEMOS.map((d) => d.href), ["/", "/mur", "/carte", "/bench"]);
+test("DEMOS : trois démos dans l'ordre, avec une phrase chacune", () => {
+  assert.deepEqual(DEMOS.map((d) => d.href), ["/", "/mur", "/bench"]);
   assert.ok(DEMOS[0].title.includes("Réseau d'eau"));
   for (const d of DEMOS) assert.ok(d.sentence.length > 10);
 });

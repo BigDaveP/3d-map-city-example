@@ -1,7 +1,6 @@
 /** Export vidéo : détection des API d'enregistrement, refus d'un fichier vide (R19), bandeau de crédits. */
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
-import { CARTE_VIDEO_CREDITS } from "../src/lib/carte/catalog";
 import { canRecord, creditFontPx, drawCredits, recordMap, stripHeight, wrapCredits } from "../src/client/aqueduc/video";
 import { CITY, VIDEO_CREDITS } from "../src/lib/aqueduc/city";
 
@@ -144,9 +143,5 @@ describe("bandeau de crédits", () => {
     drawCredits(c as never, ["a", "b"], 800, 600, h, 18);
     assert.deepEqual(rects[0], [0, 600, 800, h]);
     assert.ok(texts.every((t) => t.y >= 600 && t.y + 18 <= 600 + h));
-  });
-  it("/carte crédite son fond de carte et ses données simulées", () => {
-    assert.match(CARTE_VIDEO_CREDITS.join(" "), /OpenFreeMap, OpenMapTiles, OpenStreetMap/);
-    assert.match(CARTE_VIDEO_CREDITS.join(" "), /simulées/);
   });
 });
