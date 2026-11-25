@@ -8,7 +8,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import type { Map as MlMap, Marker, Popup } from "maplibre-gl";
 import { COURIERS, RESTAURANTS } from "@/lib/carte/catalog";
-import type { Metrics } from "../metrics";
+import type { Metrics } from "../hic3d/metrics";
 import { CourierPanel, panelHooks, RestaurantPanel } from "./Panels";
 import { couriers, statusChangedAt, toggleRestaurant, useCarte } from "./store";
 

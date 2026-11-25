@@ -11,7 +11,7 @@
  */
 import { useEffect } from "react";
 import { EXTRA_TAGS_MAX } from "@/lib/aqueduc/city";
-import type { Metrics } from "../metrics";
+import type { Metrics } from "../hic3d/metrics";
 import { aqueducStore, incidentQuery, simNow, type AqState } from "./store";
 import { useAq } from "./useAq";
 

@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { afterEach, describe, it } from "node:test";
 import { CARTE_VIDEO_CREDITS } from "../src/lib/carte/catalog";
-import { canRecord, creditFontPx, drawCredits, recordMap, stripHeight, wrapCredits } from "../src/client/carte/video";
+import { canRecord, creditFontPx, drawCredits, recordMap, stripHeight, wrapCredits } from "../src/client/aqueduc/video";
 import { CITY, VIDEO_CREDITS } from "../src/lib/aqueduc/city";
 
 const g = globalThis as Record<string, unknown>;

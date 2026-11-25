@@ -3,7 +3,7 @@
  * WebGL et lui ajoute un bandeau de crédits (attribution des données, fond de carte, mention
  * « simulation »). Le contrôle d'attribution de MapLibre est du DOM : sans ce bandeau, aucun fichier
  * exporté ne créditerait ses sources. Seul ce qui est dessiné DANS le canvas de la carte est
- * enregistré : en mode HTML-in-Canvas les panneaux y sont, en mode classique (popups DOM) non.
+ * enregistré : en mode HTML-in-Canvas les étiquettes y sont, en mode classique (marqueurs DOM) non.
  */
 import type { Map as MlMap } from "maplibre-gl";
 

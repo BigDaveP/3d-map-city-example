@@ -7,7 +7,7 @@ import { memo, useEffect, useRef, useState } from "react";
 import { KINDS } from "@/lib/sim/types";
 import { CARD_H, CARD_W, MID_SCALE, type Level, type WorldLayout } from "@/lib/world";
 import type { Camera } from "../camera";
-import type { Metrics } from "../metrics";
+import type { Metrics } from "../hic3d/metrics";
 import { statusOf, useData, type DataStore } from "../store";
 import { useStore } from "zustand";
 import { cardLevel, togglePin, uiStore } from "../ui";

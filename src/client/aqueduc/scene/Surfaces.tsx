@@ -12,10 +12,10 @@
 import { useMemo } from "react";
 import type { Map as MlMap } from "maplibre-gl";
 import { CITY } from "@/lib/aqueduc/city";
-import { metersPerPixel, placeGround, placePanel, placeVertical, verticalFlip, type PanelPlacement } from "../../carte/hic/geometry";
-import { TRANSITION_MS } from "../../carte/hic/panelLayer";
+import { metersPerPixel, placeGround, placePanel, placeVertical, verticalFlip, type PanelPlacement } from "../../hic3d/geometry";
+import { TRANSITION_MS } from "../../hic3d/panelLayer";
 import { HicHost, type HicHostProps, type SurfaceSpec } from "../../hic3d/HicHost";
-import type { Metrics } from "../../metrics";
+import type { Metrics } from "../../hic3d/metrics";
 import { lineCenter, segment, type NetIndex } from "../net";
 import { aqueducStore } from "../store";
 import { useAq } from "../useAq";

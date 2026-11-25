@@ -14,7 +14,7 @@ import type { Map as MlMap } from "maplibre-gl";
 import { useStore } from "zustand";
 import { RESTAURANTS } from "@/lib/carte/catalog";
 import { HicHost, type HicHostProps, type SurfaceSpec } from "../hic3d/HicHost";
-import type { Metrics } from "../metrics";
+import type { Metrics } from "../hic3d/metrics";
 import { CourierPanel, PANEL_SIZE, RestaurantPanel } from "./Panels";
 import { carteStore, couriers, statusChangedAt } from "./store";
 

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { modelMatrix, mul, PanelProjection, placeGround, placePanel, placeVertical, verticalFlip } from "../src/client/carte/hic/geometry";
+import { modelMatrix, mul, PanelProjection, placeGround, placePanel, placeVertical, verticalFlip } from "../src/client/hic3d/geometry";
 
 const anchor = { x: 0.3, y: 0.36, z: 0 };
 const unit = 1e-7;

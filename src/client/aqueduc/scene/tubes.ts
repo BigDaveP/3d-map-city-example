@@ -11,7 +11,7 @@
  * Mercator) et la matrice envoyée au shader est projection × translation(origine), multipliée en
  * Float64 sur le CPU. Des coordonnées Mercator absolues en Float32 (~0,3, à ~1 m près) multipliées
  * par la projection dans le shader décaleraient la profondeur de plusieurs mètres (voir `clipFrom`
- * dans `carte/hic/panelLayer.ts`).
+ * dans `hic3d/panelLayer.ts`).
  *
  * Rendu à la demande : `triggerRepaint` seulement quand les instances ou les couleurs changent.
  */
@@ -19,7 +19,7 @@ import type { CustomLayerInterface, Map as MlMap } from "maplibre-gl";
 import { CITY } from "@/lib/aqueduc/city";
 import type { PipeClass } from "@/lib/aqueduc/network";
 import { FLUSHING_2026 } from "@/lib/aqueduc/sim";
-import { mul } from "../../carte/hic/geometry";
+import { mul } from "../../hic3d/geometry";
 import type { NetIndex } from "../net";
 import { BAD_RGB, NO_DATA_RGB, rampColor, setUnderground } from "../pipes";
 import { aqueducStore, type AqState } from "../store";

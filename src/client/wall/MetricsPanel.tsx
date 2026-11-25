@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import type { Metrics, MetricsSnapshot } from "../metrics";
+import type { Metrics, MetricsSnapshot } from "../hic3d/metrics";
 import type { Sources } from "../sources";
 import type { DataStore } from "../store";
 

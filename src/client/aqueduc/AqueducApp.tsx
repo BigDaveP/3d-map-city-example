@@ -7,9 +7,9 @@
 import { useEffect, useRef, useState } from "react";
 import type { CameraOptions, Map as MlMap, MapGeoJSONFeature } from "maplibre-gl";
 import { CITY, SIM_CREDIT } from "@/lib/aqueduc/city";
-import { detectApi } from "../hic/detect";
-import { STYLE_URL, WORKER_URL } from "../mapStyle";
-import { Metrics } from "../metrics";
+import { detectApi } from "../hic3d/detect";
+import { STYLE_URL, WORKER_URL } from "./mapStyle";
+import { Metrics } from "../hic3d/metrics";
 import { ClassicScene } from "./classic/ClassicScene";
 import { indexNetwork, lineCenter, segment, type NetIndex } from "./net";
 import {

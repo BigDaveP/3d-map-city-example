@@ -4,7 +4,7 @@
  * (microtâche) + éventuel handler `paint` du canvas.
  */
 import type { Camera } from "../camera";
-import type { Metrics } from "../metrics";
+import type { Metrics } from "../hic3d/metrics";
 import type { DataStore } from "../store";
 
 export type FrameFn = (now: number) => void;

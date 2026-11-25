@@ -16,7 +16,7 @@ import { DisplayState, WallRenderer } from "../hic/renderer";
 import { RecaptureScheduler } from "../hic/scheduler";
 import { HicSurface, probeGeometryUnit } from "../hic/surface";
 import { AtlasStore, PerCardStore, type TextureStore } from "../hic/textures";
-import type { Metrics } from "../metrics";
+import type { Metrics } from "../hic3d/metrics";
 import type { DataStore } from "../store";
 import { useStore } from "zustand";
 import { cardLevel, togglePin, uiStore } from "../ui";

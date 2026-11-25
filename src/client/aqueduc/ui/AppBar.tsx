@@ -8,7 +8,7 @@
 import { useId, useMemo, useState, type FormEvent } from "react";
 import type { Map as MlMap } from "maplibre-gl";
 import DemoNav from "../../shell/DemoNav";
-import type { Metrics } from "../../metrics";
+import type { Metrics } from "../../hic3d/metrics";
 import { clockDay, clockTime } from "../format";
 import { fold, lineCenter, segment, type NetIndex } from "../net";
 import { startScenario } from "../scenarioController";

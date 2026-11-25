@@ -5,7 +5,7 @@
  *  - vérification des pixels (piège : API présente mais aucun pixel transmis) ;
  *  - géométrie pour le hit testing (updateElementGeometry ou getElementTransform).
  */
-import { detectApi, type ApiSupport } from "./detect";
+import { detectApi, type ApiSupport } from "../hic3d/detect";
 
 type AnyCanvas = HTMLCanvasElement & {
   requestPaint?: () => void;

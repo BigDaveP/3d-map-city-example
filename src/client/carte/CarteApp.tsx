@@ -7,9 +7,9 @@ import { useEffect, useRef, useState } from "react";
 import type { Map as MlMap } from "maplibre-gl";
 import { useStore } from "zustand";
 import { CARTE_VIDEO_CREDITS, CITIES, COURIERS, RESTAURANTS, type CityId } from "@/lib/carte/catalog";
-import { detectApi } from "../hic/detect";
-import { STYLE_URL, WORKER_URL } from "../mapStyle";
-import { Metrics } from "../metrics";
+import { detectApi } from "../hic3d/detect";
+import { STYLE_URL, WORKER_URL } from "../aqueduc/mapStyle";
+import { Metrics } from "../hic3d/metrics";
 import { RobotView } from "../wall/RobotView";
 import { ClassicOverlay } from "./ClassicOverlay";
 import { createDynamicsLayer } from "./dynamics";
@@ -17,8 +17,8 @@ import { HicPanels } from "./HicPanels";
 import { setRefresh } from "./Panels";
 import { applyRestaurants, carteStore, couriers, toggleCourier, toggleRestaurant, type CarteMode, type RestaurantView } from "./store";
 import { CarteToolbar } from "./Toolbar";
-import { CarteMetrics } from "./CarteMetrics";
-import { download, recordMap } from "./video";
+import { MetricsDetail } from "../aqueduc/ui/MetricsDetail";
+import { download, recordMap } from "../aqueduc/video";
 
 /** Enregistre 10 s du canvas et propose le fichier ; le résultat reste accessible au banc. */
 async function exportVideo(map: MlMap) {
@@ -194,7 +194,7 @@ export default function CarteApp({ initialMode, initialCity }: { initialMode?: C
           />
         )}
       </div>
-      {ctx && <CarteMetrics metrics={ctx.metrics} />}
+      {ctx && <MetricsDetail metrics={ctx.metrics} mode={s.mode} rows={[["Panneaux ouverts", String(s.openRestaurants.length + s.openCouriers.length)]]} />}
       {s.robotOpen && <RobotView onClose={() => carteStore.setState({ robotOpen: false })} />}
     </div>
   );

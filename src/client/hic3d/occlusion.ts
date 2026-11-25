@@ -16,7 +16,7 @@
  */
 import { useEffect, type RefObject } from "react";
 import type { Map as MlMap } from "maplibre-gl";
-import type { PanelLayer } from "../carte/hic/panelLayer";
+import type { PanelLayer } from "./panelLayer";
 
 /** distance (px) et âge (ms) au-delà desquels un verdict d'occlusion sous le curseur n'est plus fiable */
 export const VERDICT_PX = 6;

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { Metrics } from "../src/client/metrics";
+import { Metrics } from "../src/client/hic3d/metrics";
 
 const busy = (ms: number) => {
   const t = performance.now();
