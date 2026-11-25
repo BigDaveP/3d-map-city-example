@@ -20,8 +20,11 @@ test("Metrics : mises à jour comptées à part et une seule fois dans le travai
   m.frameEnd(frameWork);
   m.update(3);
   const r = m.endPhase()!;
-  assert.ok(frameWork >= 5 && frameWork < 7 + 2, `travail de frame ${frameWork}`);
+  // compté une fois : le travail de frame est le temps écoulé de la mise à jour (les 2 ms signalées
+  // dedans n'y sont pas ajoutées), sans borne d'horloge haute
   assert.equal(r.updates, 2);
+  assert.ok(frameWork >= 5, `travail de frame ${frameWork}`);
+  assert.ok(Math.abs(frameWork - r.updMax) < 1e-6, `travail de frame ${frameWork}, mise à jour ${r.updMax}`);
   assert.ok(r.updMax >= 5, `updMax ${r.updMax}`);
   assert.ok(r.workMax >= 5);
   assert.ok(r.updMsPerSec > 0);
@@ -41,7 +44,11 @@ test("Metrics : un travail commencé pendant une mise à jour mesurée n'est pas
   // lot ultérieur (minuterie) : compté
   busy(1);
   m.update(4, performance.now());
+  const frameWork = m.pendingWork();
   const r = m.endPhase()!;
+  // deux mises à jour (le message et le lot ultérieur) ; le lot de 2 ms n'est ni dans la série ni
+  // dans le travail de frame, qui vaut la somme des deux
   assert.equal(r.updates, 2);
-  assert.ok(r.updMax >= 3 && r.updMax < 5);
+  assert.ok(r.updP50 >= 3 && r.updMax >= 4, `${r.updP50} / ${r.updMax}`);
+  assert.ok(Math.abs(frameWork - (r.updP50 + r.updMax)) < 1e-6, `travail de frame ${frameWork}`);
 });
