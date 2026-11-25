@@ -41,7 +41,16 @@
   },
   "warmupMs": 4000,
   "tubes": "souterrain=false : tubes non dessinés quel que soit le réglage, représenté par les lignes hic/60 ; souterrain=true mesuré pour maitresses et tout",
-  "latency": "réception SSE du message → image qui affiche la valeur : classique, requestAnimationFrame après le commit du DOM du marqueur ; HTML-in-Canvas, dessin qui suit l'upload de la texture de l'étiquette (HicHost, SurfaceSpec.changedAt) ; hors première capture ; inclut la cadence de 2 s des étiquettes (useThrottled) dans les deux modes",
+  "latency": "réception SSE du message → image qui affiche la valeur : classique, requestAnimationFrame après le commit du DOM du marqueur ; HTML-in-Canvas, dessin qui suit l'upload de la texture de l'étiquette (HicHost, SurfaceSpec.changedAt) ; hors première capture ; inclut la cadence de 2 s des étiquettes (useThrottled) dans les deux modes ; étiquettes à l'écran seulement ; percentiles vides quand aucun échantillon. HTML-in-Canvas compte un échantillon par capture : une lecture remplacée avant sa capture n'est pas comptée (regroupement)",
+  "tagsOnScreen": {
+    "classic/20": 11,
+    "hic/20": 12,
+    "classic/60": 34,
+    "hic/60": 37,
+    "classic/120": 36,
+    "hic/120": 38
+  },
+  "tagsOnScreenNote": "étiquettes dont l'emprise recoupe la carte à la caméra de départ, après la chauffe ; mesurées une fois, dans une passe séparée après la campagne (même caméra, même procédure, une répétition) ; les autres sont montées hors du cadre",
   "work": "workP50/workP95/workMax : JS par image (rAF) ; upd* : JS par mise à jour de données (message du flux de bout en bout, lots d'étiquettes hors message, paint avec captures)",
   "runtimeS": 724,
   "errors": []
