@@ -1,5 +1,5 @@
 {
-  "date": "2026-11-25T01:35:29.351Z",
+  "date": "2026-11-25T01:51:01.992Z",
   "browser": "Chromium 158.0.8127.36",
   "flags": [
     "--enable-blink-features=CanvasDrawElement",
@@ -28,21 +28,21 @@
   "phases": {
     "1-rotation": {
       "planned": "90° en 8000 ms (linéaire)",
-      "meanMs": 8138
+      "meanMs": 8147
     },
     "2-immobile": {
       "planned": "12000 ms, horloge ×60",
-      "meanMs": 12093
+      "meanMs": 12095
     },
     "3-scenario": {
       "planned": "5 étapes + fermeture des vannes, 3000 ms chacune",
-      "meanMs": 18100
+      "meanMs": 18104
     }
   },
   "warmupMs": 4000,
   "tubes": "souterrain=false : tubes non dessinés quel que soit le réglage, représenté par les lignes hic/60 ; souterrain=true mesuré pour maitresses et tout",
   "latency": "réception SSE du message → image qui affiche la valeur : classique, requestAnimationFrame après le commit du DOM du marqueur ; HTML-in-Canvas, dessin qui suit l'upload de la texture de l'étiquette (HicHost, SurfaceSpec.changedAt) ; hors première capture ; inclut la cadence de 2 s des étiquettes (useThrottled) dans les deux modes",
   "work": "workP50/workP95/workMax : JS par image (rAF) ; upd* : JS par mise à jour de données (message du flux de bout en bout, lots d'étiquettes hors message, paint avec captures)",
-  "runtimeS": 723,
+  "runtimeS": 724,
   "errors": []
 }
