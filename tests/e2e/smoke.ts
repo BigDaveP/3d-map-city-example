@@ -1308,18 +1308,24 @@ async function deneigement(b: Browser, mode: "hic" | "classic") {
   const before = await bellText(p);
   check("08:00 : la cloche demande de décider l'interdiction", /décider l'interdiction/.test(before), before.slice(0, 120).replace(/\n/g, " | "));
   const box = (z: string) => p.locator(".dn-zone-opt", { hasText: `Zone ${z}` }).locator("input");
-  // rien de coché : le bouton dit ce qu'il fait (« Aucune interdiction ce soir ») et une ligne l'explique
+  // rien de coché : le bouton dit ce qu'il fait par un verbe, en style secondaire, et une ligne dit qu'il annule l'interdiction
   const emptyBtn = p.locator(".dn-decide-btn");
   const emptyNote = (await p.locator(".dn-caution").innerText().catch(() => "")) || "";
+  const emptyLook = await emptyBtn.evaluate((e) => ({ pri: e.classList.contains("aq-pri"), bg: getComputedStyle(e).backgroundColor }));
   check(
-    "08:00 : aucune zone cochée ; bouton actif « Aucune interdiction ce soir », effet expliqué (aria-describedby)",
-    !(await box("A").isChecked()) && !(await box("B").isChecked()) && !(await box("C").isChecked()) && (await emptyBtn.innerText()) === "Aucune interdiction ce soir" && (await emptyBtn.isEnabled()) && /pas d'interdiction ce soir/.test(emptyNote) && (await emptyBtn.getAttribute("aria-describedby")) === (await p.locator(".dn-caution").getAttribute("id")),
-    `${await emptyBtn.innerText()} · ${emptyNote}`,
+    "08:00 : aucune zone cochée ; bouton actif « Décider : aucune interdiction », style secondaire (pas aq-pri), « annule l'interdiction de ce soir » (aria-describedby)",
+    !(await box("A").isChecked()) && !(await box("B").isChecked()) && !(await box("C").isChecked()) && (await emptyBtn.innerText()) === "Décider : aucune interdiction" && (await emptyBtn.isEnabled()) && !emptyLook.pri && /annule l'interdiction de ce soir/.test(emptyNote) && (await emptyBtn.getAttribute("aria-describedby")) === (await p.locator(".dn-caution").getAttribute("id")),
+    `${await emptyBtn.innerText()} · ${JSON.stringify(emptyLook)} · ${emptyNote}`,
   );
+  if (process.env.SHOT_DN_0800) {
+    await p.waitForTimeout(800);
+    await p.screenshot({ path: process.env.SHOT_DN_0800 });
+    console.log(`capture : ${process.env.SHOT_DN_0800}`);
+  }
   await box("A").check();
   await box("B").check();
   const dirty = await p.locator(".dn-decided").innerText();
-  check("A et B cochées, non enregistrées : « Modifications non enregistrées », bouton « Décider pour ce soir », aucune action encore", dirty.includes("Modifications non enregistrées") && (await p.evaluate(() => (window as any).__territoire.store.getState().actions.length)) === 0, dirty);
+  check("A et B cochées, non enregistrées : « Modifications non enregistrées », bouton principal « Décider pour ce soir », aucune action encore", dirty.includes("Modifications non enregistrées") && (await emptyBtn.innerText()) === "Décider pour ce soir" && (await emptyBtn.evaluate((e) => e.classList.contains("aq-pri"))) && (await p.evaluate(() => (window as any).__territoire.store.getState().actions.length)) === 0, dirty);
   await p.getByRole("button", { name: "Décider pour ce soir" }).click();
   await p.waitForTimeout(300);
   check("A et B programmées, C sans interdiction (__territoire.snow.plans)", (await snowPlans(p)) === "A:programmee B:programmee C:aucune", await snowPlans(p));

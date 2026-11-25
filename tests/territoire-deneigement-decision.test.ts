@@ -8,20 +8,34 @@ const at = (h: string) => atHour(SCENARIO_DAY, h);
 const next = (h: string) => atHour(atHour(SCENARIO_DAY, "12:00") + 24 * 3_600_000, h);
 const ban = (h: string, zones: ("A" | "B" | "C")[], t = at(h)): EnvAction => ({ at: t, kind: "ban", zones });
 
-test("08:00 sans décision : rien de coché ; le bouton dit « Aucune interdiction ce soir » et explique l'effet", () => {
+test("08:00 sans décision : rien de coché ; bouton secondaire « Décider : aucune interdiction », qui dit annuler l'interdiction de ce soir", () => {
   const v = decisionView(at("08:00"), [], null);
   assert.deepEqual(v.checked, []);
   assert.equal(v.dirty, false);
-  assert.equal(v.button, "Aucune interdiction ce soir");
-  assert.match(v.empty ?? "", /pas d'interdiction ce soir/);
+  assert.equal(v.button, "Décider : aucune interdiction");
+  assert.equal(v.primary, false);
+  assert.equal(v.empty, "Aucune zone cochée : décider maintenant annule l'interdiction de ce soir, y compris la décision par défaut de la direction à 10 h 00 ; les feux restent éteints.");
   assert.equal(v.caution, null);
   assert.equal(v.status, "Aucune décision pour ce soir");
-  // une zone cochée : « Décider pour ce soir », choix non enregistré signalé
+  // une zone cochée : bouton principal « Décider pour ce soir », choix non enregistré signalé
   const w = decisionView(at("08:00"), [], { base: v.base, zones: ["A"] });
   assert.deepEqual(w.checked, ["A"]);
   assert.equal(w.dirty, true);
   assert.equal(w.button, "Décider pour ce soir");
+  assert.equal(w.primary, true);
   assert.equal(w.empty, null);
+});
+
+test("tout décocher sur une décision en vigueur : bouton secondaire, la ligne dit qu'il annule l'interdiction de ce soir", () => {
+  const v = decisionView(at("10:30"), [], null);
+  const off = decisionView(at("10:30"), [], { base: v.base, zones: [] });
+  assert.equal(off.dirty, true);
+  assert.equal(off.button, "Décider : aucune interdiction");
+  assert.equal(off.primary, false);
+  assert.match(off.empty ?? "", /annule l'interdiction de ce soir/);
+  // déjà « aucune zone » : la ligne le dit, sans parler d'annuler
+  const none = decisionView(at("10:30"), [ban("09:00", [])], null);
+  assert.equal(none.empty, "Aucune zone cochée : pas d'interdiction ce soir, comme la décision en vigueur.");
 });
 
 test("après 10:00 : les cases suivent la décision par défaut ; un choix commencé avant est oublié, pas affiché à côté", () => {
@@ -73,13 +87,16 @@ test("R11 : la nuit, le bouton change la nuit en cours ; « En vigueur jusqu'à 
   assert.equal(v.button, "Appliquer à la nuit en cours");
   const off = decisionView(next("00:30"), [ban("08:00", ["A", "B"])], { base: v.base, zones: [] });
   assert.equal(off.button, "Lever l'interdiction cette nuit");
-  assert.match(off.empty ?? "", /s'éteignent tout de suite/);
+  assert.equal(off.primary, false);
+  assert.match(off.empty ?? "", /lève l'interdiction de la nuit en cours ; les feux s'éteignent tout de suite/);
 });
 
 test("la nuit, une décision « aucune zone » de la veille est nommée (pas « Aucune décision »)", () => {
   const v = decisionView(next("00:30"), [ban("11:00", [])], null);
   assert.equal(v.status, "Décidée par vous à 11 h 00 : aucune zone");
   assert.deepEqual(v.checked, []);
+  // rien à lever : le bouton ne parle pas de lever une interdiction
+  assert.equal(v.button, "Décider : aucune interdiction");
   // rien en vigueur : pas de « jusqu'à 6 h »
   assert.equal(v.caution, "De nuit, une décision change les feux tout de suite.");
 });

@@ -56,7 +56,7 @@ function Decision({ t }: { t: number }) {
           </label>
         ))}
       </fieldset>
-      <button type="button" className="aq-btn aq-pri dn-decide-btn" aria-describedby={notes.length > 0 ? noteId : undefined} onClick={decide}>
+      <button type="button" className={`aq-btn${v.primary ? " aq-pri" : ""} dn-decide-btn`} data-primary={v.primary || undefined} aria-describedby={notes.length > 0 ? noteId : undefined} onClick={decide}>
         {v.button}
       </button>
       {notes.length > 0 && (
