@@ -21,6 +21,11 @@ function readDismissed(): boolean {
 
 export function NoApiBanner() {
   const api = useAq((s) => s.api);
+  const fallback = useAq((s) => s.fallback);
+  const mode = useAq((s) => s.mode);
+  // API présente mais désactivée pendant l'affichage (vérification, GPU) : même bandeau, autre texte
+  const lost = api !== "absente" && fallback !== "" && mode === "classic";
+  const show = api === "absente" || lost;
   const [dismissed, setDismissed] = useState<boolean | null>(null);
   const [hasVideo, setHasVideo] = useState(false);
   const [how, setHow] = useState(false);
@@ -33,23 +38,24 @@ export function NoApiBanner() {
 
   // la vidéo n'est proposée que si le fichier répond 200
   useEffect(() => {
-    if (api !== "absente" || dismissed !== false) return;
+    if (!show || dismissed !== false) return;
     let gone = false;
     fetch(VIDEO_URL, { method: "HEAD" })
       .then((r) => !gone && setHasVideo(r.status === 200))
       .catch(() => {});
     return () => void (gone = true);
-  }, [api, dismissed]);
+  }, [show, dismissed]);
 
   useEffect(() => {
     if (!playing) return;
     closeBtn.current?.focus();
-    const key = (e: KeyboardEvent) => e.key === "Escape" && (setPlaying(false), opener.current?.focus());
+    const key = (e: KeyboardEvent) =>
+      e.key === "Escape" && (setPlaying(false), opener.current?.focus());
     document.addEventListener("keydown", key);
     return () => document.removeEventListener("keydown", key);
   }, [playing]);
 
-  if (api !== "absente" || dismissed !== false) return null;
+  if (!show || dismissed !== false) return null;
   const dismiss = () => {
     try {
       sessionStorage.setItem(DISMISS_KEY, "1");
@@ -57,31 +63,79 @@ export function NoApiBanner() {
     setDismissed(true);
   };
   return (
-    <section className="aq-noapi" aria-label="Version classique" data-testid="noapi">
-      <p className="aq-noapi-text">Votre navigateur n&apos;active pas HTML-in-Canvas : vous voyez la version classique.</p>
+    <section
+      className="aq-noapi"
+      aria-label="Version classique"
+      data-testid="noapi"
+    >
+      <p
+        className="aq-noapi-text"
+        data-testid={lost ? "noapi-lost" : undefined}
+      >
+        {lost ? (
+          <>
+            HTML-in-Canvas s&apos;est désactivé pendant l&apos;affichage : vous
+            voyez la version classique.{" "}
+            <span className="aq-noapi-why">{fallback}</span>
+          </>
+        ) : (
+          "Votre navigateur n'active pas HTML-in-Canvas : vous voyez la version classique."
+        )}
+      </p>
       <div className="aq-noapi-btns">
         {hasVideo && (
-          <button ref={opener} type="button" className="aq-btn aq-pri" onClick={() => setPlaying(true)}>
+          <button
+            ref={opener}
+            type="button"
+            className="aq-btn aq-pri"
+            onClick={() => setPlaying(true)}
+          >
             Voir la version HTML-in-Canvas en vidéo
           </button>
         )}
-        <button type="button" className="aq-btn" aria-expanded={how} aria-controls="aq-noapi-how" onClick={() => setHow(!how)}>
-          Comment l&apos;activer
-        </button>
-        <button type="button" className="aq-close aq-noapi-x" aria-label="Fermer le bandeau" onClick={dismiss}>
+        {!lost && (
+          <button
+            type="button"
+            className="aq-btn"
+            aria-expanded={how}
+            aria-controls="aq-noapi-how"
+            onClick={() => setHow(!how)}
+          >
+            Comment l&apos;activer
+          </button>
+        )}
+        <button
+          type="button"
+          className="aq-close aq-noapi-x"
+          aria-label="Fermer le bandeau"
+          onClick={dismiss}
+        >
           ×
         </button>
       </div>
-      {how && (
+      {how && !lost && (
         <p id="aq-noapi-how" className="aq-noapi-how">
-          Ouvrez <code>chrome://flags/#canvas-draw-element</code>, activez l&apos;option, puis relancez Chrome (ou utilisez un jeton d&apos;essai Origin Trial).
+          Ouvrez <code>chrome://flags/#canvas-draw-element</code>, activez
+          l&apos;option, puis relancez Chrome (ou utilisez un jeton d&apos;essai
+          Origin Trial).
         </p>
       )}
       {playing && (
-        <div className="aq-noapi-video" role="dialog" aria-modal="true" aria-label="Version HTML-in-Canvas en vidéo" onClick={(e) => e.target === e.currentTarget && setPlaying(false)}>
+        <div
+          className="aq-noapi-video"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Version HTML-in-Canvas en vidéo"
+          onClick={(e) => e.target === e.currentTarget && setPlaying(false)}
+        >
           <div className="aq-noapi-frame">
             <video src={VIDEO_URL} controls autoPlay muted playsInline />
-            <button ref={closeBtn} type="button" className="aq-btn" onClick={() => (setPlaying(false), opener.current?.focus())}>
+            <button
+              ref={closeBtn}
+              type="button"
+              className="aq-btn"
+              onClick={() => (setPlaying(false), opener.current?.focus())}
+            >
               Fermer la vidéo
             </button>
           </div>

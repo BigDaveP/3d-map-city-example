@@ -106,6 +106,7 @@ html[data-aq="app"] .aq-ssr { display: none; }
 /* dans le flux, entre la barre et la carte : ne recouvre ni les commandes ni l'attribution */
 .aq-noapi { position: relative; z-index: 15; flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 4px var(--aq-gap); padding: 5px 44px 5px var(--aq-gap); background: #fdf3e1; border-bottom: 1px solid #ecd9b4; font-size: 12.5px; }
 .aq-noapi-text { margin: 0; flex: 1 1 320px; color: #5c3d00; }
+.aq-noapi-why { color: var(--aq-ink-2); }
 .aq-noapi-btns { display: flex; flex-wrap: wrap; gap: 6px; }
 .aq-noapi .aq-btn { padding: 3px 9px; }
 .aq-noapi-x { top: 50%; right: 8px; margin-top: -15px; }

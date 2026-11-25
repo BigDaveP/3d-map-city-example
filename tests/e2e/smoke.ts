@@ -709,6 +709,28 @@ async function withoutApi() {
   }
 }
 
+/** Repli après vérification (API présente) : la raison est affichée dans une note refermable. */
+async function fallbackNote(b: Browser) {
+  console.log("\n== / repli HTML-in-Canvas après vérification : note visible");
+  const ctx = await b.newContext({ viewport: { width: 1440, height: 860 }, deviceScaleFactor: 1 });
+  const p = await ctx.newPage();
+  const errors = collectErrors(p);
+  await p.goto(`${BASE}/?mode=hic`);
+  await p.waitForFunction(() => (window as any).__aqueduc && (window as any).__hicMap?.layer, null, { timeout: 45_000 });
+  check("API présente : pas de bandeau avant le repli", (await p.locator("[data-testid=noapi]").count()) === 0);
+  // même écriture que `onFallback` de la scène (texture vide, aucun paint…)
+  await p.evaluate(() => (window as any).__aqueduc.store.setState({ mode: "classic", fallback: "Mode classique activé automatiquement : texture vide (test)." }));
+  const note = p.locator("[data-testid=noapi-lost]");
+  await note.waitFor({ timeout: 5_000 }).catch(() => {});
+  const text = (await note.count()) ? await note.innerText() : "";
+  check("note de repli visible : raison et mode classique", /s'est désactivé pendant l'affichage/.test(text) && text.includes("texture vide (test)"), text.slice(0, 140));
+  check("note de repli : pas de « Comment l'activer » (l'API est présente)", (await p.getByRole("button", { name: "Comment l'activer" }).count()) === 0);
+  await p.getByRole("button", { name: "Fermer le bandeau" }).click();
+  check("note refermable", (await p.locator("[data-testid=noapi]").count()) === 0);
+  check("aucune erreur console", errors.length === 0, errors.join(" | "));
+  await ctx.close();
+}
+
 /** /carte en mode HTML-in-Canvas : 5 panneaux capturés, vérifiés par readPixels, sans repli. */
 async function carteHic(b: Browser) {
   console.log("\n== /carte?mode=hic (HTML-in-Canvas)");
@@ -759,6 +781,7 @@ try {
   await scenarioClassic(b);
   await appBar(b);
   await withoutApi();
+  await fallbackNote(b);
   await carteHic(b);
   await otherPages();
 } finally {
