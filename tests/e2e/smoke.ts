@@ -391,8 +391,13 @@ async function classic(b: Browser) {
   const tags = await shownTags(p);
   check("étiquettes DOM : couche Pression, 8 au plus, une valeur chacune", tags.length > 0 && relevant(tags, ["pression", "debit", "reservoir"]), tags.map((t) => t.id).join(" "));
   await p.evaluate(() => (window as any).__aqueduc.store.setState({ layer: "age" }));
-  await p.waitForTimeout(500);
-  const ageTags = await shownTags(p);
+  // les statuts des étiquettes suivent le flux avec un léger retard : lancé après 14 h (heure réelle),
+  // l'heure épinglée de midi remplace un réseau en bris, dont les alertes mettent ~1 s à retomber
+  let ageTags = await shownTags(p);
+  for (let i = 0; i < 12 && !ageTags.every((t) => t.st > 0); i++) {
+    await p.waitForTimeout(250);
+    ageTags = await shownTags(p);
+  }
   check("couche Âge : seulement les capteurs en attention ou en alerte", ageTags.every((t) => t.st > 0), ageTags.map((t) => `${t.id}:${t.st}`).join(" ") || "aucune");
   await p.evaluate(() => (window as any).__aqueduc.store.setState({ layer: "pression" }));
   const sector = await p.locator(".aq-flat .aq-mark-sector", { hasText: "CENTRE-VILLE" }).innerText().catch(() => "");
