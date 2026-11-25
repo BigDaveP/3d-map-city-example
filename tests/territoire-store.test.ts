@@ -156,7 +156,7 @@ test("scénario guidé sur la journée simulée : détection à 14:01, isolation
   detach();
 });
 
-const fc = (issuedAt: string): Forecast => ({ source: "eccc", issuedAt, current: { tempC: -3, condition: "Neige" }, periods: [], hourly: [], warnings: [] });
+const fc = (issuedAt: string): Forecast => ({ source: "eccc", issuedAt, current: { tempC: -3, condition: "Neige", iconCode: 17 }, periods: [], hourly: [], warnings: [], sun: null });
 
 /** `fetch` simulé : réponses données dans l'ordre (statut 500 → `null`), appels comptés. */
 function stubFetch(replies: (Forecast | null | "500")[]) {

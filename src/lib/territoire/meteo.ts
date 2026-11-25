@@ -6,10 +6,13 @@
 export interface Forecast {
   source: "eccc";
   issuedAt: string;
-  current: { tempC: number | null; condition: string };
-  periods: { name: string; summary: string; snowCm: number | null; rainMm: number | null }[];
-  hourly: { t: number; tempC: number | null; condition: string; pop: number | null }[];
+  /** `iconCode` : code d'icône d'ECCC (0 à 48, voir weatherIcon.ts), null s'il n'est pas publié */
+  current: { tempC: number | null; condition: string; iconCode: number | null };
+  periods: { name: string; summary: string; snowCm: number | null; rainMm: number | null; iconCode: number | null }[];
+  hourly: { t: number; tempC: number | null; condition: string; pop: number | null; iconCode: number | null }[];
   warnings: { title: string; type: string; expires: string }[];
+  /** lever et coucher du soleil du jour de la fiche (ms), null s'ils ne sont pas publiés */
+  sun: { rise: number; set: number } | null;
 }
 
 export const SNOW_THRESHOLD_CM = 5;
@@ -43,6 +46,12 @@ const num = (v: unknown): number | null => {
   return null;
 };
 const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
+/** Code d'icône d'ECCC (`{ value: 0, url, format }`) : entier de 0 à 48, sinon null. */
+const icon = (v: unknown): number | null => {
+  const n = isObj(v) ? num(v.value) : null;
+  return n !== null && Number.isInteger(n) && n >= 0 && n <= 48 ? n : null;
+};
+const DAY_MS = 86_400_000;
 
 export function parseCityPage(feature: unknown): Forecast | null {
   if (!isObj(feature) || !isObj(feature.properties)) return null;
@@ -62,6 +71,7 @@ export function parseCityPage(feature: unknown): Forecast | null {
       summary: str(f.textSummary),
       snowCm: isSnow ? (units === "mm" ? amount / 10 : amount) : null,
       rainMm: isRain ? (units === "cm" ? amount * 10 : amount) : null,
+      iconCode: isObj(f.abbreviatedForecast) ? icon(f.abbreviatedForecast.icon) : null,
     };
   });
   if (periods.length === 0) return null;
@@ -70,18 +80,23 @@ export function parseCityPage(feature: unknown): Forecast | null {
   const hourly = hourlyRaw.filter(isObj).flatMap((h) => {
     const t = Date.parse(str(h.timestamp));
     if (!Number.isFinite(t)) return [];
-    return [{ t, tempC: isObj(h.temperature) ? num(h.temperature.value) : null, condition: str(h.condition), pop: isObj(h.lop) ? num(h.lop.value) : null }];
+    return [{ t, tempC: isObj(h.temperature) ? num(h.temperature.value) : null, condition: str(h.condition), pop: isObj(h.lop) ? num(h.lop.value) : null, iconCode: icon(h.iconCode) }];
   });
+
+  const rs = isObj(p.riseSet) ? p.riseSet : {};
+  const rise = Date.parse(str(rs.sunrise));
+  const set = Date.parse(str(rs.sunset));
 
   const warnings = arr(p.warnings).filter(isObj).map((w) => ({ title: str(w.description), type: str(w.type), expires: str(w.expiryTime) }));
 
   return {
     source: "eccc",
     issuedAt: str(p.lastUpdated),
-    current: { tempC: isObj(cur.temperature) ? num(cur.temperature.value) : null, condition: str(cur.condition) },
+    current: { tempC: isObj(cur.temperature) ? num(cur.temperature.value) : null, condition: str(cur.condition), iconCode: icon(cur.iconCode) },
     periods,
     hourly,
     warnings,
+    sun: Number.isFinite(rise) && Number.isFinite(set) && set > rise ? { rise, set } : null,
   };
 }
 
@@ -93,4 +108,14 @@ export function snowTonightCm(f: Forecast): number {
 /** Titre d'un avertissement qui parle de neige ou d'hiver, sinon null. */
 export function snowWarning(f: Forecast): string | null {
   return f.warnings.find((w) => /NEIGE|HIVER/.test(w.title.toUpperCase()))?.title ?? null;
+}
+
+/**
+ * Nuit à l'instant t, d'après le lever et le coucher du soleil de la fiche (reportés de jour en jour :
+ * quelques minutes d'écart sur les 24 h de la prévision horaire). Sans eux : jour.
+ */
+export function isNightAt(f: Pick<Forecast, "sun">, t: number): boolean {
+  if (!f.sun) return false;
+  const since = (((t - f.sun.rise) % DAY_MS) + DAY_MS) % DAY_MS;
+  return since >= f.sun.set - f.sun.rise;
 }

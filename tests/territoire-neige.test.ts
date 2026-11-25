@@ -15,10 +15,11 @@ const zone = (t: number, actions: EnvAction[], z: "A" | "B" | "C") => snowPlan(t
 const forecast = (snowCm: number | null, warnings: Forecast["warnings"] = []): Forecast => ({
   source: "eccc",
   issuedAt: "",
-  current: { tempC: -2, condition: "" },
-  periods: [{ name: "Ce soir", summary: "", snowCm, rainMm: null }],
+  current: { tempC: -2, condition: "", iconCode: null },
+  periods: [{ name: "Ce soir", summary: "", snowCm, rainMm: null, iconCode: null }],
   hourly: [],
   warnings,
+  sun: null,
 });
 
 test("FLEET est réexportée de fleet.ts", () => {
