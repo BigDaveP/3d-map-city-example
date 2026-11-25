@@ -47,12 +47,14 @@ recharger la carte. Le mode se force par `?mode=classic` ou `?mode=hic`.
 Collecte, Zonage et Évaluation forment le lot 2 : ils figurent à l'accueil et dans le sélecteur,
 marqués « À venir » et inactifs (`/carte/collecte` ramène à l'accueil).
 
-**Horloge commune.** Toute la ville suit une horloge simulée, en heure de Trois-Rivières, sur une
-journée scénarisée (le 24 novembre) : prévision de neige à 7 h 30, décision par défaut de la
-direction à 10 h si le visiteur n'a pas décidé, bris de conduite à 14 h, heure conseillée pour
-décider à 15 h (plus tard, la décision reste possible, avec une mise en garde), interdiction en
-vigueur de 23 h à 6 h. La frise de 24 h permet d'aller à n'importe quelle heure ; les alertes et
-les états suivent.
+**Horloge commune.** Toute la ville suit une horloge simulée, en heure de Trois-Rivières. Elle part
+de la date et de l'heure réelles, et chaque jour rejoue la même journée scénarisée : prévision de
+neige à 7 h 30, décision par défaut de la direction à 10 h si le visiteur n'a pas décidé, bris de
+conduite à 14 h, heure conseillée pour décider à 15 h (plus tard, la décision reste possible, avec
+une mise en garde), interdiction en vigueur de 23 h à 6 h. La frise de 24 h permet d'aller à
+n'importe quelle heure ; les alertes et les états suivent. La date fixe du 24 novembre 2026
+(`SCENARIO_DAY`) ne fixe que les tests, le banc et les preuves ; le serveur s'en sert aussi comme
+jour de référence pour les chiffres du rapport du bris, les mêmes chaque jour.
 
 Chaque visiteur a son propre état (décisions, scénario), en mémoire dans son onglet, sans base de
 données : ce qu'un visiteur décide n'apparaît pas chez les autres.
@@ -102,7 +104,7 @@ pas plus (profil Chromium avec cache HTTP).
 vannes et le bris de conduite. Dans le Déneigement : les feux d'interdiction (Trois-Rivières n'en a
 pas à notre connaissance), leurs emplacements, les ressources, l'avancement, la décision par
 défaut de la direction et la neige de la journée scénarisée quand la prévision réelle n'en
-annonce pas. Pour toute la ville : l'horloge et la journée du 24 novembre.
+annonce pas. Pour toute la ville : l'horloge et le déroulé de la journée scénarisée, rejoué chaque jour.
 
 ## Commandes
 
@@ -252,5 +254,6 @@ Détails et mesures dans [RULES.md](RULES.md#pièges-et-écarts-entre-la-documen
   Sokolovsky, licence [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/deed.fr).
 - Icônes de la météo : tracés de [Lucide](https://lucide.dev), licence
   [ISC](https://github.com/lucide-icons/lucide/blob/main/LICENSE) (© Lucide Contributors, et
-  © Cole Bemis pour les parties issues de Feather), selon les codes d'icônes d'ECCC.
+  © Cole Bemis pour les parties issues de Feather, licence MIT), selon les codes d'icônes d'ECCC ;
+  avis de droit d'auteur et de permission complets dans [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 - Polices Inter et JetBrains Mono (paquets Fontsource), licence SIL Open Font License.
