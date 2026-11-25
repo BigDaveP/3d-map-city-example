@@ -20,6 +20,7 @@
  * `SCALE` (défaut 1) multiplie les durées des phases ; les durées réelles sont dans le CSV et la méta.
  * Profil Chromium persistant (cache HTTP) : les tuiles OpenFreeMap ne sont téléchargées qu'une fois.
  * Sorties : bench/results/aqueduc.csv et bench/results/aqueduc-meta.json.
+ * `npm run bench:aqueduc -- --quick` : essai rapide (voir `QUICK`), écrit hors du dépôt.
  */
 import { mkdirSync, writeFileSync } from "node:fs";
 import os from "node:os";
@@ -29,12 +30,18 @@ import { SCENARIO_DAY } from "../src/lib/aqueduc/scenario";
 import { atHour } from "../src/lib/territoire/day";
 
 const BASE = process.env.BASE_URL ?? "http://localhost:3300";
-const OUT = process.env.OUT ?? "bench/results";
-const TAGS = (process.env.TAGS ?? "20,60,120").split(",").map(Number);
+/**
+ * `--quick` : vérifie que le banc tourne (une configuration par mode, 20 étiquettes, phases au quart,
+ * une répétition, sans vue souterraine, environ 1 min). Les sorties vont dans un dossier temporaire :
+ * les résultats publiés de bench/results ne sont jamais réécrits par un essai rapide.
+ */
+const QUICK = process.argv.includes("--quick");
+const OUT = process.env.OUT ?? (QUICK ? path.join(os.tmpdir(), "aqueduc-bench-quick") : "bench/results");
+const TAGS = (process.env.TAGS ?? (QUICK ? "20" : "20,60,120")).split(",").map(Number);
 const MODES = (process.env.MODES ?? "classic,hic").split(",") as Mode[];
-const REPEAT = Number(process.env.REPEAT ?? 2);
-const SCALE = Number(process.env.SCALE ?? 1);
-const UNDERGROUND = process.env.UNDERGROUND !== "0";
+const REPEAT = Number(process.env.REPEAT ?? (QUICK ? 1 : 2));
+const SCALE = Number(process.env.SCALE ?? (QUICK ? 0.25 : 1));
+const UNDERGROUND = process.env.UNDERGROUND ? process.env.UNDERGROUND !== "0" : !QUICK;
 const VIEW = { width: Number(process.env.W ?? 1280), height: Number(process.env.H ?? 800) };
 const ARGS = ["--enable-blink-features=CanvasDrawElement", "--enable-precise-memory-info"];
 const PROFILE = process.env.PROFILE ?? path.join(os.tmpdir(), "aqueduc-bench-profile");
@@ -284,6 +291,7 @@ async function main() {
         camera: CAM,
         repeat: REPEAT,
         scale: SCALE,
+        quick: QUICK,
         phases: {
           "1-rotation": { planned: `90° en ${ROTATION_MS} ms (linéaire)`, meanMs: mean("1-rotation") },
           "2-immobile": { planned: `${IMMOBILE_MS} ms, horloge ×60`, meanMs: mean("2-immobile") },
