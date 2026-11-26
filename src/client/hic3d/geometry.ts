@@ -3,6 +3,8 @@
  * Un panneau est un plan : (u, v) en px CSS de l'élément -> monde = O + u·R + v·D.
  */
 
+import type { Map as MlMap } from "maplibre-gl";
+
 export type Mat4 = Float64Array | number[];
 
 /** Produit de matrices 4×4 en colonnes (convention WebGL / gl-matrix) : a × b. */
@@ -197,3 +199,12 @@ function inv3(m: number[]): number[] {
 
 /** Mètres par pixel écran au centre de la vue (tuiles de 512 px). */
 export const metersPerPixel = (lat: number, zoom: number) => (40075016.686 * Math.cos((lat * Math.PI) / 180)) / (512 * Math.pow(2, zoom));
+
+/** px écran par mètre à un point, mesurés dans la direction de la droite de l'écran (sans raccourci). */
+export function pxPerMeter(map: Pick<MlMap, "project">, at: [number, number], bearing: number): number {
+  const b = (bearing * Math.PI) / 180;
+  const d = 10;
+  const p0 = map.project(at);
+  const p1 = map.project([at[0] + (Math.cos(b) * d) / (111_320 * Math.cos((at[1] * Math.PI) / 180)), at[1] - (Math.sin(b) * d) / 110_540]);
+  return Math.hypot(p1.x - p0.x, p1.y - p0.y) / d;
+}

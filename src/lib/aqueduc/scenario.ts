@@ -2,56 +2,67 @@
 import { CITY } from "./city";
 import { isolate } from "./graph";
 import type { IncidentInput, Model } from "./sim";
+import { atHour, dayStartOf, DAY_TIMES } from "../territoire/day";
 
-/** 24 novembre 2026, 06:00 heure de l'Est (UTC−5). */
-export const SCENARIO_DAY = Date.UTC(2026, 10, 24, 11, 0);
+/** 24 novembre 2026, minuit heure de l'Est (UTC−5) : journée de référence des tests, du banc et des preuves. */
+export const SCENARIO_DAY = Date.UTC(2026, 10, 24, 5, 0);
 
 export type StepId = "detection" | "isolation" | "intervention" | "retablissement" | "rapport";
 
-const MIN = 60_000;
-/** début du bris : 06:57, détecté par P-01 à 06:58 */
-const BREAK_AT = SCENARIO_DAY + 57 * MIN;
+export interface ScenarioStep {
+  id: StepId;
+  at: number;
+  title: string;
+  text: string;
+}
 
-export const SCENARIO_STEPS: { id: StepId; at: number; title: string; text: string }[] = [
+/** Début du bris : 14:00 de la journée locale, détecté par P-01 à 14:01. */
+export const breakAt = (day: number) => atHour(day, DAY_TIMES.breakAt);
+
+const STEP_DEFS: { id: StepId; hhmm: string; title: string; text: string }[] = [
   {
     id: "detection",
-    at: SCENARIO_DAY + 58 * MIN,
-    title: "06:58 · Détection",
+    hhmm: "14:01",
+    title: "14:01 · Détection",
     text: "Le capteur P-01 (simulé) signale une chute brutale de pression sur la conduite maîtresse 13C1949 : 300 mm, fonte grise de 1920, près de la rue des Forges. Le débit entrant du secteur grimpe.",
   },
   {
     id: "isolation",
-    at: SCENARIO_DAY + 80 * MIN,
-    title: "07:20 · Isolation",
+    hhmm: "14:23",
+    title: "14:23 · Isolation",
     text: "L'équipe repère les vannes qui coupent le plus petit tronçon autour du bris. Tant qu'elles restent ouvertes, les adresses voisines sont en basse pression ; les fermer prive d'eau seulement le tronçon isolé.",
   },
   {
     id: "intervention",
-    at: SCENARIO_DAY + 125 * MIN,
-    title: "08:05 · Intervention",
+    hhmm: "15:08",
+    title: "15:08 · Intervention",
     text: "Vannes fermées, excavation et réparation de la conduite. Les adresses du tronçon isolé sont sans eau ; le reste du secteur a retrouvé sa pression normale.",
   },
   {
     id: "retablissement",
-    at: SCENARIO_DAY + 340 * MIN,
-    title: "11:40 · Rétablissement",
+    hhmm: "18:43",
+    title: "18:43 · Rétablissement",
     text: "Remise en eau progressive en dix minutes. La turbidité monte temporairement dans le secteur ; le chlore résiduel est contrôlé, avec avis d'ébullition préventif s'il passe sous 0,2 mg/L.",
   },
   {
     id: "rapport",
-    at: SCENARIO_DAY + 465 * MIN,
-    title: "13:45 · Rapport",
+    hhmm: "20:48",
+    title: "20:48 · Rapport",
     text: "Turbidité revenue sous 0,3 UTN, pression normale partout. Le rapport résume la chronologie, les vannes manœuvrées et les adresses touchées ; la séquence peut être exportée en vidéo.",
   },
 ];
 
-const timeOf = (id: StepId) => SCENARIO_STEPS.find((s) => s.id === id)!.at;
-const ORDER: StepId[] = SCENARIO_STEPS.map((s) => s.id);
+/** Étapes du scénario pour la journée locale `day` (minuit local). */
+export function scenarioSteps(day: number): ScenarioStep[] {
+  return STEP_DEFS.map(({ hhmm, ...s }) => ({ ...s, at: atHour(day, hhmm) }));
+}
 
-/** Étape en cours à l'heure simulée t : la dernière commencée (détection avant 06:58). */
+const ORDER: StepId[] = STEP_DEFS.map((s) => s.id);
+
+/** Étape en cours à l'heure simulée t : la dernière commencée de sa journée (détection avant 14:01). */
 export function stepAtTime(t: number): StepId {
   let id: StepId = ORDER[0];
-  for (const s of SCENARIO_STEPS) if (s.at <= t) id = s.id;
+  for (const s of scenarioSteps(dayStartOf(t))) if (s.at <= t) id = s.id;
   return id;
 }
 
@@ -63,26 +74,40 @@ export interface ScenarioIncidentParams {
 }
 
 /**
- * Incident d'une étape à partir des seules vannes qui isolent le tronçon : utilisable par le client,
- * qui n'a pas le modèle (les vannes lui viennent du serveur). Les vannes ne sont fermées qu'à
- * l'étape « isolation » si le visiteur l'a fait (`valvesClosed`) ; après, l'équipe les a fermées
- * dans tous les cas.
+ * Incident d'une étape de la journée `day` à partir des seules vannes qui isolent le tronçon :
+ * utilisable par le client, qui n'a pas le modèle (les vannes lui viennent du serveur). Les vannes
+ * ne sont fermées qu'à l'étape « isolation » si le visiteur l'a fait (`valvesClosed`) ; après,
+ * l'équipe les a fermées dans tous les cas.
  */
-export function scenarioIncidentParams(step: StepId, valvesClosed: boolean, valves: readonly number[]): ScenarioIncidentParams {
+export function scenarioIncidentParams(step: StepId, valvesClosed: boolean, valves: readonly number[], day: number): ScenarioIncidentParams {
   const k = ORDER.indexOf(step);
   const closed = k > ORDER.indexOf("isolation") || (step === "isolation" && valvesClosed);
   return {
-    startedAt: BREAK_AT,
+    startedAt: breakAt(day),
     closedValves: closed ? [...valves] : [],
-    restoredAt: k >= ORDER.indexOf("retablissement") ? timeOf("retablissement") : null,
+    restoredAt: k >= ORDER.indexOf("retablissement") ? scenarioSteps(day)[ORDER.indexOf("retablissement")].at : null,
   };
+}
+
+/**
+ * Incident de la journée à l'heure t (horloge commune) : null avant le bris de 14:00. Les vannes sont
+ * fermées dès `isolatedAt` (le visiteur) ou à l'étape d'intervention (par défaut), la première des deux.
+ */
+export function dayIncident(t: number, isolatedAt: number | null, valves: readonly number[]): ScenarioIncidentParams | null {
+  const day = dayStartOf(t);
+  const startedAt = breakAt(day);
+  if (t < startedAt) return null;
+  const steps = scenarioSteps(day);
+  const at = (id: StepId) => steps[ORDER.indexOf(id)].at;
+  const closedAt = Math.min(isolatedAt ?? Infinity, at("intervention"));
+  return { startedAt, closedValves: t >= closedAt ? [...valves] : [], restoredAt: at("retablissement") };
 }
 
 /**
  * Incident à appliquer à une étape, pour le modèle (serveur, tests) : le modèle fournit l'index du
  * tronçon et les vannes qui l'isolent.
  */
-export function scenarioIncident(step: StepId, valvesClosed: boolean, m: Model): IncidentInput {
+export function scenarioIncident(step: StepId, valvesClosed: boolean, m: Model, day: number): IncidentInput {
   const segment = m.network.byId.get(CITY.breakSegment)!;
-  return { segment, ...scenarioIncidentParams(step, valvesClosed, isolate(m.network, segment, m.valves).valves) };
+  return { segment, ...scenarioIncidentParams(step, valvesClosed, isolate(m.network, segment, m.valves).valves, day) };
 }

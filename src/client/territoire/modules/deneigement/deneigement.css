@@ -1,0 +1,129 @@
+/*
+ * Déneigement : panneau (météo, décision, ressources, légende), marquages des zones (au sol en
+ * HTML-in-Canvas, étiquettes plates en classique) et fiche. Jetons de territoire/theme.css : états
+ * « programmé » (ambre) et « en vigueur » (orange), comme les couches de la carte (layers.ts).
+ */
+
+/* ---------------------------------------------------------------- panneau */
+@media (min-width: 721px) {
+  .dn-panel { width: 320px; }
+}
+.dn-panel .tr-envpanel-ops { display: grid; gap: 12px; }
+.dn-h { display: flex; align-items: center; gap: 4px; margin: 0 0 8px; font-size: var(--tr-text-sm); font-weight: 600; color: var(--tr-ink); }
+.dn-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.dn-note { margin: 8px 0 0; font-size: var(--tr-text-xs); line-height: 1.4; color: var(--tr-ink-2); }
+.dn-credit { margin: 4px 0 0; font-size: var(--tr-text-xs); line-height: 1.35; color: var(--tr-ink-3); }
+
+/* météo : carte 12 dans un panneau 16 à 16 de marge, rayons imbriqués ramenés au minimum de la commande */
+.dn-weather { padding: 8px 12px; border: 1px solid var(--tr-line); border-radius: var(--r-md); background: var(--tr-surface-2); }
+/* chiffre et source sur une ligne, libellé dessous (la source « Environnement Canada » est longue) */
+.dn-weather-h { display: grid; grid-template-columns: 1fr auto; grid-template-areas: "cm src" "label label"; align-items: center; column-gap: 8px; }
+.dn-weather-h h3 { grid-area: label; margin: 0; font-size: var(--tr-text-xs); font-weight: 500; color: var(--tr-ink-2); }
+.dn-weather-h .dn-src { grid-area: src; }
+.dn-src { flex: none; display: inline-flex; align-items: center; height: 20px; padding: 0 6px; border: 1px solid; border-radius: var(--r-sm); font: 500 var(--tr-text-xs)/1 var(--tr-font); white-space: nowrap; }
+.dn-src[data-src="eccc"] { color: var(--sev-info-text); border-color: var(--tr-line); }
+.dn-src[data-src="simulation"] { color: var(--state-simulated); border-color: var(--state-simulated-line); }
+.dn-weather-cm { grid-area: cm; margin: 0; font-size: var(--tr-text-sm); color: var(--tr-ink-2); white-space: nowrap; }
+.dn-weather-cm .aq-num { font: 500 var(--tr-text-xl) var(--tr-font); font-variant-numeric: tabular-nums; color: var(--tr-ink); }
+.dn-weather-note { margin: 4px 0 0; font-size: var(--tr-text-xs); line-height: 1.4; color: var(--tr-ink-2); }
+.dn-weather-off { display: grid; gap: 8px; justify-items: start; margin-top: 8px; padding: 8px; border: 1px solid var(--sev-attention-line); border-radius: var(--r-sm); background: var(--sev-attention-soft); font-size: var(--tr-text-xs); line-height: 1.4; color: var(--sev-attention-text); }
+.dn-weather-off p { margin: 0; }
+.dn-weather-off b { font-weight: 600; }
+.dn-weather-off .aq-btn { width: auto; min-height: 28px; padding: 0 12px; }
+.dn-weather-warn { margin: 8px 0 0; padding: 4px 8px; border: 1px solid var(--sev-attention-line); border-radius: var(--r-sm); background: var(--sev-attention-soft); font-size: var(--tr-text-xs); font-weight: 500; color: var(--sev-attention-text); }
+
+/* décision en deux gestes : jamais bloquée (R11) */
+.dn-zones { display: flex; gap: 8px; min-width: 0; margin: 0 0 8px; padding: 0; border: 0; }
+.dn-zone-opt { flex: 1; display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 8px; border: 1px solid var(--tr-line); border-radius: var(--r-md); background: var(--tr-surface); font-weight: 500; cursor: pointer; transition: border-color var(--tr-fast) var(--tr-ease), background-color var(--tr-fast) var(--tr-ease); }
+.dn-zone-opt:hover { border-color: var(--tr-line-strong); }
+.dn-zone-opt:has(input:checked) { border-color: var(--state-scheduled); background: var(--sev-attention-soft); }
+.dn-zone-opt:has(input:focus-visible) { outline: 2px solid var(--tr-focus); outline-offset: 1px; }
+.dn-zone-opt input { margin: 0; accent-color: var(--state-active); }
+.dn-caution { margin: 8px 0 0; font-size: var(--tr-text-xs); line-height: 1.4; color: var(--tr-ink-2); }
+.dn-caution[data-timing] { color: var(--sev-attention-text); }
+.dn-decided { margin: 4px 0 0; font-size: var(--tr-text-xs); color: var(--tr-ink-2); }
+.dn-dirty { font-weight: 600; color: var(--sev-attention-text); }
+
+/* ressources */
+.dn-res { padding: 0 16px 4px; }
+.dn-res summary { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 32px; list-style: none; cursor: pointer; }
+.dn-res summary::-webkit-details-marker { display: none; }
+.dn-res summary .dn-h { margin: 0; }
+.dn-res summary .tr-ui-i { color: var(--tr-ink-3); transition: transform var(--tr-fast) var(--tr-ease); }
+.dn-res[open] summary .tr-ui-i { transform: rotate(90deg); }
+.dn-res summary:focus-visible { outline: 2px solid var(--tr-focus); outline-offset: 2px; border-radius: var(--r-sm); }
+.dn-res-sum { display: flex; gap: 8px; font-size: var(--tr-text-xs); color: var(--tr-ink-2); }
+.dn-res-list { display: grid; gap: 2px; max-height: 240px; margin: 4px 0 0; padding: 0; overflow: auto; list-style: none; }
+.dn-res-list li { display: grid; grid-template-columns: 48px 1fr auto; align-items: center; gap: 8px; min-height: 32px; padding: 0 4px; border-radius: var(--r-sm); }
+.dn-res-list li[data-selected] { background: var(--tr-accent-soft); }
+.dn-res-id { padding: 0; border: 0; background: none; font-size: var(--tr-text-xs); font-weight: 500; text-align: left; color: var(--tr-accent); cursor: pointer; }
+.dn-res-id:hover { text-decoration: underline; }
+.dn-res-k { overflow: hidden; font-size: var(--tr-text-xs); white-space: nowrap; text-overflow: ellipsis; color: var(--tr-ink-2); }
+.dn-res select,
+.dn-inspector select { min-height: 28px; padding: 0 4px; border: 1px solid var(--tr-line); border-radius: var(--r-sm); background: var(--tr-surface); font: var(--tr-text-xs) var(--tr-font); color: var(--tr-ink); }
+
+/* légende : zones et feux en deux colonnes, mention de simulation et attribution toujours visibles */
+.dn-legend { display: grid; grid-template-columns: auto auto; column-gap: 16px; padding: 8px 16px 12px; }
+.dn-legend > p { grid-column: 1 / -1; }
+.dn-legend-row { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; font-size: var(--tr-text-xs); color: var(--tr-ink); }
+.dn-legend li { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+.dn-sw { flex: none; width: 14px; height: 10px; border: 1.5px solid; border-radius: 2px; }
+.dn-sw[data-ban="aucune"] { border-color: var(--tr-ink-2); background: color-mix(in srgb, var(--state-off) 12%, transparent); opacity: 0.75; }
+.dn-sw[data-ban="programmee"] { border-color: var(--state-scheduled); background: color-mix(in srgb, var(--state-scheduled) 18%, transparent); }
+.dn-sw[data-ban="en-vigueur"] { border-color: var(--state-active); background: color-mix(in srgb, var(--state-active) 22%, transparent); }
+.dn-dot { flex: none; width: 9px; height: 9px; margin: 0 2.5px; border-radius: 50%; }
+/* mêmes symboles que la couche dn-lights (la carte) : éteint petit et gris foncé, programmé anneau
+   ambre, allumé plus gros, orange cerclé de blanc sur un halo, clignotant sans disparaître (0,4) :
+   un état vivant de la carte, pas une décoration */
+.dn-dot[data-lights="eteint"] { width: 6px; height: 6px; margin: 0 4px; background: var(--tr-ink-2); box-shadow: 0 0 0 1px var(--tr-surface); }
+.dn-dot[data-lights="programme"] { width: 8px; height: 8px; margin: 0 3px; background: var(--tr-surface); box-shadow: inset 0 0 0 1.8px var(--state-scheduled); }
+.dn-dot[data-lights="allume"] { width: 9px; height: 9px; background: var(--state-active); box-shadow: 0 0 0 1.6px var(--tr-surface), 0 0 5px 2px color-mix(in srgb, var(--state-active) 55%, transparent); animation: dn-blink 1s steps(1) infinite; }
+@keyframes dn-blink { 50% { background: color-mix(in srgb, var(--state-active) 40%, var(--tr-surface)); } }
+.dn-sim-note { margin-top: 8px; font-weight: 500; color: var(--state-simulated); }
+
+/* ---------------------------------------------------------------- marquages des zones */
+.dn-mark { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; margin: 0; padding: 0; border: 0; background: none; font-family: var(--tr-font); color: var(--tr-ink); text-align: center; white-space: nowrap; cursor: pointer; }
+.dn-mark-name { font-weight: 800; line-height: 1.05; letter-spacing: 0.01em; }
+.dn-mark-state { font-weight: 700; line-height: 1.2; }
+.dn-mark-fig { font-weight: 600; line-height: 1.2; color: var(--tr-ink-2); }
+.dn-mark-fig .aq-num { font-weight: 700; color: var(--tr-ink); }
+.dn-mark[data-ban="programmee"] .dn-mark-state { color: var(--sev-attention-text); }
+.dn-mark[data-ban="en-vigueur"] .dn-mark-state { color: color-mix(in srgb, var(--state-active) 78%, black); }
+
+/* au sol (HTML-in-Canvas) : plaque claire bordée de la couleur de l'état ; capturée telle quelle */
+.dn-mark[drawable] { box-sizing: border-box; overflow: hidden; padding: 8px 14px; border: 4px solid var(--tr-line-strong); border-radius: 20px; background: rgba(255, 255, 255, 0.86); }
+.dn-mark[drawable][data-ban="programmee"] { border-color: var(--state-scheduled); }
+.dn-mark[drawable][data-ban="en-vigueur"] { border-color: var(--state-active); }
+.dn-mark[drawable][aria-pressed="true"] { border-color: var(--tr-accent); background: rgba(255, 255, 255, 0.95); }
+.dn-mark[drawable]:focus-visible { outline: none; border-color: var(--tr-focus); border-style: double; border-width: 7px; }
+.dn-mark[drawable] .dn-mark-name { font-size: 40px; }
+.dn-mark[drawable] .dn-mark-state { font-size: 21px; }
+.dn-mark[drawable] .dn-mark-fig { font-size: 22px; }
+
+/* étiquette plate (mode classique) */
+.dn-flat .dn-mark { pointer-events: auto; padding: 4px 12px; border: 1.5px solid var(--tr-line-strong); border-radius: var(--r-md); background: var(--tr-veil); box-shadow: var(--shadow-1); }
+.dn-flat .dn-mark[data-ban="programmee"] { border-color: var(--state-scheduled); }
+.dn-flat .dn-mark[data-ban="en-vigueur"] { border-color: var(--state-active); }
+.dn-flat .dn-mark[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--tr-accent); }
+.dn-flat .dn-mark-name { font-size: 15px; }
+.dn-flat .dn-mark-state,
+.dn-flat .dn-mark-fig { font-size: var(--tr-text-xs); }
+
+/* ---------------------------------------------------------------- fiche */
+.dn-status[data-tone="off"] { color: var(--tr-ink-2); }
+.dn-muted { font-weight: 500; color: var(--tr-ink-3); }
+.dn-progress { display: inline-flex; align-items: center; gap: 8px; }
+.dn-bar { display: inline-block; width: 90px; height: 6px; overflow: hidden; border-radius: 3px; background: var(--tr-line); }
+.dn-bar > span { display: block; height: 100%; background: var(--state-progress); }
+.dn-assigned { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.dn-assigned li { display: grid; gap: 4px; }
+.dn-assigned-k { font-size: var(--tr-text-xs); color: var(--tr-ink-2); }
+.dn-assigned-ids { display: flex; flex-wrap: wrap; gap: 4px; }
+.dn-chip { min-height: 24px; padding: 0 8px; border: 1px solid var(--tr-line); border-radius: var(--r-sm); background: var(--tr-surface-2); font-size: var(--tr-text-xs); color: var(--tr-ink); cursor: pointer; transition: border-color var(--tr-fast) var(--tr-ease); }
+.dn-chip:hover { border-color: var(--tr-accent); }
+.dn-link { padding: 0; border: 0; background: none; font: inherit; font-weight: 500; color: var(--tr-accent); cursor: pointer; }
+.dn-link:hover { text-decoration: underline; }
+
+@media (prefers-reduced-motion: reduce) {
+  .dn-dot[data-lights="allume"] { animation: none; }
+}

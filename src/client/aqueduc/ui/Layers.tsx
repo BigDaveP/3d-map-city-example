@@ -1,10 +1,11 @@
 "use client";
-/** Couches, repliables, avec la légende de la couche active. */
-import { useEffect, useId, useState } from "react";
+/** Panneau de l'aqueduc : scénario de bris, couches repliables et légende de la couche active. */
 import { FLUSHING_2026 } from "@/lib/aqueduc/sim";
+import { EnvPanel } from "../../territoire/shell/EnvPanel";
 import { num } from "../format";
 import { FLUSH_COLORS, NO_DATA, PIPE_STOPS } from "../pipes";
 import { TUBE_DEPTH_M, TUBE_EXAGGERATION } from "../scene/tubes";
+import { startScenario } from "../scenarioController";
 import { aqueducStore, type LayerId } from "../store";
 import { useAq } from "../useAq";
 
@@ -85,65 +86,65 @@ function Legend({ layer }: { layer: LayerId }) {
   );
 }
 
+/**
+ * Panneau de l'aqueduc : l'opération (scénario de bris), puis les couches, la vue souterraine et la
+ * légende de la couche active. Pendant le scénario, le récit prend sa place (une chose à la fois).
+ */
 export function Layers() {
   const layer = useAq((s) => s.layer);
   const underground = useAq((s) => s.underground);
   const all = useAq((s) => s.undergroundAll);
   const tubesError = useAq((s) => s.undergroundError);
   const incidents = useAq((s) => (s.incident ? 1 : 0));
-  const [open, setOpen] = useState(true);
-  const bodyId = useId();
-  // le récit du scénario prend la place à gauche (une seule chose à la fois)
   const scenario = useAq((s) => s.scenario.active);
-  // replié par défaut sur un écran étroit
-  useEffect(() => {
-    if (window.matchMedia("(max-width: 720px)").matches) setOpen(false);
-  }, []);
   if (scenario) return null;
   return (
-    <section className="aq-layers aq-panel" aria-label="Couches">
-      <button type="button" className="aq-layers-h" aria-expanded={open} aria-controls={bodyId} onClick={() => setOpen(!open)}>
-        <span>
-          Couches
-          {/* panneau replié : la vue souterraine garde son facteur d'exagération à l'écran */}
-          {underground && !open && !tubesError && <em className="aq-under-x"> · souterrain ×{TUBE_EXAGGERATION}</em>}
-        </span>
-        <span className="aq-caret" aria-hidden="true" />
-      </button>
-      {open && (
-        <div id={bodyId}>
-          <fieldset className="aq-layer-list">
-            <legend className="aq-sr">Couleur des conduites</legend>
-            {LAYERS.map((l) => (
-              <label key={l.id} className="aq-layer" data-on={layer === l.id || undefined}>
-                <input type="radio" name="aq-layer" value={l.id} checked={layer === l.id} onChange={() => aqueducStore.setState({ layer: l.id })} />
-                <span className="aq-key" style={{ background: l.swatch }} />
-                {l.label}
-                {l.id === "incidents" && incidents > 0 && <em className="aq-num">{incidents}</em>}
-              </label>
-            ))}
-          </fieldset>
-          <div className="aq-under">
-            <button type="button" className="aq-btn aq-under-btn" aria-pressed={underground} onClick={() => aqueducStore.setState({ underground: !underground })}>
-              Vue souterraine
-            </button>
-            {underground && !tubesError && (
-              <label className="aq-under-all">
-                <input type="checkbox" checked={all} onChange={(e) => aqueducStore.setState({ undergroundAll: e.target.checked })} />
-                Tout le réseau
-              </label>
-            )}
-            {underground && (
-              <p className="aq-under-note" role="status" data-tone={tubesError ? "bad" : undefined} title={tubesError || undefined}>
-                {tubesError
-                  ? "Vue souterraine indisponible : ce navigateur refuse les tubes 3D (WebGL). Les conduites restent tracées au sol."
-                  : <>Diamètres exagérés ×{TUBE_EXAGGERATION} · axe à {TUBE_DEPTH_M}&nbsp;m, plus bas pour les grosses conduites</>}
-              </p>
-            )}
-          </div>
-          <Legend layer={layer} />
-        </div>
-      )}
-    </section>
+    <EnvPanel
+      env="aqueduc"
+      className="aq-layers"
+      subtitle="Conduites réelles · capteurs et bris simulés"
+      // panneau replié : la vue souterraine garde son facteur d'exagération à l'écran
+      collapsedHint={underground && !tubesError && <em className="aq-under-x"> · souterrain ×{TUBE_EXAGGERATION}</em>}
+      operations={
+        <>
+          <button type="button" className="aq-btn aq-pri aq-launch" onClick={() => startScenario()}>
+            Lancer le scénario de bris
+          </button>
+          <p className="tr-envpanel-help">Bris de 14 h au centre-ville, en 5 étapes (simulation)</p>
+        </>
+      }
+    >
+      <h3 className="aq-h3 tr-h3">Couches</h3>
+      <fieldset className="aq-layer-list">
+        <legend className="aq-sr">Couleur des conduites</legend>
+        {LAYERS.map((l) => (
+          <label key={l.id} className="aq-layer" data-on={layer === l.id || undefined}>
+            <input type="radio" name="aq-layer" value={l.id} checked={layer === l.id} onChange={() => aqueducStore.setState({ layer: l.id })} />
+            <span className="aq-key" style={{ background: l.swatch }} />
+            {l.label}
+            {l.id === "incidents" && incidents > 0 && <em className="aq-num">{incidents}</em>}
+          </label>
+        ))}
+      </fieldset>
+      <div className="aq-under">
+        <button type="button" className="aq-btn aq-under-btn" aria-pressed={underground} onClick={() => aqueducStore.setState({ underground: !underground })}>
+          Vue souterraine
+        </button>
+        {underground && !tubesError && (
+          <label className="aq-under-all">
+            <input type="checkbox" checked={all} onChange={(e) => aqueducStore.setState({ undergroundAll: e.target.checked })} />
+            Tout le réseau
+          </label>
+        )}
+        {underground && (
+          <p className="aq-under-note" role="status" data-tone={tubesError ? "bad" : undefined} title={tubesError || undefined}>
+            {tubesError
+              ? "Vue souterraine indisponible : ce navigateur refuse les tubes 3D (WebGL). Les conduites restent tracées au sol."
+              : <>Diamètres exagérés ×{TUBE_EXAGGERATION} · axe à {TUBE_DEPTH_M}&nbsp;m, plus bas pour les grosses conduites</>}
+          </p>
+        )}
+      </div>
+      <Legend layer={layer} />
+    </EnvPanel>
   );
 }

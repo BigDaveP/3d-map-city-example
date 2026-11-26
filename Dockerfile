@@ -24,7 +24,7 @@ ENV NODE_ENV=production \
 RUN addgroup -S app && adduser -S app -G app
 COPY --from=build --chown=app:app /app/.next/standalone ./
 COPY --from=build --chown=app:app /app/.next/static ./.next/static
-# fichiers statiques (vidéo de la version HTML-in-Canvas, public/aqueduc)
+# fichiers statiques (vignettes de l'accueil et vidéo de la visite, public/territoire)
 COPY --from=build --chown=app:app /app/public ./public
 # résultats du banc (page /bench)
 COPY --from=build --chown=app:app /app/bench/results ./bench/results

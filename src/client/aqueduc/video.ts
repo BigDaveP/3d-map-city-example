@@ -62,12 +62,17 @@ export function drawCredits(c: Ctx2D, lines: readonly string[], w: number, y: nu
   lines.forEach((l, i) => c.fillText(l, Math.round(px * 0.8), Math.round(y + px * 0.55 + i * px * 1.35)));
 }
 
+const aborted = () => new DOMException("enregistrement interrompu", "AbortError");
+
 /**
  * Enregistre `ms` de la carte avec, sous l'image, le bandeau `credits` (une entrée par crédit,
  * coupée au besoin). Le canvas 2D est redessiné à l'événement « render » de MapLibre : le tampon
  * WebGL y est encore lisible (preserveDrawingBuffer: false le vide après composition).
+ * `signal` interrompt l'enregistrement (la vue se démonte, l'environnement change) : la promesse est
+ * rejetée avec une AbortError, sans fichier ni URL d'objet à révoquer.
  */
-export async function recordMap(map: MlMap, credits: readonly string[], ms = 10_000, fps = 30): Promise<Recording> {
+export async function recordMap(map: MlMap, credits: readonly string[], ms = 10_000, fps = 30, signal?: AbortSignal): Promise<Recording> {
+  if (signal?.aborted) throw aborted();
   if (!canRecord()) throw new Error("enregistrement du canvas non pris en charge par ce navigateur");
   const src = map.getCanvas();
   const out = document.createElement("canvas") as HTMLCanvasElement & { captureStream(fps?: number): MediaStream };
@@ -111,7 +116,10 @@ export async function recordMap(map: MlMap, credits: readonly string[], ms = 10_
   try {
     rec.start(500);
     pump();
-    await new Promise((r) => setTimeout(r, ms));
+    await new Promise<void>((r) => {
+      const timer = setTimeout(r, ms);
+      signal?.addEventListener("abort", () => (clearTimeout(timer), r()), { once: true });
+    });
     rec.stop();
     await done;
   } finally {
@@ -119,6 +127,7 @@ export async function recordMap(map: MlMap, credits: readonly string[], ms = 10_
     map.off("render", frame);
     stream.getTracks().forEach((t) => t.stop());
   }
+  if (signal?.aborted) throw aborted();
   if (!chunks.length) throw new Error("enregistrement vide : aucune image reçue");
   const blob = new Blob(chunks, { type: mime || "video/webm" });
   return { url: URL.createObjectURL(blob), size: blob.size, mime: blob.type, ms: performance.now() - t0 };

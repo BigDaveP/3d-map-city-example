@@ -167,7 +167,11 @@ export function HicHost({ ml, map, metrics, surfaces, layerOptions, onFallback, 
       }
       // texture manquante ou contenu changé ; la surface focalisée d'abord
       const focusedKey = focusable((document.activeElement as HTMLElement | null)?.closest?.<HTMLElement>("[data-panel]")?.dataset.panel);
-      const todo = [...layer.panels.values()].filter((p) => p.el && (!p.tex || dirty.has(p.key)));
+      // `isConnected` : une surface déjà retirée du DOM (démontage en cours) n'est pas capturée ; un
+      // upload depuis un élément détaché échouerait et ferait passer la session en mode classique.
+      // Correctif de fond à faire : retirer la couche dans le nettoyage d'un `useLayoutEffect` (phase
+      // de mutation, avec le DOM) plutôt que dans celui d'un effet passif.
+      const todo = [...layer.panels.values()].filter((p) => p.el?.isConnected && (!p.tex || dirty.has(p.key)));
       todo.sort((a, b) => (a.key === focusedKey ? -1 : b.key === focusedKey ? 1 : 0));
       if (!todo.length) return;
       // l'état GL est suivi par MapLibre : on le restaure après nos uploads
@@ -266,6 +270,7 @@ export function HicHost({ ml, map, metrics, surfaces, layerOptions, onFallback, 
       canvas.removeAttribute("content");
       canvas.removeAttribute("layoutsubtree");
       metrics.gpuBytes = 0;
+      if ((w.__hicMap as { layer?: unknown } | undefined)?.layer === layer) delete w.__hicMap;
       setReady(false);
     };
   }, [ml, map, canvas, metrics]);

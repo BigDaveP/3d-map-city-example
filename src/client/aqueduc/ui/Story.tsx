@@ -5,10 +5,11 @@
  * avant l'isolation, sans eau après), précédent / suivant, « Explorer librement » et, au rapport,
  * l'export vidéo de la séquence. Tout y est simulé, et le récit le dit.
  */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Map as MlMap } from "maplibre-gl";
 import { VIDEO_CREDITS } from "@/lib/aqueduc/city";
-import { SCENARIO_STEPS, type StepId } from "@/lib/aqueduc/scenario";
+import { scenarioSteps, type ScenarioStep, type StepId } from "@/lib/aqueduc/scenario";
+import { useSimDay, useTerritoire } from "../../territoire/useTerritoire";
 import { canRecord, download, recordMap } from "../video";
 import { clockTime, num } from "../format";
 import type { NetIndex } from "../net";
@@ -18,7 +19,6 @@ import { useImpactTotals } from "../scene/SectorMark";
 import { useAq } from "../useAq";
 
 export const VIDEO_MS = 10_000;
-const timeOf = (id: StepId) => SCENARIO_STEPS.find((s) => s.id === id)!.at;
 const plural = (n: number, one: string, many: string) => `${num(n)} ${n > 1 ? many : one}`;
 
 function duration(ms: number) {
@@ -28,9 +28,10 @@ function duration(ms: number) {
 }
 
 /** Le chiffre de l'étape (R8b) : calculé depuis le flux, ou depuis le plan du serveur au rapport. */
-function StepFigure({ net, step }: { net: NetIndex; step: StepId }) {
+function StepFigure({ net, step, steps }: { net: NetIndex; step: StepId; steps: ScenarioStep[] }) {
   const closed = useAq((s) => s.scenario.valvesClosed);
-  const mode = useAq((s) => s.mode);
+  const mode = useTerritoire((s) => s.mode);
+  const timeOf = (id: StepId) => steps.find((s) => s.id === id)!.at;
   const live = useImpactTotals(net);
   const plan = net.data.scenario;
   const valves = plan.valves.map((v) => valveLabel(net, v)).join(" et ");
@@ -64,32 +65,46 @@ function StepFigure({ net, step }: { net: NetIndex; step: StepId }) {
 function useVideoExport(map: MlMap) {
   const [state, setState] = useState<{ busy: boolean; msg: string }>({ busy: false, msg: "" });
   const url = useRef("");
+  // enregistrement en cours : interrompu si le récit se démonte (changement d'environnement, fin du scénario)
+  const recording = useRef<AbortController | null>(null);
   const [supported, setSupported] = useState(true);
   // le navigateur est interrogé après le montage (rien à lire côté serveur)
   useEffect(() => setSupported(canRecord()), []);
-  useEffect(() => () => void (url.current && URL.revokeObjectURL(url.current)), []);
+  useEffect(
+    () => () => {
+      recording.current?.abort();
+      if (url.current) URL.revokeObjectURL(url.current);
+      url.current = "";
+    },
+    [],
+  );
   const run = async () => {
     if (!canRecord()) return setState({ busy: false, msg: "Votre navigateur ne sait pas enregistrer la carte." });
     setState({ busy: true, msg: "Enregistrement de la séquence (10 s)…" });
+    const ctl = new AbortController();
+    recording.current = ctl;
     const stop = replayForVideo();
     try {
-      const r = await recordMap(map, VIDEO_CREDITS, VIDEO_MS);
+      const r = await recordMap(map, VIDEO_CREDITS, VIDEO_MS, undefined, ctl.signal);
       if (url.current) URL.revokeObjectURL(url.current);
       url.current = r.url;
       setState({ busy: false, msg: `Vidéo enregistrée : scenario-bris.webm, ${num(r.size / 1e6, 1)} Mo, ${num(r.ms / 1000, 1)} s.` });
       download(r.url, "scenario-bris.webm");
     } catch (e) {
-      setState({ busy: false, msg: `La vidéo n'a pas pu être enregistrée (${(e as Error).message}).` });
+      // interrompu au démontage : plus rien à afficher ni à télécharger
+      if (!ctl.signal.aborted) setState({ busy: false, msg: `La vidéo n'a pas pu être enregistrée (${(e as Error).message}).` });
     } finally {
       stop();
-      goToStep("rapport");
+      if (recording.current === ctl) recording.current = null;
+      // le récit démonté (autre environnement), le scénario est déjà terminé : on n'y revient pas
+      if (!ctl.signal.aborted) goToStep("rapport");
     }
   };
   return { ...state, supported, run };
 }
 
 function ExportVideo({ video }: { video: ReturnType<typeof useVideoExport> }) {
-  const mode = useAq((s) => s.mode);
+  const mode = useTerritoire((s) => s.mode);
   return (
     <div className="aq-story-export">
       <button type="button" className="aq-btn aq-pri" disabled={video.busy || !video.supported} onClick={video.run}>
@@ -112,13 +127,16 @@ export function Story({ map, net }: { map: MlMap; net: NetIndex }) {
   const step = useAq((s) => s.scenario.step);
   const heading = useRef<HTMLHeadingElement>(null);
   const video = useVideoExport(map);
+  // étapes de la journée simulée, où le scénario se joue
+  const day = useSimDay();
+  const steps = useMemo(() => scenarioSteps(day), [day]);
   // le récit apparaît : le focus y va (clavier, lecteur d'écran)
   useEffect(() => {
     if (active) heading.current?.focus();
   }, [active]);
   if (!active) return null;
-  const k = SCENARIO_STEPS.findIndex((s) => s.id === step);
-  const last = k === SCENARIO_STEPS.length - 1;
+  const k = steps.findIndex((s) => s.id === step);
+  const last = k === steps.length - 1;
   return (
     <aside className="aq-story aq-panel" aria-label="Scénario de bris guidé (simulation)" data-testid="story">
       <span className="aq-h3">Scénario simulé · 5 étapes</span>
@@ -126,7 +144,7 @@ export function Story({ map, net }: { map: MlMap; net: NetIndex }) {
         Une conduite de 1920 cède sous la rue des Forges
       </h2>
       <ol className="aq-story-steps">
-        {SCENARIO_STEPS.map((s, i) => {
+        {steps.map((s, i) => {
           const [time, name] = s.title.split(" · ");
           return (
             <li key={s.id} data-state={i < k ? "done" : i === k ? "now" : undefined}>
@@ -141,7 +159,7 @@ export function Story({ map, net }: { map: MlMap; net: NetIndex }) {
               {i === k && (
                 <div className="aq-story-body">
                   <p>{s.text}</p>
-                  <StepFigure net={net} step={s.id} />
+                  <StepFigure net={net} step={s.id} steps={steps} />
                 </div>
               )}
             </li>
@@ -150,7 +168,7 @@ export function Story({ map, net }: { map: MlMap; net: NetIndex }) {
       </ol>
       <div className="aq-btns aq-story-nav">
         <button type="button" className="aq-btn" disabled={k === 0 || video.busy} onClick={() => prevStep()}>
-          ← Précédent
+          Précédent
         </button>
         {last ? (
           <button type="button" className="aq-btn" disabled={video.busy} onClick={() => startScenario()}>
@@ -158,7 +176,7 @@ export function Story({ map, net }: { map: MlMap; net: NetIndex }) {
           </button>
         ) : (
           <button type="button" className="aq-btn aq-pri" disabled={video.busy} onClick={() => nextStep()}>
-            Étape suivante →
+            Étape suivante
           </button>
         )}
         <button type="button" className="aq-btn aq-story-exit" disabled={video.busy} onClick={() => exploreFreely()}>

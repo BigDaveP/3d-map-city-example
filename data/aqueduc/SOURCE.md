@@ -1,5 +1,7 @@
 # Source des données d'aqueduc
 
+Autres données de l'outil (zones de stationnement de nuit réelles, feux d'interdiction simulés) : [data/territoire/SOURCE.md](../territoire/SOURCE.md).
+
 - **Jeu de données** : Conduites d'eau potable, Ville de Trois-Rivières
 - **Page** : https://www.donneesquebec.ca/recherche/dataset/7ad4ea4e-cfc5-417b-9eb8-6e7f379a8f6e
 - **Fichier téléchargé** : https://www.donneesquebec.ca/recherche/dataset/7ad4ea4e-cfc5-417b-9eb8-6e7f379a8f6e/resource/d55f59ee-a9be-4f38-a78e-c13ebe3ca7b3/download/conduites-eau-potable-v3r.json

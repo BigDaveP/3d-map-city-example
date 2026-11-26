@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { createPropertyExpression, latest } from "@maplibre/maplibre-gl-style-spec";
 import { NO_DATA, PIPE_STOPS, pipeColor } from "../src/client/aqueduc/pipes";
-import { aqueducStore, seek, setSpeed, simNow } from "../src/client/aqueduc/store";
+import { seek, setSpeed, simNow, territoireStore } from "../src/client/territoire/store";
 import { dayStart, sectorStatus } from "../src/client/aqueduc/format";
 import { FLUSHING_2026, localHour } from "../src/lib/aqueduc/sim";
 
@@ -55,23 +55,23 @@ test("pipeColor : chaque couche produit une expression valide et suit PIPE_STOPS
 
 test("simNow : à ×60, l'horloge simulée avance de 60 s par seconde réelle", () => {
   const t0 = Date.UTC(2026, 10, 24, 12, 42);
-  aqueducStore.setState({ clock: { t0, speed: 60, startedAt: 1_000_000 } });
+  territoireStore.setState({ clock: { t0, speed: 60, startedAt: 1_000_000 } });
   assert.equal(simNow(1_000_000), t0);
   assert.equal(simNow(1_001_000), t0 + 60_000);
   assert.equal(simNow(1_010_000), t0 + 600_000);
-  aqueducStore.setState({ clock: { t0, speed: 1, startedAt: 1_000_000 } });
+  territoireStore.setState({ clock: { t0, speed: 1, startedAt: 1_000_000 } });
   assert.equal(simNow(1_001_000), t0 + 1000);
 });
 
 test("setSpeed et seek : repartent de l'heure simulée courante, sans saut", () => {
   const t0 = Date.UTC(2026, 10, 24, 12, 0);
-  aqueducStore.setState({ clock: { t0, speed: 1, startedAt: 2_000_000 } });
+  territoireStore.setState({ clock: { t0, speed: 1, startedAt: 2_000_000 } });
   setSpeed(60, 2_010_000);
-  assert.deepEqual(aqueducStore.getState().clock, { t0: t0 + 10_000, speed: 60, startedAt: 2_010_000 });
+  assert.deepEqual(territoireStore.getState().clock, { t0: t0 + 10_000, speed: 60, startedAt: 2_010_000 });
   assert.equal(simNow(2_011_000), t0 + 70_000);
   seek(t0 - 3_600_000, 2_020_000);
   assert.equal(simNow(2_020_000), t0 - 3_600_000);
-  assert.equal(aqueducStore.getState().clock.speed, 60);
+  assert.equal(territoireStore.getState().clock.speed, 60);
 });
 
 test("dayStart : minuit local de la journée simulée", () => {
@@ -114,4 +114,29 @@ test("applyPipeLayers : couches valides selon la spécification de style, condui
   assert.deepEqual(errors.map((e: { message: string }) => e.message), []);
   const ids = layers.map((l) => l.id);
   assert.ok(ids.indexOf("aq-pipes-casing") < ids.indexOf("aq-pipes") && ids.indexOf("aq-pipes") < ids.indexOf("building-3d"));
+});
+
+test("removePipeLayers : retire les couches et les sources de l'aqueduc, sans toucher au fond", async () => {
+  const { applyPipeLayers, removePipeLayers } = await import("../src/client/aqueduc/pipes");
+  const sources = new Map<string, unknown>([["openmaptiles", {}]]);
+  const layers: { id: string }[] = [{ id: "building-3d" }];
+  const map = {
+    getLayer: (id: string) => layers.find((l) => l.id === id),
+    getSource: (id: string) => sources.get(id),
+    addSource: (id: string, s: unknown) => void sources.set(id, s),
+    removeSource: (id: string) => {
+      assert.ok(!layers.some((l) => (l as { source?: string }).source === id), `source ${id} encore utilisée`);
+      sources.delete(id);
+    },
+    addLayer: (l: { id: string }) => void layers.push(l),
+    removeLayer: (id: string) => void layers.splice(layers.findIndex((l) => l.id === id), 1),
+  };
+  const data = { segments: { type: "FeatureCollection", features: [] }, sensors: [], sectors: [], valves: [], attribution: "", demoSegments: [] };
+  applyPipeLayers(map as never, data as never, "pression");
+  assert.ok(layers.length > 1 && sources.size > 1);
+  removePipeLayers(map as never);
+  assert.deepEqual(layers.map((l) => l.id), ["building-3d"]);
+  assert.deepEqual([...sources.keys()], ["openmaptiles"]);
+  // deux fois : sans erreur (démontage après un échec de chargement)
+  removePipeLayers(map as never);
 });

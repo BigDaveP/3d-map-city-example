@@ -102,6 +102,8 @@ async function main() {
     "data/aqueduc/SOURCE.md",
     `# Source des données d'aqueduc
 
+Autres données de l'outil (zones de stationnement de nuit réelles, feux d'interdiction simulés) : [data/territoire/SOURCE.md](../territoire/SOURCE.md).
+
 - **Jeu de données** : Conduites d'eau potable, Ville de Trois-Rivières
 - **Page** : ${PAGE}
 - **Fichier téléchargé** : ${URL_SOURCE}

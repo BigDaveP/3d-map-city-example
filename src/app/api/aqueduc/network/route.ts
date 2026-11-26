@@ -7,7 +7,7 @@
  */
 import { CITY, extraTagId } from "@/lib/aqueduc/city";
 import { isolate, isolationPath } from "@/lib/aqueduc/graph";
-import { SCENARIO_STEPS, scenarioIncident } from "@/lib/aqueduc/scenario";
+import { SCENARIO_DAY, scenarioIncident, scenarioSteps } from "@/lib/aqueduc/scenario";
 import { breakHistory, incidentImpact } from "@/lib/aqueduc/sim";
 import { getDemoSegments, getExtraTagNodes, getModel } from "@/server/aqueduc";
 
@@ -35,15 +35,15 @@ export async function GET() {
   // scénario de bris : vannes qui isolent le tronçon et adresses touchées à l'isolation, vannes ouvertes puis fermées
   const brk = n.byId.get(CITY.breakSegment)!;
   const iso = isolate(n, brk, m.valves);
-  const at = SCENARIO_STEPS.find((s) => s.id === "isolation")!.at;
+  const at = scenarioSteps(SCENARIO_DAY).find((s) => s.id === "isolation")!.at;
   const scenario = {
     segment: CITY.breakSegment,
     valves: iso.valves,
     isolated: iso.isolated,
     path: isolationPath(n, iso),
     impact: {
-      lowPressure: incidentImpact(m, at, scenarioIncident("isolation", false, m)).lowPressureAddresses,
-      withoutWater: incidentImpact(m, at, scenarioIncident("isolation", true, m)).withoutWaterAddresses,
+      lowPressure: incidentImpact(m, at, scenarioIncident("isolation", false, m, SCENARIO_DAY)).lowPressureAddresses,
+      withoutWater: incidentImpact(m, at, scenarioIncident("isolation", true, m, SCENARIO_DAY)).withoutWaterAddresses,
     },
   };
   const body = {

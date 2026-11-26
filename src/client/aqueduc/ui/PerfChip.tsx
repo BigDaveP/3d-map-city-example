@@ -9,6 +9,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import type { Metrics } from "../../hic3d/metrics";
 import { num } from "../format";
+import { useTerritoire } from "../../territoire/useTerritoire";
 import { useAq } from "../useAq";
 import { MetricsDetail } from "./MetricsDetail";
 
@@ -16,7 +17,7 @@ import { MetricsDetail } from "./MetricsDetail";
 export function PerfChip({ metrics, tubes }: { metrics: Metrics | null; tubes: { instances: number } | null }) {
   const [snap, setSnap] = useState({ fps: 0, frame: 0, update: 0, tubes: 0 });
   const [open, setOpen] = useState(false);
-  const mode = useAq((s) => s.mode);
+  const mode = useTerritoire((s) => s.mode);
   const sensors = useAq((s) => s.live.readings.length);
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {

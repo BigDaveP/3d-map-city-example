@@ -4,11 +4,11 @@
  * incident, capteurs) sont ici des étiquettes plates en DOM, des marqueurs MapLibre toujours au
  * premier plan : ni perspective, ni masquage par les bâtiments. Mêmes composants, même contenu.
  */
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
-import { createPortal } from "react-dom";
-import type { Map as MlMap, PositionAnchor } from "maplibre-gl";
+import { useCallback, useMemo } from "react";
+import type { Map as MlMap } from "maplibre-gl";
 import { CITY } from "@/lib/aqueduc/city";
 import type { Metrics } from "../../hic3d/metrics";
+import { Pin } from "../../territoire/scene/Pin";
 import { lineCenter, segment, type NetIndex } from "../net";
 import { IncidentMark } from "../scene/IncidentMark";
 import { SectorMark, useVisibleSectors } from "../scene/SectorMark";
@@ -29,21 +29,6 @@ function awayFrom(at: [number, number], from: [number, number], m: number): [num
   const dy = (at[1] - from[1]) * ky;
   const n = Math.hypot(dx, dy) || 1;
   return [at[0] + (m * dx) / n / kx, at[1] + (m * dy) / n / ky];
-}
-
-/** Marqueur MapLibre dont le contenu est rendu par React (portail). */
-function Pin({ ml, map, at, anchor, className, children }: { ml: ML; map: MlMap; at: [number, number]; anchor: PositionAnchor; className: string; children: ReactNode }) {
-  const [el, setEl] = useState<HTMLDivElement | null>(null);
-  useEffect(() => {
-    const div = document.createElement("div");
-    div.className = className;
-    // un clic sur l'étiquette ne doit pas atteindre la carte (qui désélectionnerait)
-    div.addEventListener("click", (e) => e.stopPropagation());
-    const marker = new ml.Marker({ element: div, anchor }).setLngLat(at).addTo(map);
-    setEl(div);
-    return () => void marker.remove();
-  }, [ml, map, at, anchor, className]);
-  return el ? createPortal(children, el) : null;
 }
 
 export function ClassicScene({ ml, map, net, metrics }: { ml: ML; map: MlMap; net: NetIndex; metrics: Metrics }) {

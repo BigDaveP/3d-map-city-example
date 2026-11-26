@@ -3,7 +3,8 @@
  * par la page serveur, les routes, le client et les tests (aucun import React ni navigateur).
  */
 import type { Material, PipeClass } from "@/lib/aqueduc/network";
-import { localHour, type SectorStat, type SensorKind } from "@/lib/aqueduc/sim";
+import type { SectorStat, SensorKind } from "@/lib/aqueduc/sim";
+import { dayStartOf } from "@/lib/territoire/day";
 
 export const TIME_ZONE = "America/Toronto";
 
@@ -51,12 +52,15 @@ export function sensorValue(kind: SensorKind, v: number): string {
   return `${num(v, 0)} %`;
 }
 
-const hm = new Intl.DateTimeFormat("fr-CA", { timeZone: TIME_ZONE, hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+const hm = new Intl.DateTimeFormat("en-CA", { timeZone: TIME_ZONE, hour: "numeric", minute: "2-digit", hourCycle: "h23" });
 const dayFmt = new Intl.DateTimeFormat("fr-CA", { timeZone: TIME_ZONE, weekday: "short", day: "numeric", month: "short" });
 
-/** « 07:42 » à l'heure de l'Est. */
+/** « 7 h 42 » à l'heure de l'Est : le même format que l'accueil et les alertes. */
 export function clockTime(t: number): string {
-  return hm.format(t).replace(" h ", ":");
+  const parts = hm.formatToParts(t);
+  const h = parts.find((p) => p.type === "hour")?.value ?? "0";
+  const m = parts.find((p) => p.type === "minute")?.value ?? "00";
+  return `${Number(h)} h ${m}`;
 }
 
 /** « mar. 24 nov. » à l'heure de l'Est. */
@@ -65,10 +69,7 @@ export function clockDay(t: number): string {
 }
 
 /** Minuit local (heure de l'Est) de la journée qui contient t, à la minute près. */
-export function dayStart(t: number): number {
-  const d = t - localHour(t) * 3_600_000;
-  return Math.round(d / 60_000) * 60_000;
-}
+export const dayStart = dayStartOf;
 
 /** Statut d'un secteur : 2 si un capteur y est en alerte, 1 si le débit de nuit est élevé (fuite probable), sinon 0. */
 export function sectorStatus(stat: Pick<SectorStat, "nightRatio">, alerts: number): { level: 0 | 1 | 2; label: string } {

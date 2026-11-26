@@ -3,15 +3,17 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { publishNoticeAction } from "@/app/aqueduc-actions";
 import { CITY } from "@/lib/aqueduc/city";
-import { SCENARIO_STEPS } from "@/lib/aqueduc/scenario";
+import { scenarioSteps, stepAtTime } from "@/lib/aqueduc/scenario";
 import { demand, FLUSHING_2026, localHour, nominalFlowLs, THRESHOLDS } from "@/lib/aqueduc/sim";
 import { MATERIAL, num, PIPE_CLASS, sectorStatus, SENSOR_KIND, sensorValue, STATUS_LABEL } from "../format";
 import { segment, type NetIndex } from "../net";
 import { cutLayout, valveLabel } from "../scene/cut";
 import { CutSection } from "../scene/CutSection";
 import { useImpactTotals } from "../scene/SectorMark";
+import { useSimDay, useTerritoire } from "../../territoire/useTerritoire";
 import { addNotice, select, type Notice } from "../store";
 import { useAq } from "../useAq";
+import { UiIcon } from "../../territoire/shell/EnvIcon";
 
 const TONE = ["good", "warn", "bad"] as const;
 const DAY_FMT = new Intl.DateTimeFormat("fr-CA", { day: "numeric", month: "long", timeZone: "UTC" });
@@ -39,7 +41,7 @@ function SegmentCard({ net, id, incident }: { net: NetIndex; id: string; inciden
   return (
     <>
       <header className="aq-insp-h">
-        {incident && <span className="aq-badge">BRIS PROBABLE</span>}
+        {incident && <span className="aq-badge">Bris probable</span>}
         <span className="aq-insp-id aq-num">{p.id}</span>
         <span className="aq-insp-sub">
           {PIPE_CLASS[p.c]} · {net.sectorById.get(p.s)?.name}
@@ -188,10 +190,11 @@ function SectorCard({ net, id }: { net: NetIndex; id: string }) {
  * est ici, en illustration 2D, avec ses vannes à fermer.
  */
 function Isolation({ net }: { net: NetIndex }) {
-  const mode = useAq((s) => s.mode);
+  const mode = useTerritoire((s) => s.mode);
   const atIsolation = useAq((s) => s.scenario.active && s.scenario.step === "isolation");
   const closedNow = useAq((s) => (s.incident?.closedValves.length ?? 0) > 0);
-  const restored = useAq((s) => s.incident?.restoredAt != null);
+  // l'incident porte toujours l'heure de la remise en eau : elle est passée à l'heure de la dernière lecture
+  const restored = useAq((s) => s.incident?.restoredAt != null && s.live.t >= s.incident.restoredAt);
   const cut = useMemo(() => cutLayout(net), [net]);
   const impact = useImpactTotals(net);
   const valves = net.data.scenario.valves.map((v) => valveLabel(net, v)).join(" et ");
@@ -219,8 +222,11 @@ function Isolation({ net }: { net: NetIndex }) {
 }
 
 function IncidentCard({ net, id }: { net: NetIndex; id: string }) {
-  const step = useAq((s) => s.scenario.step);
-  const k = SCENARIO_STEPS.findIndex((x) => x.id === step);
+  // étape du scénario, ou hors scénario celle de l'heure de la dernière lecture du flux
+  const step = useAq((s) => (s.scenario.active ? s.scenario.step : s.live.t ? stepAtTime(s.live.t) : null));
+  const day = useSimDay();
+  const steps = useMemo(() => scenarioSteps(day), [day]);
+  const k = steps.findIndex((x) => x.id === step);
   const idx = net.segById.get(id);
   return (
     <>
@@ -228,7 +234,7 @@ function IncidentCard({ net, id }: { net: NetIndex; id: string }) {
       {id === CITY.breakSegment && <Isolation net={net} />}
       <h3 className="aq-h3">Intervention</h3>
       <ol className="aq-steps">
-        {SCENARIO_STEPS.map((x, i) => (
+        {steps.map((x, i) => (
           <li key={x.id} data-state={i < k ? "done" : i === k ? "now" : undefined}>
             {x.title}
           </li>
@@ -259,7 +265,7 @@ export function Inspector({ net }: { net: NetIndex }) {
   return (
     <aside className="aq-inspector aq-panel" aria-label="Fiche de l'élément sélectionné" data-testid="inspector">
       <button type="button" className="aq-close" aria-label="Fermer la fiche" onClick={() => select(null)}>
-        ×
+        <UiIcon name="close" />
       </button>
       {sel.kind === "segment" && <SegmentCard net={net} id={sel.id} incident={isIncident} />}
       {sel.kind === "sensor" && <SensorCard net={net} id={sel.id} />}

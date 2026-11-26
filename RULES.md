@@ -3,10 +3,11 @@
 Ce document répond à une question : **quand et comment utiliser HTML-in-Canvas dans un
 dashboard ?** Il s'appuie sur un mur de supervision (1 000 cartes, 5 sources de données
 simulées) mesuré par un banc Playwright. Le mur, son banc et ses résultats ont depuis été
-retirés du dépôt, qui ne garde que la démo réseau d'eau (`/`) ; on les retrouve dans
-l'historique git, jusqu'au commit `da1c01b` (`src/client/wall/`, `bench/run-bench.ts`,
-`bench/results/results.csv`). Les règles ci-dessous valent toujours pour HTML-in-Canvas et
-guident la démo réseau d'eau (bilan dans [CAPABILITIES.md](CAPABILITIES.md)).
+retirés du dépôt, qui contient maintenant l'outil de gestion du territoire (`/` et
+`/carte/[env]`) ; on les retrouve dans l'historique git, jusqu'au commit `da1c01b`
+(`src/client/wall/`, `bench/run-bench.ts`, `bench/results/results.csv`). Les règles ci-dessous
+valent toujours pour HTML-in-Canvas et guident les vues 3D de l'outil (bilan dans
+[CAPABILITIES.md](CAPABILITIES.md)).
 
 ## En bref
 

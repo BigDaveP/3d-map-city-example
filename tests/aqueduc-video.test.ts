@@ -101,6 +101,31 @@ describe("recordMap", () => {
     const r = await recordMap(fakeMap, VIDEO_CREDITS, 5);
     assert.equal(r.size, 64);
   });
+  it("s'interrompt sur signal (démontage) : AbortError, écouteur retiré, aucune URL d'objet", async () => {
+    g.MediaRecorder = FakeRecorder;
+    g.HTMLCanvasElement = { prototype: { captureStream() {} } };
+    g.requestAnimationFrame = () => 0;
+    g.cancelAnimationFrame = () => {};
+    fakeDocument();
+    FakeRecorder.chunk = 64;
+    const created: unknown[] = [];
+    const origCreate = URL.createObjectURL;
+    URL.createObjectURL = (b: Blob) => (created.push(b), "blob:x");
+    try {
+      const ctl = new AbortController();
+      const t0 = Date.now();
+      const p = recordMap(fakeMap, VIDEO_CREDITS, 60_000, 30, ctl.signal);
+      ctl.abort();
+      await assert.rejects(p, (e: Error) => e.name === "AbortError");
+      assert.ok(Date.now() - t0 < 1000, "n'attend pas la fin des 60 s");
+      assert.equal(listeners.size, 0);
+      assert.equal(created.length, 0);
+      // déjà interrompu : refusé tout de suite
+      await assert.rejects(recordMap(fakeMap, VIDEO_CREDITS, 5, 30, ctl.signal), (e: Error) => e.name === "AbortError");
+    } finally {
+      URL.createObjectURL = origCreate;
+    }
+  });
   it("incruste les crédits sous l'image de la carte (dimensions paires)", async () => {
     g.MediaRecorder = FakeRecorder;
     g.HTMLCanvasElement = { prototype: { captureStream() {} } };
