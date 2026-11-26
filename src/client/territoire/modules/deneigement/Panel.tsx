@@ -119,7 +119,7 @@ function Resources({ data, plans }: { data: DeneigementData; plans: readonly Zon
           );
         })}
       </ul>
-      <p className="dn-note">Équipes, chenillettes, niveleuses, souffleuses et camions : Simulation. Réaffectation possible jour et nuit</p>
+      <p className="dn-note">Équipes, chenillettes, niveleuses, souffleuses et camions : Simulation. Réaffectation possible jour et nuit.</p>
     </details>
   );
 }

@@ -81,16 +81,32 @@ test("instantané de l'accueil à 14:05 sans action : bris critique en tête, r�
   assert.equal(snap.alerts[0].severity, "critique");
   assert.equal(snap.alerts[0].time, "14 h 01");
   assert.deepEqual(snap.summary, { critique: 1, attention: 0, info: 0 });
-  assert.deepEqual(snap.next.map((e) => [e.time, e.label]), [
-    ["15 h 00", "Heure conseillée pour décider l'interdiction"],
-    ["19 h 00", "Début de la neige"],
-    ["23 h 00", "Interdiction en vigueur"],
+  // la décision par défaut de 10 h est en vigueur : plus d'« Heure conseillée pour décider »
+  assert.deepEqual(snap.next.map((e) => [e.time, e.label, e.tomorrow]), [
+    ["19 h 00", "Début de la neige", false],
+    ["23 h 00", "Interdiction en vigueur", false],
+    ["6 h 00", "Levée automatique de l'interdiction", true],
   ]);
   assert.deepEqual(snap.snow, sim);
   // le soir, les événements de demain sont marqués
   const late = homeSnapshot(at("23:30"), [], null).next;
   assert.ok(late.every((e) => e.tomorrow));
   assert.equal(late[0].time, "6 h 00");
+});
+
+test("« À venir » : l'heure conseillée n'apparaît que tant que rien n'est décidé ; la collecte (lot 2) jamais", () => {
+  // 11:00 : la décision par défaut est en vigueur, l'heure conseillée n'est plus annoncée
+  assert.ok(!homeSnapshot(at("11:00"), [], null).next.some((e) => e.label === "Heure conseillée pour décider l'interdiction"));
+  // 09:00, rien de décidé : elle est annoncée
+  const noDecision = homeSnapshot(at("09:00"), [], null).next.map((e) => e.label);
+  assert.deepEqual(noDecision, ["Décision par défaut de l'interdiction", "Bris de conduite au centre-ville", "Heure conseillée pour décider l'interdiction"]);
+  // décidé par le visiteur à 08:30 : masquée
+  const decided = homeSnapshot(at("09:00"), [{ at: at("08:30"), kind: "ban", zones: ["A"] }], null).next.map((e) => e.label);
+  assert.ok(!decided.includes("Heure conseillée pour décider l'interdiction"), decided.join(" | "));
+  // 06:30 : la collecte de 7 h (lot 2) n'est pas annoncée
+  const morning = homeSnapshot(at("06:30"), [], null).next;
+  assert.ok(morning.every((e) => e.env !== "collecte"));
+  assert.equal(morning[0].label, "Prévision de neige pour ce soir");
 });
 
 test("ouvrir une alerte : le focus n'est posé que pour l'environnement de l'alerte", () => {

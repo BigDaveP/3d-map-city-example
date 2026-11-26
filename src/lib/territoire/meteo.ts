@@ -23,7 +23,7 @@ export const METEO_ATTRIBUTION = "Météo : Environnement et Changement climatiq
 
 /**
  * Périodes comptées pour « cette nuit ». La spec en annonce deux, mais la fiche réelle de référence place
- * la neige à la troisième (aujourd'hui, ce soir, puis le lendemain) : on couvre les 24 h à venir.
+ * la neige à la troisième (aujourd'hui, ce soir, puis le lendemain) : on couvre les 36 h à venir (R1).
  */
 const TONIGHT_PERIODS = 3;
 

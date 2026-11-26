@@ -7,7 +7,7 @@
  * (`EnvModule.timeline`) et peut interpréter le curseur (scénario guidé de l'aqueduc).
  */
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
-import { atHour, dayEndOf, dayEvents, dayStartOf } from "@/lib/territoire/day";
+import { atHour, dayEndOf, dayEvents, dayStartOf, isLot1Event } from "@/lib/territoire/day";
 import { ENVS } from "@/lib/territoire/envs";
 import { clockDay, clockTime } from "../../aqueduc/format";
 import type { TimelineParts, TimelineTrack } from "../modules/types";
@@ -36,7 +36,8 @@ export function Timeline({ track }: { track: TimelineTrack | null }) {
   const day = dayStartOf(now);
   const dayEnd = dayEndOf(now);
   const len = dayEnd - day;
-  const events = useMemo(() => dayEvents(day), [day]);
+  // environnements du lot 1 seulement : la collecte (lot 2) est « À venir »
+  const events = useMemo(() => dayEvents(day, isLot1Event), [day]);
   const plot = useRef<HTMLDivElement>(null);
   // position en cours de glissement ou de réglage au clavier (validée au relâchement)
   const [preview, setPreview] = useState<number | null>(null);
@@ -128,13 +129,13 @@ export function Timeline({ track }: { track: TimelineTrack | null }) {
                 >
                   <button
                     type="button"
-                    aria-label={`${e.label} : ${ENVS[e.env].title}, aller à ${e.time}`}
+                    aria-label={`${e.label.replace(/ \([^)]*\)$/, "")} : ${ENVS[e.env].title}, aller à ${clockTime(e.at)}`}
                     // le clic choisit l'heure du repère, pas celle sous le pointeur
                     onPointerDown={(ev) => ev.stopPropagation()}
                     onClick={() => go(e.at)}
                   />
                   <span className="tr-tip" role="tooltip">
-                    <b className="aq-num">{e.time}</b> {e.label.replace(/ \([^)]*\)$/, "")}
+                    <b className="aq-num">{clockTime(e.at)}</b> {e.label.replace(/ \([^)]*\)$/, "")}
                     <em>{ENVS[e.env].title}</em>
                   </span>
                 </li>

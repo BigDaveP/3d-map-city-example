@@ -1317,6 +1317,12 @@ async function deneigement(b: Browser, mode: "hic" | "classic") {
   const panel = await p.locator(".dn-panel").innerText();
   check("panneau : météo (source, neige des prochaines 36 h, crédit), « Décidée à 10 h 00 par la direction (simulé) »", /Neige · prochaines 36 h/i.test(panel) && /(Environnement Canada|Simulation)/.test(panel) && /Météo : Environnement et Changement climatique Canada/.test(panel) && panel.includes("Décidée à 10 h 00 par la direction (simulé)"), panel.slice(0, 200).replace(/\n/g, " | "));
   check("légende : « Simulation : feux inspirés du système de la Ville de Québec » et attribution des zones", panel.includes("Simulation : feux inspirés du système de la Ville de Québec") && panel.includes("Zones de stationnement de nuit : Ville de Trois-Rivières, Données Québec, CC-BY 4.0"));
+  const ticks = await p.locator(".tr-tl-ticks li").evaluateAll((els) => els.map((e) => ({ env: e.getAttribute("data-env"), label: e.querySelector("button")?.getAttribute("aria-label") ?? "", tip: e.querySelector(".tr-tip b")?.textContent ?? "" })));
+  check(
+    "frise : 7 repères du lot 1 (pas de collecte), heures au format « 15 h 00 » dans les bulles et les noms accessibles",
+    ticks.length === 7 && ticks.every((x) => x.env !== "collecte" && /^\d{1,2} h \d{2}$/.test(x.tip) && /aller à \d{1,2} h \d{2}$/.test(x.label)) && ticks.some((x) => x.tip === "15 h 00"),
+    JSON.stringify(ticks.slice(0, 3)),
+  );
   const leg1030 = await legendVisible(p);
   check("10:30, 1440 × 860 : mention de simulation et attribution des zones visibles sans défiler", leg1030.ok, leg1030.detail);
   if (mode === "hic" && process.env.SHOT_DN_1030) {

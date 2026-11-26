@@ -2,7 +2,7 @@
  * Journée locale de la démo (America/Toronto) : minuit local, heures de la journée scénarisée et
  * actions datées. Module pur, sans React ni navigateur.
  */
-import type { EnvId } from "./envs";
+import { ENVS, type EnvId } from "./envs";
 
 export const TZ = "America/Toronto";
 
@@ -98,15 +98,30 @@ const EVENTS: { time: keyof typeof DAY_TIMES; label: string; env: EnvId }[] = [
   { time: "banStart", label: "Interdiction en vigueur (23 h)", env: "deneigement" },
 ];
 
-/** Événements scénarisés de la journée `day` (minuit local), dans l'ordre : heure « HH:MM », instant, libellé. */
-export function dayEvents(day: number): { at: number; time: string; label: string; env: EnvId }[] {
-  return EVENTS.map((e) => ({ at: atHour(day, DAY_TIMES[e.time]), time: DAY_TIMES[e.time], label: e.label, env: e.env }));
+/** Événement scénarisé : repère (`DAY_TIMES`), instant, heure « HH:MM », libellé, environnement. */
+export interface DayEvent {
+  id: keyof typeof DAY_TIMES;
+  at: number;
+  time: string;
+  label: string;
+  env: EnvId;
 }
 
-/** Les n prochains événements scénarisés après t (aujourd'hui, puis demain). */
-export function nextEvents(t: number, n: number): { at: number; label: string; env: EnvId }[] {
+/**
+ * Événement d'un environnement disponible au lot 1 : ceux du lot 2 (collecte de 7 h) restent dans le
+ * modèle, mais ni l'accueil ni la frise ne les montrent tant que leur environnement est « À venir ».
+ */
+export const isLot1Event = (e: Pick<DayEvent, "env">): boolean => ENVS[e.env].lot === 1;
+
+/** Événements scénarisés de la journée `day` (minuit local), dans l'ordre ; `keep` les filtre (tous par défaut). */
+export function dayEvents(day: number, keep: (e: DayEvent) => boolean = () => true): DayEvent[] {
+  return EVENTS.map((e): DayEvent => ({ id: e.time, at: atHour(day, DAY_TIMES[e.time]), time: DAY_TIMES[e.time], label: e.label, env: e.env })).filter(keep);
+}
+
+/** Les n prochains événements scénarisés après t (aujourd'hui, puis demain), filtrés par `keep`. */
+export function nextEvents(t: number, n: number, keep: (e: DayEvent) => boolean = () => true): DayEvent[] {
   return [dayStartOf(t), dayEndOf(t)]
-    .flatMap((day) => dayEvents(day).map(({ at, label, env }) => ({ at, label, env })))
+    .flatMap((day) => dayEvents(day, keep))
     .filter((e) => e.at > t)
     .sort((a, b) => a.at - b.at)
     .slice(0, n);

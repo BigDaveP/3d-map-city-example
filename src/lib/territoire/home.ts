@@ -7,10 +7,10 @@
  */
 import { dayIncident } from "../aqueduc/scenario";
 import { allAlerts, deneigementAlerts, summarize, type Alert, type Severity } from "./alerts";
-import { actionsUpTo, atHour, dayEndOf, dayStartOf, DAY_TIMES, nextEvents, TZ, type EnvAction } from "./day";
+import { actionsUpTo, atHour, dayEndOf, dayStartOf, DAY_TIMES, isLot1Event, nextEvents, TZ, type DayEvent, type EnvAction } from "./day";
 import { ENVS, type EnvFocus, type EnvId } from "./envs";
 import type { Forecast } from "./meteo";
-import { snowPlan, snowSource, type SnowSource } from "./neige";
+import { banDecision, operationDayOf, snowPlan, snowSource, type SnowSource } from "./neige";
 
 export type Mode = "classic" | "hic";
 /** Ton d'une ligne d'état : les trois gravités, plus « normal » et « inactif » (lot 2). */
@@ -151,6 +151,16 @@ export interface HomeSnapshot {
 const bare = (label: string) => label.replace(/\s*\([^)]*\)$/, "");
 
 /**
+ * Événements à montrer dans « À venir » à l'heure t : ceux du lot 1 seulement, et pas « Heure
+ * conseillée pour décider l'interdiction » quand une décision est déjà en vigueur pour ce soir.
+ */
+export function upcomingFilter(t: number, actions: readonly EnvAction[]): (e: DayEvent) => boolean {
+  const op = operationDayOf(t);
+  const decided = banDecision(t, actions) !== null;
+  return (e) => isLot1Event(e) && !(e.id === "decisionDeadline" && decided && operationDayOf(e.at) === op);
+}
+
+/**
  * État de l'accueil à l'heure t : alertes triées (gravité, puis la plus récente), résumé par gravité,
  * trois prochains événements, une ligne par environnement. `forecast` null : neige simulée.
  */
@@ -163,7 +173,7 @@ export function homeSnapshot(t: number, actions: readonly EnvAction[], forecast:
     stamp: overviewStamp(t),
     alerts: alerts.map((a) => ({ ...a, time: hourLabel(a.at), href: envHref(a.env, mode) })),
     summary: summarize(alerts),
-    next: nextEvents(t, 3).map((e) => ({ ...e, time: hourLabel(e.at), label: bare(e.label), tomorrow: e.at >= tomorrow })),
+    next: nextEvents(t, 3, upcomingFilter(t, actions)).map((e) => ({ at: e.at, env: e.env, time: hourLabel(e.at), label: bare(e.label), tomorrow: e.at >= tomorrow })),
     envs: homeEnvs(t, actions, snow, mode),
     snow,
   };

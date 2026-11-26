@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { actionsUpTo, atHour, dayEndOf, dayEvents, dayStartOf, DAY_TIMES, nextEvents, type EnvAction } from "../src/lib/territoire/day";
+import { actionsUpTo, atHour, dayEndOf, dayEvents, dayStartOf, DAY_TIMES, isLot1Event, nextEvents, type EnvAction } from "../src/lib/territoire/day";
 import { ENVS } from "../src/lib/territoire/envs";
 import { SCENARIO_DAY } from "../src/lib/aqueduc/scenario";
 
@@ -74,4 +74,14 @@ test("dayEvents : les événements scénarisés de la journée, dans l'ordre, à
   // le jour du changement d'heure, 23:00 est à 24 h − 1 h du minuit local (journée de 25 h)
   const fall = dayStartOf(Date.UTC(2026, 10, 1, 12));
   assert.equal(dayEvents(fall).at(-1)!.at - fall, 24 * H);
+});
+
+test("isLot1Event : la collecte (lot 2) reste dans le modèle, mais est écartée de l'accueil et de la frise", () => {
+  const all = dayEvents(SCENARIO_DAY);
+  assert.ok(all.some((e) => e.id === "collecteStart" && e.env === "collecte"));
+  const lot1 = dayEvents(SCENARIO_DAY, isLot1Event);
+  assert.equal(lot1.length, all.length - 1);
+  assert.ok(lot1.every((e) => e.env !== "collecte"));
+  assert.equal(nextEvents(atHour(SCENARIO_DAY, "06:30"), 1)[0].id, "collecteStart");
+  assert.equal(nextEvents(atHour(SCENARIO_DAY, "06:30"), 1, isLot1Event)[0].id, "forecastAt");
 });
