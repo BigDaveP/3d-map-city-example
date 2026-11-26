@@ -358,6 +358,19 @@ async function shownTags(p: Page) {
     });
   });
 }
+/**
+ * Étiquettes une fois stabilisées : juste après `pin`, le choix des étiquettes peut encore refléter
+ * l'heure réelle d'avant (après 14 h, un capteur de qualité en attention), le temps d'un rendu. On
+ * attend au plus 3 s qu'elles soient pertinentes, puis on rend le dernier état (le contrôle échoue).
+ */
+async function settledTags(p: Page, kinds: string[]) {
+  let tags = await shownTags(p);
+  for (let i = 0; i < 12 && !relevant(tags, kinds); i++) {
+    await p.waitForTimeout(250);
+    tags = await shownTags(p);
+  }
+  return tags;
+}
 /** Règle R13 : au plus 8 étiquettes, une valeur chacune, toutes pertinentes pour la couche (ou en attention / alerte). */
 function relevant(tags: Awaited<ReturnType<typeof shownTags>>, kinds: string[]) {
   return tags.length <= 8 && tags.every((t) => t.values === 1 && (kinds.includes(t.kind) || t.st > 0));
@@ -403,7 +416,7 @@ async function classic(b: Browser) {
   });
   check("flux SSE : lectures de tous les capteurs", live.readings === live.sensors, JSON.stringify(live));
   check("flux SSE : pression alignée sur demoSegments", live.pressure === live.demo && live.demo > 0);
-  const tags = await shownTags(p);
+  const tags = await settledTags(p, ["pression", "debit", "reservoir"]);
   check("étiquettes DOM : couche Pression, 8 au plus, une valeur chacune", tags.length > 0 && relevant(tags, ["pression", "debit", "reservoir"]), tags.map((t) => t.id).join(" "));
   await p.evaluate(() => (window as any).__aqueduc.store.setState({ layer: "age" }));
   // les statuts des étiquettes suivent le flux avec un léger retard : lancé après 14 h (heure réelle),
@@ -486,8 +499,8 @@ async function homeHic(b: Browser) {
     const values = [...document.querySelectorAll('.maplibregl-canvas > [data-panel^="sensor:"]')].map((e) => e.querySelectorAll(".aq-num").length);
     return { mode: st.mode, fallback: st.fallback || stats.fallback || "", api: st.api, uploads: stats.uploads, verified: stats.verified, keys, values, markers: document.querySelectorAll(".maplibregl-marker").length };
   });
-  const sensors = r.keys.filter((k) => k.startsWith("sensor:")).length;
-  const tags = await shownTags(p);
+  const tags = await settledTags(p, ["pression", "debit", "reservoir"]);
+  const sensors = (await p.evaluate(() => [...(window as any).__hicMap.layer.panels.keys()])).filter((k: string) => k.startsWith("sensor:")).length;
   check("surfaces montées : marquage du Centre-ville et étiquettes de capteurs", r.keys.includes("sector:centre-ville") && sensors > 0 && sensors === tags.length, `${r.keys.length} surfaces, ${sensors} étiquettes : ${tags.map((t) => t.id).join(" ")}`);
   check("étiquettes pertinentes (couche Pression, 8 au plus)", relevant(tags, ["pression", "debit", "reservoir"]));
   check("toutes les surfaces capturées, vérifiées par readPixels", captured && r.uploads >= r.keys.length && r.verified >= 3, `uploads ${r.uploads}, verified ${r.verified}`);
